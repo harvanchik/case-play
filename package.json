@@ -1,7 +1,7 @@
 {
-  "name": "tailwind-template",
-  "version": "1.7.3",
-  "description": "Jake Harvanchik's TailwindCSS Starter Template Project",
+  "name": "flag-football-case-plays",
+  "version": "1.0.0",
+  "description": "Flag Football Case Plays",
   "author": "Jake Harvanchik",
   "main": "index.js",
   "scripts": {

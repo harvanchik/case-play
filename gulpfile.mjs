@@ -9,7 +9,7 @@ import rev from 'gulp-rev';
 import rewrite from 'gulp-rev-rewrite';
 
 const root = './'; // the path to the root of your project (you probably do not need to change this)
-const destination = `${root}dist`; // the destination folder of the gulped content (change as needed (i.e. 'docs'))
+const destination = `${root}docs`; // the destination folder of the gulped content (change as needed (i.e. 'docs'))
 const manifest = `${root}rev-manifest.json`; // the name of the manifest file (do not edit unless you know what you're doing)
 
 /**
@@ -17,11 +17,7 @@ const manifest = `${root}rev-manifest.json`; // the name of the manifest file (d
  */
 function html() {
   return gulp
-    .src([
-      `${root}**/*.html`,
-      `!${root}node_modules/**/*.html`,
-      `!${destination}/**/*.html`,
-    ])
+    .src([`${root}**/*.html`, `!${root}node_modules/**/*.html`, `!${destination}/**/*.html`])
     .pipe(
       htmlmin({
         collapseWhitespace: true,
@@ -108,6 +104,13 @@ function svg() {
 }
 
 /**
+ * Copy favicon
+ */
+function favicon() {
+  return gulp.src([`${root}favicon.ico`]).pipe(gulp.dest(destination));
+}
+
+/**
  * Remove all content within the destination folder
  */
 function clean() {
@@ -117,7 +120,7 @@ function clean() {
 /**
  * The default task (triggered when running 'gulp' in the console)
  */
-gulp.task('default', gulp.series(clean, styles, javascript, images, svg, html));
+gulp.task('default', gulp.series(clean, styles, javascript, images, svg, favicon, html));
 /**
  * Task to remove the destination folder and its contents.
  */

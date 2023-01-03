@@ -1,6 +1,7 @@
 {
   "cSpell.words": [
     "cssnano",
+    "deflagged",
     "exif",
     "gulpfile",
     "heif",
@@ -8,5 +9,6 @@
     "jsmin",
     "Parens",
     "Wathan"
-  ]
+  ],
+  "liveServer.settings.port": 5501
 }

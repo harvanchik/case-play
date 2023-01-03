@@ -1,3 +1,21 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+spoiler {
+  @apply flex cursor-default flex-col space-y-3 bg-stone-900 p-4 text-stone-900 drop-shadow-md transition-colors duration-[2.5s] ease-in hover:text-white;
+}
+mark {
+  @apply bg-stone-900 font-bold text-stone-900 transition-colors duration-[2.5s] ease-in group-hover:bg-yellow-400;
+}
+
+p > mark {
+  @apply bg-yellow-400 font-bold transition-none;
+}
+
+.preload * {
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -ms-transition: none !important;
+  -o-transition: none !important;
+}
