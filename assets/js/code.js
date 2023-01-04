@@ -67,6 +67,21 @@ function highlight(target) {
     elements[i].innerHTML = text;
   }
 }
+function getCasePlays(directory = '../../case') {
+  // Make an HTTP request to the directory URL
+  const request = new XMLHttpRequest();
+  request.open('GET', directory, false);
+  request.send(null);
+
+  // Get the list of files from the response
+  const fileList = request.responseText;
+
+  // Extract the file names from the list
+  const fileNames = fileList.match(/href="([^"]*\.html)/g);
+
+  // Return the file names
+  return fileNames.map(name => name.substring(6).replace('.html', '').replace('/case/', ''));
+}
 
 // update page title
 document.title = `Case Play ${code()}`;
