@@ -3,10 +3,10 @@
 @tailwind utilities;
 
 spoiler {
-  @apply flex cursor-default select-none flex-col space-y-3 bg-stone-900 p-4 text-stone-900 shadow-lg transition-colors duration-[2s] ease-in hover:select-text hover:text-white;
+  @apply flex cursor-default select-none flex-col space-y-3 bg-stone-900 p-4 text-stone-900 shadow-lg transition-colors duration-[1.5s] ease-in selection:bg-stone-100 selection:text-stone-900 hover:select-text hover:text-white;
 }
 mark {
-  @apply bg-stone-900 font-bold text-stone-900 transition-colors duration-[2.5s] ease-in group-hover:bg-yellow-400;
+  @apply bg-stone-900 font-bold text-stone-900 transition-colors duration-[1.5s] ease-in group-hover:bg-yellow-400;
 }
 
 p > mark {
