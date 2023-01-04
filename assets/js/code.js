@@ -68,8 +68,12 @@ function highlight(target) {
   }
 }
 async function getCasePlays() {
+  const dir = window.location.href.includes('localhost')
+    ? '/case/'
+    : `${window.location.origin}/flag-football-case-plays/case/`;
+  console.log(dir);
   // use the fetch API to get the list of files from the directory
-  const response = await fetch(`${window.location.origin}/case/`);
+  const response = await fetch(dir);
   // get the response text as a string
   const fileList = await response.text();
   // extract the file names from the response
