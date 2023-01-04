@@ -30,10 +30,10 @@ function highlight(target) {
     // if there is no text, continue
     if (!text) continue;
     // create a regular expression to match text in parentheses
-    var letterRegex = /\(([a-z])\)/gi;
+    var letterRegex = /\(([a-z])\)/g;
     // replace the matched text with a mark element
-    text = text.replace(letterRegex, function (match, p1) {
-      // Create a mark element
+    text = text.replace(letterRegex, (match, p1) => {
+      // create a mark element
       var mark = document.createElement('mark');
       // set the color attribute based on the letter
       if (p1 === 'a') {
@@ -48,19 +48,31 @@ function highlight(target) {
         mark.setAttribute('red', true);
       }
       // set the text of the mark element
-      mark.textContent = `(${p1})`;
+      mark.textContent = match;
       // return the mark element as a string
       return mark.outerHTML;
     });
-    // create a regular expression to match 'Team ' and any capital letter
-    var teamRegex = /Team ([A-Z])/gi;
-    // replace the matched text with a mark element
-    text = text.replace(teamRegex, function (match, p1) {
-      // Create a mark element
+    // create a regular expression to match teams
+    var teamRegex = /Team ([ABKR])|[ABKR]-[0-9]{1,2}/g;
+    // replace the matched text with a team element
+    text = text.replace(teamRegex, (match, p1) => {
+      // create a team element
       var team = document.createElement('team');
-      // set the text of the mark element
-      team.textContent = `Team ${p1}`;
-      // return the mark element as a string
+      // set the text of the team element
+      team.textContent = match;
+      // return the team element as a string
+      return team.outerHTML;
+    });
+    // create a regular expression to match team yard lines
+    // var yardRegex = /[ABKR]'s\s[1-4]?[0-9]/g;
+    var yardRegex = /([ABKR]'s\s[1-4]?[0-9])|([ABKR]'s)/g;
+    // replace the matched text with a bold element
+    text = text.replace(yardRegex, (match, p1) => {
+      // create a bold element
+      var team = document.createElement('bold');
+      // set the text of the bold element
+      team.textContent = match;
+      // return the bold element as a string
       return team.outerHTML;
     });
     // update the element with the modified text
