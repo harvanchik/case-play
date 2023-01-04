@@ -71,6 +71,11 @@ function getCasePlays(directory = '../../case') {
   // Make an HTTP request to the directory URL
   const request = new XMLHttpRequest();
   request.open('GET', directory, false);
+  // set headers
+  request.setRequestHeader('Access-Control-Allow-Origin', '*');
+  request.setRequestHeader('Access-Control-Allow-Methods', 'GET');
+  // enable trail controlled feature 'interest-cohort'
+  request.setRequestHeader('Feature-Policy', 'interest-cohort=()');
   request.send(null);
 
   // Get the list of files from the response
