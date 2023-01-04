@@ -67,24 +67,14 @@ function highlight(target) {
     elements[i].innerHTML = text;
   }
 }
-function getCasePlays(directory = '../../case') {
-  // Make an HTTP request to the directory URL
-  const request = new XMLHttpRequest();
-  request.open('GET', directory, false);
-  // set headers
-  request.setRequestHeader('Access-Control-Allow-Origin', '*');
-  request.setRequestHeader('Access-Control-Allow-Methods', 'GET');
-  // enable trail controlled feature 'interest-cohort'
-  request.setRequestHeader('Feature-Policy', 'interest-cohort=()');
-  request.send(null);
-
-  // Get the list of files from the response
-  const fileList = request.responseText;
-
-  // Extract the file names from the list
+async function getCasePlays() {
+  // use the fetch API to get the list of files from the directory
+  const response = await fetch('../../case');
+  // get the response text as a string
+  const fileList = await response.text();
+  // extract the file names from the response
   const fileNames = fileList.match(/href="([^"]*\.html)/g);
-
-  // Return the file names
+  // return the file names
   return fileNames.map(name => name.substring(6).replace('.html', '').replace('/case/', ''));
 }
 
