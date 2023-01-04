@@ -20,10 +20,10 @@
         </h2>
       </div>
       <grid class="mx-auto grid grid-cols-3 text-lg text-stone-900 lg:grid-cols-5 lg:px-3">
-        <template x-for="casePlay in await getCasePlays()">
+        <template x-for="casePlay in getCasePlays()">
           <div
             class="mx-3 mb-3 flex w-20 cursor-pointer border-2 border-stone-900 bg-white shadow-lg transition duration-150 ease-out hover:scale-105 hover:bg-stone-200 active:bg-stone-300"
-            @click="window.location.href = `/case/${casePlay}.html`">
+            @click="window.location.href = getCasePlayURL(casePlay)">
             <span class="mx-auto" x-text="casePlay"></span>
           </div>
         </template>

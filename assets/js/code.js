@@ -67,7 +67,7 @@ function highlight(target) {
     elements[i].innerHTML = text;
   }
 }
-async function getCasePlays() {
+function getCasePlays() {
   return ['a5b', 'a5c', 'b7a', 'c3f', 'g4a', 'h6a', 's3g', 'w0a', 'y7i', 'z9a'];
   // const dir = window.location.origin.includes('localhost')
   //   ? '/case/'
@@ -82,6 +82,12 @@ async function getCasePlays() {
   // const fileNames = fileList.match(/href="([^"]*\.html)/g);
   // // return the file names
   // return fileNames.map(name => name.substring(6).replace('.html', '').replace('/case/', ''));
+}
+
+function getCasePlayURL(casePlay) {
+  return window.location.origin.includes('localhost')
+    ? `/case/${casePlay}.html`
+    : `${window.location.href.replace('index.html', '')}case/${casePlay}.html`;
 }
 
 // update page title
