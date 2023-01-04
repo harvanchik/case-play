@@ -9,8 +9,8 @@ function link() {
   return `https://jake.harvanchik.me/case/?p=${code()}`;
 }
 function copied() {
-  // get button element
-  const button = document.querySelector('button');
+  // get button element with id "share
+  const button = document.querySelector('#share');
   // if button already has green background, return
   if (button.classList.contains('!bg-green-500')) return;
   // make button have green background
