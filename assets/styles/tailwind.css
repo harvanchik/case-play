@@ -6,13 +6,36 @@ spoiler {
   @apply flex cursor-default select-none flex-col space-y-3 bg-stone-900 p-4 text-stone-900 shadow-lg transition-colors duration-[1.5s] ease-in selection:bg-stone-100 selection:text-stone-900 hover:select-text hover:text-white;
 }
 mark {
-  @apply bg-stone-900 font-bold text-stone-900 transition-colors duration-[1.5s] ease-in group-hover:bg-yellow-400;
+  @apply bg-current font-bold text-stone-900 transition-colors duration-[1.5s] ease-in group-hover:bg-lime-300;
 }
-
+mark[blue] {
+  @apply group-hover:bg-sky-300;
+}
+mark[orange] {
+  @apply group-hover:bg-orange-300;
+}
+mark[indigo] {
+  @apply group-hover:bg-indigo-300;
+}
+mark[red] {
+  @apply group-hover:bg-red-300;
+}
 p > mark {
-  @apply bg-yellow-400 font-bold transition-none;
+  @apply bg-lime-300 font-bold transition-none;
 }
-
+p > mark[blue] {
+  @apply bg-sky-300;
+}
+p > mark[orange] {
+  @apply bg-orange-300;
+}
+p > mark[indigo] {
+  @apply bg-indigo-300;
+}
+p > mark[red] {
+  @apply bg-red-300;
+}
+/* to prevent color transition on page load */
 .preload * {
   -webkit-transition: none !important;
   -moz-transition: none !important;
