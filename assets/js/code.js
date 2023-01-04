@@ -68,20 +68,20 @@ function highlight(target) {
   }
 }
 async function getCasePlays() {
-  const dir = window.location.origin.includes('localhost')
-    ? '/case/'
-    : `${window.location.href.replace('index.html', '')}case/`;
-  console.log(dir);
-  // TODO: fix this so it works on github pages
+  return ['a5b', 'a5c', 'b7a', 'c3f', 'g4a', 'h6a', 's3g', 'w0a', 'y7i', 'z9a'];
+  // const dir = window.location.origin.includes('localhost')
+  //   ? '/case/'
+  //   : `${window.location.href.replace('index.html', '')}case/`;
+  // // TODO: fix this so it works on github pages
 
-  // use the fetch API to get the list of files from the directory
-  const response = await fetch(dir);
-  // get the response text as a string
-  const fileList = await response.text();
-  // extract the file names from the response
-  const fileNames = fileList.match(/href="([^"]*\.html)/g);
-  // return the file names
-  return fileNames.map(name => name.substring(6).replace('.html', '').replace('/case/', ''));
+  // // use the fetch API to get the list of files from the directory
+  // const response = await fetch(dir);
+  // // get the response text as a string
+  // const fileList = await response.text();
+  // // extract the file names from the response
+  // const fileNames = fileList.match(/href="([^"]*\.html)/g);
+  // // return the file names
+  // return fileNames.map(name => name.substring(6).replace('.html', '').replace('/case/', ''));
 }
 
 // update page title
