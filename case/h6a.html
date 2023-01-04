@@ -15,6 +15,13 @@
   </head>
 
   <body class="preload bg-stone-100" x-init="document.body.classList.remove('preload');" x-data="{ share: link() }">
+    <!-- START: Home Button -->
+    <button
+      class="absolute left-4 top-4 hidden bg-stone-800 px-3 py-1 font-semibold text-white shadow-lg transition duration-150 ease-out hover:scale-105 hover:bg-stone-900 active:bg-black lg:flex"
+      @click="window.location.href='/index.html'">
+      home
+    </button>
+    <!-- END: Home Button -->
     <section class="flex w-full flex-col space-y-6 py-10 lg:pt-40">
       <div class="flex flex-col space-y-2">
         <h1

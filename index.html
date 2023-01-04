@@ -23,7 +23,7 @@
         <template x-for="casePlay in casePlays">
           <div
             class="mx-3 mb-3 flex w-20 cursor-pointer border-2 border-stone-900 bg-white shadow-lg transition duration-150 ease-out hover:scale-105 hover:bg-stone-200 active:bg-stone-300"
-            @click="window.location = `https://jake.harvanchik.me/case/?p=${casePlay}`">
+            @click="window.location.href = `/case/${casePlay}.html`">
             <span class="mx-auto" x-text="casePlay"></span>
           </div>
         </template>
