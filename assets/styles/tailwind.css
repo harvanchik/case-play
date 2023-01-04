@@ -35,6 +35,9 @@ p > mark[indigo] {
 p > mark[red] {
   @apply bg-red-300;
 }
+team {
+  @apply underline;
+}
 /* to prevent color transition on page load */
 .preload * {
   -webkit-transition: none !important;

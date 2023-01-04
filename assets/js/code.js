@@ -30,9 +30,9 @@ function highlight(target) {
     // if there is no text, continue
     if (!text) continue;
     // create a regular expression to match text in parentheses
-    var regex = /\(([a-z])\)/gi;
+    var letterRegex = /\(([a-z])\)/gi;
     // replace the matched text with a mark element
-    text = text.replace(regex, function (match, p1) {
+    text = text.replace(letterRegex, function (match, p1) {
       // Create a mark element
       var mark = document.createElement('mark');
       // set the color attribute based on the letter
@@ -44,13 +44,24 @@ function highlight(target) {
         mark.setAttribute('orange', true);
       } else if (p1 === 'd') {
         mark.setAttribute('indigo', true);
-      } else if (p1 === 'de') {
+      } else if (p1 === 'e') {
         mark.setAttribute('red', true);
       }
       // set the text of the mark element
       mark.textContent = `(${p1})`;
       // return the mark element as a string
       return mark.outerHTML;
+    });
+    // create a regular expression to match 'Team ' and any capital letter
+    var teamRegex = /Team ([A-Z])/gi;
+    // replace the matched text with a mark element
+    text = text.replace(teamRegex, function (match, p1) {
+      // Create a mark element
+      var team = document.createElement('team');
+      // set the text of the mark element
+      team.textContent = `Team ${p1}`;
+      // return the mark element as a string
+      return team.outerHTML;
     });
     // update the element with the modified text
     elements[i].innerHTML = text;

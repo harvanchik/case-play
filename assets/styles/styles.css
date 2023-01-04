@@ -908,10 +908,6 @@ select {
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
 }
 
-.cursor-text {
-  cursor: text;
-}
-
 .select-none {
   -webkit-user-select: none;
      -moz-user-select: none;
@@ -1058,11 +1054,6 @@ select {
 .bg-gray-200 {
   --tw-bg-opacity: 1;
   background-color: rgb(229 231 235 / var(--tw-bg-opacity));
-}
-
-.\!bg-green-600 {
-  --tw-bg-opacity: 1 !important;
-  background-color: rgb(22 163 74 / var(--tw-bg-opacity)) !important;
 }
 
 .\!bg-green-500 {
@@ -1391,6 +1382,10 @@ p > mark[red] {
   background-color: rgb(252 165 165 / var(--tw-bg-opacity));
 }
 
+team {
+  text-decoration-line: underline;
+}
+
 /* to prevent color transition on page load */
 
 .preload * {
@@ -1488,11 +1483,6 @@ p > mark[red] {
 
 .focus\:ring-offset-2:focus {
   --tw-ring-offset-width: 2px;
-}
-
-.active\:bg-green-600:active {
-  --tw-bg-opacity: 1;
-  background-color: rgb(22 163 74 / var(--tw-bg-opacity));
 }
 
 .active\:bg-green-500:active {
