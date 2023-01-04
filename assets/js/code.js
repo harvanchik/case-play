@@ -68,10 +68,9 @@ function highlight(target) {
   }
 }
 async function getCasePlays() {
-  const dir = window.location.href.includes('localhost')
+  const dir = window.location.origin.includes('localhost')
     ? '/case/'
-    : `${window.location.origin}/flag-football-case-plays/case/`;
-  console.log(window.location.href);
+    : `${window.location.href.replace('index.html', '')}/case/`;
   console.log(dir);
   // TODO: fix this so it works on github pages
 
