@@ -6,7 +6,7 @@ function code() {
 }
 function link() {
   // get url
-  return `https://jake.harvanchik.me/case/?p=${code()}.html`;
+  return `https://jake.harvanchik.me/case/?p=${code()}`;
 }
 function copied() {
   // get button element
