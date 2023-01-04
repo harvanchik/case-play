@@ -12,7 +12,7 @@ mark[blue] {
   @apply group-hover:bg-sky-300;
 }
 mark[orange] {
-  @apply group-hover:bg-orange-300;
+  @apply group-hover:bg-orange-400;
 }
 mark[indigo] {
   @apply group-hover:bg-indigo-300;
@@ -27,7 +27,7 @@ p > mark[blue] {
   @apply bg-sky-300;
 }
 p > mark[orange] {
-  @apply bg-orange-300;
+  @apply bg-orange-400;
 }
 p > mark[indigo] {
   @apply bg-indigo-300;
