@@ -42,6 +42,10 @@ function highlight(target) {
         mark.setAttribute('blue', true);
       } else if (p1 === 'c') {
         mark.setAttribute('orange', true);
+      } else if (p1 === 'd') {
+        mark.setAttribute('indigo', true);
+      } else if (p1 === 'de') {
+        mark.setAttribute('red', true);
       }
       // set the text of the mark element
       mark.textContent = `(${p1})`;
