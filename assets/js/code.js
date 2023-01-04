@@ -71,7 +71,10 @@ async function getCasePlays() {
   const dir = window.location.href.includes('localhost')
     ? '/case/'
     : `${window.location.origin}/flag-football-case-plays/case/`;
+  console.log(window.location.href);
   console.log(dir);
+  // TODO: fix this so it works on github pages
+
   // use the fetch API to get the list of files from the directory
   const response = await fetch(dir);
   // get the response text as a string
