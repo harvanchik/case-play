@@ -6,9 +6,11 @@ const config = {
 	// Consult https://kit.svelte.dev/docs/integrations#preprocessors
 	// for more information about preprocessors
 	preprocess: vitePreprocess(),
-
 	kit: {
-		adapter: adapter()
+		adapter: adapter(),
+		alias: {
+			$db: './src/db'
+		}
 	}
 };
 
