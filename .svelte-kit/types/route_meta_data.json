@@ -1,0 +1,8 @@
+{
+	"/": [
+		"src/routes/+page.server.ts"
+	],
+	"/c/[casePlayId]": [
+		"src/routes/c/[casePlayId]/+page.server.ts"
+	]
+}

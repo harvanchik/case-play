@@ -3,7 +3,7 @@
 	import type { PageData } from './$types';
 	import casePlays from '../../+page.svelte';
 
-	const casePlayId: string = $page.params.slug;
+	const casePlayId: string = $page.params.casePlayId;
 
 	// $: ({ casePlay } = casePlays[0]);
 	console.log(casePlays);
