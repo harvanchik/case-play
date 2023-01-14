@@ -1,11 +1,10 @@
-import { casePlays } from '$db/case-play';
+import { casePlaysCol } from '$db/case-play';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params }) => {
-	// get case play from db
-	const data = await casePlays.findOne({ id: params.casePlayId });
+	// get case play from case plays collection
+	const data = await casePlaysCol.findOne({ id: params.casePlayId });
 	console.log(data);
-	return {
-		casePlay: JSON.parse(JSON.stringify(data))
-	};
+	// return case play as json
+	return { casePlay: JSON.parse(JSON.stringify(data)) };
 };

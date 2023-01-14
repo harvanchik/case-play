@@ -1,12 +1,15 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import type { PageData } from './$types';
-	import casePlays from '../../+page.svelte';
 
 	const casePlayId: string = $page.params.casePlayId;
 
+	export let data: PageData;
+
+	$: ({ casePlay } = data); // deconstruct data into casePlay
+
 	// $: ({ casePlay } = casePlays[0]);
-	console.log(casePlays);
+	console.log(casePlay);
 </script>
 
 <main class="bg-stone-100 min-h-screen overflow-hidden">
@@ -20,7 +23,7 @@
 	<section class="mt-1 flex w-full flex-col space-y-6 py-10 lg:pt-40">
 		<div class="flex flex-col space-y-2">
 			<h1 class="mx-auto w-max border-b-4 border-stone-900 px-5 pb-3 text-5xl">
-				Case Play {casePlayId}
+				{casePlay.name}
 			</h1>
 			<h2 class="mx-auto w-max text-sm text-stone-700">
 				created by <a href="https://jake.harvanchik.me" target="_blank" rel="noreferrer" class="underline"
@@ -29,19 +32,10 @@
 		</div>
 		<div class="mx-auto flex flex-col space-y-5 px-3 text-lg text-stone-900 lg:w-2/5 lg:px-0">
 			<p class="border-2 border-stone-900 bg-white p-4 shadow-lg">
-				<!-- {casePlays.play} -->
+				{casePlay.play}
 			</p>
 			<spoiler class="group">
-				<span>
-					In (a), if Team B accepts the illegal contact penalty, then it is Team A's ball at A's 21 and a
-					replay fourth down. This is a double foul and the Referee should announce that both penalties
-					offset. If Team B declines the penalty and Team A accepts the flag guarding penalty, then it's Team
-					B's ball at B's 10.
-				</span>
-				<span>
-					In (b), if Team B declines the illegal contact penalty, it is Team B's ball at B's 25. If Team B
-					accepts the penalty, then it is Team A's ball at A's 11 and replay fourth down, double stakes.
-				</span>
+				{casePlay.answer}
 			</spoiler>
 			<div class="space-between flex flex-row items-center">
 				<div class="flex select-none flex-row items-center space-x-2 pl-2 text-sm">
