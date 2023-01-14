@@ -1,15 +1,9 @@
 <script lang="ts">
-	import { page } from '$app/stores';
 	import type { PageData } from './$types';
-
-	const casePlayId: string = $page.params.casePlayId;
 
 	export let data: PageData;
 
 	$: ({ casePlay } = data); // deconstruct data into casePlay
-
-	// $: ({ casePlay } = casePlays[0]);
-	console.log(casePlay);
 </script>
 
 <main class="bg-stone-100 min-h-screen overflow-hidden">
