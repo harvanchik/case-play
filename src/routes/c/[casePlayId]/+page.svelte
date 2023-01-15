@@ -9,22 +9,23 @@
 	$: answer = format(casePlay.answer); // formatted case play answer
 
 	/**
-	 * Format the case play text.
-	 * @param text The case play text.
-	 * @returns The formatted case play text.
+	 * Format text into a case play text.
+	 * This method automatically colors, underlines, and bolds portions of the text using regex.
+	 * @param text The text to format.
+	 * @returns The formatted text.
 	 */
-	function format(text: string) {
+	function format(text: string): string {
 		// create a regular expression to match newlines
 		const NEWLINE_REGEX = /\n/g;
-		// replace the matched text with a br element
+		// replace newline with br element
 		text = text.replace(NEWLINE_REGEX, '<br>');
-		// create a regular expression to match text in parentheses
+		// create a regular expression to match letters in parentheses
 		const LETTER_REGEX = /\(([a-z])\)/g;
 		// replace the matched text with a mark element
 		text = text.replace(LETTER_REGEX, (match, p1) => {
 			// create a mark element
 			let mark = '<mark ';
-			// set the color of the mark element based on the letter
+			// set the color of the mark element
 			if (p1 === 'a') mark = `${mark}green>`;
 			else if (p1 === 'b') mark = `${mark}blue>`;
 			else if (p1 === 'c') mark = `${mark}orange>`;
@@ -35,7 +36,7 @@
 			// return the mark element as a string
 			return `${mark}${match}</mark>`;
 		});
-		// create a regular expression to match teams
+		// create a regular expression to match teams/players
 		const TEAM_REGEX = /Team ([ABKR])|[ABKR]-[0-9]{1,2}/g;
 		// replace the matched text with a u element
 		text = text.replace(TEAM_REGEX, match => {
@@ -55,6 +56,7 @@
 		text = text.replace(/declines|decline/gi, '<span class="decline">$&</span>');
 		// if text matched 'offset', make the text yellow
 		text = text.replace(/offset/gi, '<span class="offset">$&</span>');
+		// return the formatted text
 		return text;
 	}
 </script>
