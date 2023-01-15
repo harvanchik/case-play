@@ -41,10 +41,8 @@ team {
 bold {
 	@apply font-semibold;
 }
-/* to prevent color transition on page load */
-.preload * {
-	-webkit-transition: none !important;
-	-moz-transition: none !important;
-	-ms-transition: none !important;
-	-o-transition: none !important;
+br {
+	display: block;
+	margin-top: 0.75rem;
+	content: ' ';
 }

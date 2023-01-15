@@ -4,6 +4,66 @@
 	export let data: PageData;
 
 	$: ({ casePlay } = data); // deconstruct data into casePlay
+
+	// formatted case play text
+	$: play = format(casePlay.play);
+	// formatted case play answer
+	$: answer = format(casePlay.answer);
+
+	/**
+	 * Format the case play text.
+	 * @param text The case play text.
+	 * @returns The formatted case play text.
+	 */
+	function format(text: string) {
+		// create a regular expression to match text in parentheses
+		var letterRegex = /\(([a-z])\)/g;
+		// replace the matched text with a mark element
+		text = text.replace(letterRegex, (match, p1) => {
+			// create a mark element
+			var mark = document.createElement('mark');
+			// set the color attribute based on the letter
+			if (p1 === 'a') {
+				mark.setAttribute('green', 'true');
+			} else if (p1 === 'b') {
+				mark.setAttribute('blue', true);
+			} else if (p1 === 'c') {
+				mark.setAttribute('orange', true);
+			} else if (p1 === 'd') {
+				mark.setAttribute('indigo', true);
+			} else if (p1 === 'e') {
+				mark.setAttribute('red', true);
+			}
+			// set the text of the mark element
+			mark.textContent = match;
+			// return the mark element as a string
+			return mark.outerHTML;
+		});
+		// create a regular expression to match teams
+		var teamRegex = /Team ([ABKR])|[ABKR]-[0-9]{1,2}/g;
+		// replace the matched text with a team element
+		text = text.replace(teamRegex, (match, p1) => {
+			// create a team element
+			var team = document.createElement('team');
+			// set the text of the team element
+			team.textContent = match;
+			// return the team element as a string
+			return team.outerHTML;
+		});
+		// create a regular expression to match team yard lines
+		// var yardRegex = /[ABKR]'s\s[1-4]?[0-9]/g;
+		var yardRegex = /([ABKR]'s\s[1-4]?[0-9])|([ABKR]'s)/g;
+		// replace the matched text with a bold element
+		text = text.replace(yardRegex, (match, p1) => {
+			// create a bold element
+			var team = document.createElement('bold');
+			// set the text of the bold element
+			team.textContent = match;
+			// return the bold element as a string
+			return team.outerHTML;
+		});
+		return text;
+	}
 </script>
 
 <main class="bg-stone-100 min-h-screen overflow-hidden">
@@ -25,12 +85,11 @@
 			</h2>
 		</div>
 		<div class="mx-auto flex flex-col space-y-5 px-3 text-lg text-stone-900 lg:w-2/5 lg:px-0">
-			<p class="border-2 border-stone-900 bg-white p-4 shadow-lg">
-				{casePlay.play}
-			</p>
-			<spoiler class="group">
-				{casePlay.answer}
-			</spoiler>
+			<p
+				class="border-2 border-stone-900 bg-white p-4 shadow-lg"
+				contenteditable="false"
+				bind:innerHTML={play} />
+			<spoiler class="group" contenteditable="false" bind:innerHTML={answer} />
 			<div class="space-between flex flex-row items-center">
 				<div class="flex select-none flex-row items-center space-x-2 pl-2 text-sm">
 					<svg
