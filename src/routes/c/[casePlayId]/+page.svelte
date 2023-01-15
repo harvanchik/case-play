@@ -25,16 +25,18 @@
 		text = text.replace(LETTER_REGEX, (match, p1) => {
 			// create a mark element
 			let mark = '<mark ';
+			// get character after the parantheses
+			const char = text[text.indexOf(match) + match.length];
 			// set the color of the mark element
-			if (p1 === 'a') mark = `${mark}green>`;
-			else if (p1 === 'b') mark = `${mark}blue>`;
-			else if (p1 === 'c') mark = `${mark}orange>`;
-			else if (p1 === 'd') mark = `${mark}indigo>`;
-			else if (p1 === 'e') mark = `${mark}red>`;
-			else if (p1 === 'f') mark = `${mark}violet>`;
-			else mark = `${mark}yellow>`;
-			// return the mark element as a string
-			return `${mark}${match}</mark>`;
+			if (p1 === 'a') mark = `${mark}green`;
+			else if (p1 === 'b') mark = `${mark}blue`;
+			else if (p1 === 'c') mark = `${mark}orange`;
+			else if (p1 === 'd') mark = `${mark}indigo`;
+			else if (p1 === 'e') mark = `${mark}red`;
+			else if (p1 === 'f') mark = `${mark}violet`;
+			else mark = `${mark}yellow`;
+			// return the mark element as a string (add margin right if comma is after)
+			return `${mark}${char === ',' ? ' class="mr-[2px]">' : '>'}${match}</mark>`;
 		});
 		// create a regular expression to match teams/players
 		const TEAM_REGEX = /Team ([ABKR])|[ABKR]-[0-9]{1,2}/g;
@@ -50,12 +52,16 @@
 			// create a bold element
 			return `<b>${match}</b>`;
 		});
-		// if text matched 'accept' or 'accepts', make the text green
+		// if text matched 'accept', make the text green
 		text = text.replace(/accepts|accepted|accept/gi, '<span class="accept">$&</span>');
-		// if text matched 'decline' or 'declines', make the text red
+		// if text matched 'decline', make the text red
 		text = text.replace(/declines|declined|decline/gi, '<span class="decline">$&</span>');
 		// if text matched 'offset', make the text yellow
 		text = text.replace(/offset/gi, '<span class="offset">$&</span>');
+		// if text matched 'open', make the text blue
+		text = text.replace(/opens|open/gi, '<span class="open">$&</span>');
+		// if text matched 'closed', make the text pink
+		text = text.replace(/closes|closed/gi, '<span class="closed">$&</span>');
 		// return the formatted text
 		return text;
 	}
@@ -84,10 +90,11 @@
 		</div>
 		<div class="mx-auto flex flex-col space-y-5 px-3 text-lg text-stone-900 lg:w-2/5 lg:px-0">
 			<p
+				id="play"
 				class="border-2 border-stone-900 bg-white p-4 shadow-lg selection:bg-black/20"
 				contenteditable="false"
 				bind:innerHTML={play} />
-			<spoiler class="group" contenteditable="false" bind:innerHTML={answer} />
+			<spoiler id="answer" class="group" contenteditable="false" bind:innerHTML={answer} />
 			<div class="space-between flex flex-row items-center">
 				<div class="flex select-none flex-row items-center space-x-2 pl-2 text-sm">
 					<svg

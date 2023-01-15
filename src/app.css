@@ -4,7 +4,7 @@
 
 @layer base {
 	mark {
-		@apply bg-current font-bold text-stone-900 transition-colors duration-[1.5s] ease-in selection:bg-yellow-200 group-hover:bg-yellow-300;
+		@apply bg-current font-extrabold px-[1px] text-stone-900 transition-colors duration-[1.5s] ease-in selection:bg-yellow-200 group-hover:bg-yellow-300 pb-0.5;
 	}
 	mark[green] {
 		@apply selection:bg-lime-200 group-hover:bg-lime-300;
@@ -25,7 +25,7 @@
 		@apply selection:bg-violet-300 group-hover:bg-violet-400;
 	}
 	p > mark {
-		@apply bg-yellow-400 font-bold;
+		@apply bg-yellow-400 font-extrabold;
 	}
 	p > mark[green] {
 		@apply bg-lime-300;
@@ -51,6 +51,12 @@
 	br {
 		@apply block content-['_'];
 	}
+	spoiler span {
+		@apply font-medium text-stone-900 transition-colors duration-[1.5s] ease-in;
+	}
+	p#play span {
+		@apply font-medium;
+	}
 }
 
 @layer components {
@@ -61,12 +67,33 @@
 
 @layer utilities {
 	.accept {
-		@apply group-hover:text-green-500/50 font-medium text-stone-900 transition-colors duration-[1.5s] ease-in;
+		@apply group-hover:text-green-500/50;
+	}
+	p#play .accept {
+		@apply text-green-600;
 	}
 	.decline {
-		@apply group-hover:text-red-500/50 font-medium text-stone-900 transition-colors duration-[1.5s] ease-in;
+		@apply group-hover:text-red-500/50;
+	}
+	p#play .decline {
+		@apply text-red-500;
 	}
 	.offset {
-		@apply group-hover:text-yellow-500/60 font-medium text-stone-900 transition-colors duration-[1.5s] ease-in;
+		@apply group-hover:text-yellow-500/80;
+	}
+	p#play .offset {
+		@apply text-yellow-500;
+	}
+	.open {
+		@apply group-hover:text-sky-500/70;
+	}
+	p#play .open {
+		@apply text-sky-600;
+	}
+	.closed {
+		@apply group-hover:text-pink-500/70;
+	}
+	p#play .closed {
+		@apply text-pink-600;
 	}
 }
