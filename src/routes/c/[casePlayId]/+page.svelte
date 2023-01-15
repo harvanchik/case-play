@@ -70,13 +70,12 @@
 		</button></a>
 	<!-- END: Home Button -->
 	<section class="mt-1 flex w-full flex-col space-y-6 py-10 lg:pt-40">
-		<div class="flex flex-col space-y-2">
+		<div class="flex flex-col space-y-1.5">
 			<h1 class="mx-auto w-max border-b-4 border-stone-900 px-5 pb-3 text-5xl">
 				{casePlay.name}
 			</h1>
-			<h2 class="mx-auto w-max text-sm text-stone-700">
-				created by <a href="https://jake.harvanchik.me" target="_blank" rel="noreferrer" class="underline"
-					>Jake Harvanchik</a>
+			<h2 class="mx-auto w-max text-stone-700">
+				authored by {casePlay.author}
 			</h2>
 		</div>
 		<div class="mx-auto flex flex-col space-y-5 px-3 text-lg text-stone-900 lg:w-2/5 lg:px-0">
