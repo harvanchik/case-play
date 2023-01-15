@@ -25,7 +25,7 @@
 		text = text.replace(LETTER_REGEX, (match, p1) => {
 			// create a mark element
 			let mark = '<mark ';
-			// get character after the parantheses
+			// get character after the parentheses
 			const char = text[text.indexOf(match) + match.length];
 			// set the color of the mark element
 			if (p1 === 'a') mark = `${mark}green`;
@@ -51,6 +51,13 @@
 		text = text.replace(YARD_REGEX, match => {
 			// create a bold element
 			return `<b>${match}</b>`;
+		});
+		// create a regular expression to match a rule reference
+		const RULE_REGEX = /Rule ([0-9]{1,2}-[0-9]{1,2}-[0-9]{1,2}[A-Z]{0,1})/g;
+		// replace the matched text with a u element
+		text = text.replace(RULE_REGEX, match => {
+			// create a u element
+			return `<u>${match}</u>`;
 		});
 		// if text matched 'accept', make the text green
 		text = text.replace(/accepts|accepted|accept/gi, '<span class="accept">$&</span>');
