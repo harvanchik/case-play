@@ -14,6 +14,10 @@
 	 * @returns The formatted case play text.
 	 */
 	function format(text: string) {
+		// create a regular expression to match newlines
+		const NEWLINE_REGEX = /\n/g;
+		// replace the matched text with a br element
+		text = text.replace(NEWLINE_REGEX, '<br>');
 		// create a regular expression to match text in parentheses
 		const LETTER_REGEX = /\(([a-z])\)/g;
 		// replace the matched text with a mark element
