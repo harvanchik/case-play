@@ -5,10 +5,8 @@
 
 	$: ({ casePlay } = data); // deconstruct data into casePlay
 
-	// formatted case play text
-	$: play = format(casePlay.play);
-	// formatted case play answer
-	$: answer = format(casePlay.answer);
+	$: play = format(casePlay.play); // formatted case play text
+	$: answer = format(casePlay.answer); // formatted case play answer
 
 	/**
 	 * Format the case play text.
@@ -17,51 +15,42 @@
 	 */
 	function format(text: string) {
 		// create a regular expression to match text in parentheses
-		var letterRegex = /\(([a-z])\)/g;
+		const LETTER_REGEX = /\(([a-z])\)/g;
 		// replace the matched text with a mark element
-		text = text.replace(letterRegex, (match, p1) => {
+		text = text.replace(LETTER_REGEX, (match, p1) => {
 			// create a mark element
-			var mark = document.createElement('mark');
-			// set the color attribute based on the letter
-			if (p1 === 'a') {
-				mark.setAttribute('green', 'true');
-			} else if (p1 === 'b') {
-				mark.setAttribute('blue', true);
-			} else if (p1 === 'c') {
-				mark.setAttribute('orange', true);
-			} else if (p1 === 'd') {
-				mark.setAttribute('indigo', true);
-			} else if (p1 === 'e') {
-				mark.setAttribute('red', true);
-			}
-			// set the text of the mark element
-			mark.textContent = match;
+			let mark = '<mark ';
+			// set the color of the mark element based on the letter
+			if (p1 === 'a') mark = `${mark}green>`;
+			else if (p1 === 'b') mark = `${mark}blue>`;
+			else if (p1 === 'c') mark = `${mark}orange>`;
+			else if (p1 === 'd') mark = `${mark}indigo>`;
+			else if (p1 === 'e') mark = `${mark}red>`;
+			else if (p1 === 'f') mark = `${mark}violet>`;
+			else mark = `${mark}yellow>`;
 			// return the mark element as a string
-			return mark.outerHTML;
+			return `${mark}${match}</mark>`;
 		});
 		// create a regular expression to match teams
-		var teamRegex = /Team ([ABKR])|[ABKR]-[0-9]{1,2}/g;
-		// replace the matched text with a team element
-		text = text.replace(teamRegex, (match, p1) => {
-			// create a team element
-			var team = document.createElement('team');
-			// set the text of the team element
-			team.textContent = match;
-			// return the team element as a string
-			return team.outerHTML;
+		const TEAM_REGEX = /Team ([ABKR])|[ABKR]-[0-9]{1,2}/g;
+		// replace the matched text with a u element
+		text = text.replace(TEAM_REGEX, match => {
+			// create a u element
+			return `<u>${match}</u>`;
 		});
-		// create a regular expression to match team yard lines
-		// var yardRegex = /[ABKR]'s\s[1-4]?[0-9]/g;
-		var yardRegex = /([ABKR]'s\s[1-4]?[0-9])|([ABKR]'s)/g;
+		// create a regular expression to match team yardage lines
+		const YARD_REGEX = /([ABKR]'s\s[1-4]?[0-9])|([ABKR]'s)/g;
 		// replace the matched text with a bold element
-		text = text.replace(yardRegex, (match, p1) => {
+		text = text.replace(YARD_REGEX, match => {
 			// create a bold element
-			var team = document.createElement('bold');
-			// set the text of the bold element
-			team.textContent = match;
-			// return the bold element as a string
-			return team.outerHTML;
+			return `<b>${match}</b>`;
 		});
+		// if text matched 'accept' or 'accepts', make the text green
+		text = text.replace(/accepts|accept/gi, '<span class="accept">$&</span>');
+		// if text matched 'decline' or 'declines', make the text red
+		text = text.replace(/declines|decline/gi, '<span class="decline">$&</span>');
+		// if text matched 'offset', make the text yellow
+		text = text.replace(/offset/gi, '<span class="offset">$&</span>');
 		return text;
 	}
 </script>
@@ -86,7 +75,7 @@
 		</div>
 		<div class="mx-auto flex flex-col space-y-5 px-3 text-lg text-stone-900 lg:w-2/5 lg:px-0">
 			<p
-				class="border-2 border-stone-900 bg-white p-4 shadow-lg"
+				class="border-2 border-stone-900 bg-white p-4 shadow-lg selection:bg-black/20"
 				contenteditable="false"
 				bind:innerHTML={play} />
 			<spoiler class="group" contenteditable="false" bind:innerHTML={answer} />
