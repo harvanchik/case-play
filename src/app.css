@@ -61,12 +61,12 @@
 
 @layer utilities {
 	.accept {
-		@apply group-hover:text-green-500/70 font-medium text-stone-900 transition-colors duration-[1.5s] ease-in;
+		@apply group-hover:text-green-500/50 font-medium text-stone-900 transition-colors duration-[1.5s] ease-in;
 	}
 	.decline {
-		@apply group-hover:text-red-500/70 font-medium text-stone-900 transition-colors duration-[1.5s] ease-in;
+		@apply group-hover:text-red-500/50 font-medium text-stone-900 transition-colors duration-[1.5s] ease-in;
 	}
 	.offset {
-		@apply group-hover:text-yellow-500/80 font-medium text-stone-900 transition-colors duration-[1.5s] ease-in;
+		@apply group-hover:text-yellow-500/60 font-medium text-stone-900 transition-colors duration-[1.5s] ease-in;
 	}
 }
