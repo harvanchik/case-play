@@ -124,7 +124,7 @@
 		C8.832,3,3,8.832,3,16s5.832,13,13,13s13-5.832,13-13S23.168,3,16,3z" />
 						</g>
 					</svg>
-					<p class="font-semibold text-stone-600 lg:hidden">tap & hold box to reveal</p>
+					<p class="font-semibold text-stone-600 lg:hidden">tap box to reveal</p>
 					<p class="hidden font-semibold text-stone-600 lg:flex">hover over box to reveal</p>
 				</div>
 				<button
