@@ -51,9 +51,9 @@
 			return `<b>${match}</b>`;
 		});
 		// if text matched 'accept' or 'accepts', make the text green
-		text = text.replace(/accepts|accept/gi, '<span class="accept">$&</span>');
+		text = text.replace(/accepts|accepted|accept/gi, '<span class="accept">$&</span>');
 		// if text matched 'decline' or 'declines', make the text red
-		text = text.replace(/declines|decline/gi, '<span class="decline">$&</span>');
+		text = text.replace(/declines|declined|decline/gi, '<span class="decline">$&</span>');
 		// if text matched 'offset', make the text yellow
 		text = text.replace(/offset/gi, '<span class="offset">$&</span>');
 		// return the formatted text
