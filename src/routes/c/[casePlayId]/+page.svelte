@@ -61,6 +61,10 @@
 	}
 </script>
 
+<svelte:head>
+	<title>{casePlay.name}</title>
+</svelte:head>
+
 <main class="bg-stone-100 min-h-screen overflow-hidden">
 	<!-- START: Home Button -->
 	<a href="../../">

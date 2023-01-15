@@ -6,6 +6,10 @@
 	$: ({ casePlays } = data); // deconstruct data into casePlays
 </script>
 
+<svelte:head>
+	<title>Case Plays</title>
+</svelte:head>
+
 <main class="bg-stone-100 min-h-screen overflow-hidden">
 	<section class="flex w-full flex-col space-y-6 py-10 lg:pt-40">
 		<div class="flex flex-col space-y-2">
