@@ -110,22 +110,36 @@
 		</button></a>
 	<!-- END: Home Button -->
 	<section class="mt-1 flex w-full flex-col space-y-6 py-10 lg:pt-40">
+		<!-- START: Case Play Info -->
 		<div class="flex flex-col space-y-1.5">
+			<!-- START: Case Play Name -->
 			<h1 class="mx-auto text-center border-b-4 border-stone-900 px-5 pb-3 text-2xl sm:3xl lg:text-5xl">
 				{casePlay.name}
 			</h1>
+			<!-- END: Case Play Name -->
+
+			<!-- START: Case Play Author -->
 			<h2 class="mx-auto text-center text-stone-700 text-sm lg:text-base">
 				authored by {casePlay.author}
 			</h2>
+			<!-- END: Case Play Author -->
 		</div>
+		<!-- END: Case Play Info -->
 		<div class="mx-auto flex flex-col space-y-5 px-3 text-lg text-stone-900 lg:w-2/5 lg:px-0">
+			<!-- START: Case Play Prompt -->
 			<p
 				id="play"
 				class="border-2 border-stone-900 bg-white p-4 shadow-lg selection:bg-black/20"
 				contenteditable="false"
 				bind:innerHTML={play} />
+			<!-- END: Case Play Prompt -->
+
+			<!-- START: Case Play Answer -->
 			<spoiler id="answer" class="group" contenteditable="false" bind:innerHTML={answer} />
+			<!-- END: Case Play Answer -->
+
 			<div class="space-between flex flex-row items-center">
+				<!-- START: Reveal Spoiler Tip -->
 				<div class="flex select-none flex-row items-center space-x-2 pl-2 text-sm">
 					<svg
 						fill="#000000"
@@ -146,12 +160,16 @@
 					<p class="font-semibold text-stone-600 lg:hidden">tap box to reveal</p>
 					<p class="hidden font-semibold text-stone-600 lg:flex">hover over box to reveal</p>
 				</div>
+				<!-- END: Reveal Spoiler Tip -->
+
+				<!-- START: Copy URL Button -->
 				<button
 					id="share"
 					on:click={copy}
 					class="ml-auto w-24 select-none bg-stone-700 px-2 py-1 font-semibold text-white shadow-md transition-all duration-150 ease-out hover:scale-105 hover:bg-stone-800 active:bg-green-500">
 					copy url
 				</button>
+				<!-- END: Copy URL Button -->
 			</div>
 		</div>
 	</section>
