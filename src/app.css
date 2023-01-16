@@ -49,7 +49,7 @@
 		@apply font-semibold;
 	}
 	br {
-		@apply block content-['_'];
+		@apply block content-['_'] pt-2 !m-0;
 	}
 	spoiler span {
 		@apply font-medium text-stone-900 transition-colors duration-[1.25s] ease-in;
