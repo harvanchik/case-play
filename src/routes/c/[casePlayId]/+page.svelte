@@ -125,7 +125,6 @@
 			<!-- END: Case Play Author -->
 		</div>
 		<!-- END: Case Play Info -->
-		<div class="mx-auto flex flex-col space-y-5 px-3 text-lg text-stone-900 lg:w-2/5 lg:px-0">
 		<div class="mx-auto flex flex-col space-y-5 px-3 text-lg text-stone-900 lg:w-2/5 lg:px-0 leading-[1.425]">
 			<!-- START: Case Play Prompt -->
 			<p
