@@ -1,5 +1,5 @@
 import { start_mongo } from '$db/mongo';
-import { minify } from 'html-minifier-terser';
+import { minify, type Options } from 'html-minifier-terser';
 
 start_mongo()
 	.then(() => {
@@ -9,20 +9,22 @@ start_mongo()
 		console.error(error);
 	});
 
-const minification_options = {
+const MINIFY_OPTIONS: Options = {
 	collapseWhitespace: true,
-	collapseInlineTagWhitespace: true,
+	conservativeCollapse: true,
+	collapseBooleanAttributes: true,
 	removeComments: true,
 	ignoreCustomComments: [/^#/],
 	minifyCSS: true,
 	minifyJS: true,
-	sortAttributes: true,
-	sortClassName: true
+	minifyURLs: true,
+	quoteCharacter: "'",
+	removeAttributeQuotes: true
 };
 
 export async function handle({ event, resolve }: any) {
 	const response = await resolve(event, {
-		transformPageChunk: ({ html }: any) => minify(html, minification_options)
+		transformPageChunk: ({ html }: any) => minify(html, MINIFY_OPTIONS)
 	});
 
 	return response;
