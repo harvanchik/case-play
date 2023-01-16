@@ -72,6 +72,29 @@
 		// return the formatted text
 		return text;
 	}
+
+	/**
+	 * Copy the case play url to the clipboard.
+	 */
+	function copy(): void {
+		// copy url to clipboard
+		navigator.clipboard.writeText(window.location.href);
+		// add green background to share button
+		const button = document.getElementById('share');
+		// if no button found, return
+		if (!button) return;
+		// if button already has green background, return
+		if (button.classList.contains('!bg-green-500')) return;
+		// make button have green background
+		button.classList.add('!bg-green-500', 'scale-105');
+		// set button text to 'copied'
+		button.textContent = 'copied';
+		// remove it after 1 second
+		setTimeout(() => {
+			button?.classList.remove('!bg-green-500', 'scale-105');
+			button.textContent = 'copy url';
+		}, 1000);
+	}
 </script>
 
 <svelte:head>
@@ -126,6 +149,8 @@
 				<button
 					id="share"
 					class="ml-auto w-max select-none bg-stone-700 px-2 py-1 font-semibold text-white shadow-md transition-all duration-150 ease-out hover:scale-105 hover:bg-stone-800 active:bg-green-500">
+					on:click={copy}
+					class="ml-auto w-24 select-none bg-stone-700 px-2 py-1 font-semibold text-white shadow-md transition-all duration-150 ease-out hover:scale-105 hover:bg-stone-800 active:bg-green-500">
 					copy url
 				</button>
 			</div>
