@@ -113,7 +113,8 @@
 		<!-- START: Case Play Info -->
 		<div class="flex flex-col space-y-1.5">
 			<!-- START: Case Play Name -->
-			<h1 class="mx-auto text-center border-b-4 border-stone-900 px-5 pb-3 text-2xl sm:3xl lg:text-5xl">
+			<h1
+				class="mx-auto text-center border-b-4 border-stone-900 px-5 pb-3 text-2xl sm:3xl lg:text-5xl">
 				{casePlay.name}
 			</h1>
 			<!-- END: Case Play Name -->
@@ -125,17 +126,22 @@
 			<!-- END: Case Play Author -->
 		</div>
 		<!-- END: Case Play Info -->
-		<div class="mx-auto flex flex-col space-y-5 px-3 text-lg text-stone-900 lg:w-2/5 lg:px-0 leading-[1.425]">
+		<div
+			class="mx-auto flex flex-col space-y-5 px-3 text-lg text-stone-900 lg:w-2/5 lg:px-0 leading-[1.425]">
 			<!-- START: Case Play Prompt -->
 			<p
 				id="prompt"
-				class="border-2 border-stone-900 bg-white p-4 shadow-lg selection:bg-black/20"
+				class="border-2 border-stone-900 bg-white p-4 shadow-lg selection:bg-black/20 max-h-48 scrollbar scrollbar-w-3 scrollbar-track-stone-300 scrollbar-thumb-stone-700"
 				contenteditable="false"
 				bind:innerHTML={prompt} />
 			<!-- END: Case Play Prompt -->
 
 			<!-- START: Case Play Answer -->
-			<spoiler id="answer" class="group" contenteditable="false" bind:innerHTML={answer} />
+			<spoiler
+				id="answer"
+				class="group max-h-80 border-2 border-stone-900 scrollbar scrollbar-track-black/70 scrollbar-w-3 scrollbar-thumb-stone-200"
+				contenteditable="false"
+				bind:innerHTML={answer} />
 			<!-- END: Case Play Answer -->
 
 			<div class="space-between flex flex-row items-center">

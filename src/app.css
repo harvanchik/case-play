@@ -61,7 +61,7 @@
 
 @layer components {
 	spoiler {
-		@apply block cursor-default select-none flex-col space-y-3 bg-stone-900 p-4 text-stone-900 shadow-lg transition-colors duration-[1.25s] ease-in hover:text-white;
+		@apply cursor-default select-none flex-col space-y-3 bg-stone-900 p-4 text-stone-900 shadow-lg transition-colors duration-[1.25s] ease-in hover:text-white;
 	}
 }
 
