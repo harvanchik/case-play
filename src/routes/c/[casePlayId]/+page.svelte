@@ -5,14 +5,14 @@
 
 	$: ({ casePlay } = data); // deconstruct data into casePlay
 
-	$: play = format(casePlay.play); // formatted case play text
+	$: prompt = format(casePlay.prompt); // formatted case play prompt
 	$: answer = format(casePlay.answer); // formatted case play answer
 
 	/**
-	 * Format text into a case play text.
+	 * Apply the necessary formatting to transform raw text into case play text.
 	 * This method automatically colors, underlines, and bolds portions of the text using regex.
 	 * @param text The text to format.
-	 * @returns The formatted text.
+	 * @returns The text formatted as a case play.
 	 */
 	function format(text: string): string {
 		// create a regular expression to match newlines
@@ -126,12 +126,13 @@
 		</div>
 		<!-- END: Case Play Info -->
 		<div class="mx-auto flex flex-col space-y-5 px-3 text-lg text-stone-900 lg:w-2/5 lg:px-0">
+		<div class="mx-auto flex flex-col space-y-5 px-3 text-lg text-stone-900 lg:w-2/5 lg:px-0 leading-[1.425]">
 			<!-- START: Case Play Prompt -->
 			<p
-				id="play"
+				id="prompt"
 				class="border-2 border-stone-900 bg-white p-4 shadow-lg selection:bg-black/20"
 				contenteditable="false"
-				bind:innerHTML={play} />
+				bind:innerHTML={prompt} />
 			<!-- END: Case Play Prompt -->
 
 			<!-- START: Case Play Answer -->

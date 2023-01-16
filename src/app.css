@@ -54,7 +54,7 @@
 	spoiler span {
 		@apply font-medium text-stone-900 transition-colors duration-[1.25s] ease-in;
 	}
-	p#play span {
+	p#prompt span {
 		@apply font-medium;
 	}
 }
@@ -69,31 +69,31 @@
 	.accept {
 		@apply group-hover:text-green-500/50;
 	}
-	p#play .accept {
+	p#prompt .accept {
 		@apply text-green-600;
 	}
 	.decline {
 		@apply group-hover:text-red-500/50;
 	}
-	p#play .decline {
+	p#prompt .decline {
 		@apply text-red-500;
 	}
 	.offset {
 		@apply group-hover:text-yellow-500/80;
 	}
-	p#play .offset {
+	p#prompt .offset {
 		@apply text-yellow-500;
 	}
 	.open {
 		@apply group-hover:text-sky-500/70;
 	}
-	p#play .open {
+	p#prompt .open {
 		@apply text-sky-600;
 	}
 	.closed {
 		@apply group-hover:text-pink-500/70;
 	}
-	p#play .closed {
+	p#prompt .closed {
 		@apply text-pink-600;
 	}
 }
