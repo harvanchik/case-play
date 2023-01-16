@@ -105,16 +105,16 @@
 	<!-- START: Home Button -->
 	<a href="../../">
 		<button
-			class="absolute select-none left-[50%] top-3 translate-x-[-50%] bg-stone-800 px-16 py-1 text-xs font-semibold text-white shadow-lg transition duration-150 ease-out hover:scale-105 hover:bg-stone-900 active:bg-black lg:top-4 lg:left-4 lg:flex lg:translate-x-0 lg:bg-stone-800 lg:px-3 lg:text-base">
+			class="absolute select-none left-[50%] top-3 translate-x-[-50%] bg-stone-800 px-14 py-1 text-xs font-semibold text-white shadow-lg transition duration-150 ease-out hover:scale-105 hover:bg-stone-900 active:bg-black lg:top-4 lg:left-4 lg:flex lg:translate-x-0 lg:bg-stone-800 lg:px-3 lg:text-base">
 			home
 		</button></a>
 	<!-- END: Home Button -->
 	<section class="mt-1 flex w-full flex-col space-y-6 py-10 lg:pt-40">
 		<div class="flex flex-col space-y-1.5">
-			<h1 class="mx-auto w-max border-b-4 border-stone-900 px-5 pb-3 text-5xl">
+			<h1 class="mx-auto text-center border-b-4 border-stone-900 px-5 pb-3 text-2xl sm:3xl lg:text-5xl">
 				{casePlay.name}
 			</h1>
-			<h2 class="mx-auto w-max text-stone-700">
+			<h2 class="mx-auto text-center text-stone-700 text-sm lg:text-base">
 				authored by {casePlay.author}
 			</h2>
 		</div>
@@ -148,7 +148,6 @@
 				</div>
 				<button
 					id="share"
-					class="ml-auto w-max select-none bg-stone-700 px-2 py-1 font-semibold text-white shadow-md transition-all duration-150 ease-out hover:scale-105 hover:bg-stone-800 active:bg-green-500">
 					on:click={copy}
 					class="ml-auto w-24 select-none bg-stone-700 px-2 py-1 font-semibold text-white shadow-md transition-all duration-150 ease-out hover:scale-105 hover:bg-stone-800 active:bg-green-500">
 					copy url
