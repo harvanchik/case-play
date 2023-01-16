@@ -13,8 +13,6 @@ const MINIFY_OPTIONS: Options = {
 	collapseWhitespace: true,
 	conservativeCollapse: true,
 	collapseBooleanAttributes: true,
-	removeComments: true,
-	ignoreCustomComments: [/^#/],
 	minifyCSS: true,
 	minifyJS: true,
 	minifyURLs: true,
@@ -26,6 +24,5 @@ export async function handle({ event, resolve }: any) {
 	const response = await resolve(event, {
 		transformPageChunk: ({ html }: any) => minify(html, MINIFY_OPTIONS)
 	});
-
 	return response;
 }
