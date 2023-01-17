@@ -17,7 +17,8 @@ const config = {
 			jekyll: false
 		}),
 		alias: {
-			$db: './src/db'
+			$db: './src/db',
+			$stores: './src/stores'
 		}
 	}
 };

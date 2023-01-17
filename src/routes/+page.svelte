@@ -1,9 +1,22 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import { casePlaysStore } from '$stores';
+	import type { Unsubscriber } from 'svelte/store';
+	import { onDestroy } from 'svelte';
 
 	export let data: PageData;
 
-	$: ({ casePlays } = data); // deconstruct data into casePlays
+	let casePlays: any; // define case plays
+
+	casePlaysStore.set(data.casePlays); // set case plays globally
+
+	// subscribe to the case plays store
+	const casePlaySub: Unsubscriber = casePlaysStore.subscribe(value => {
+		casePlays = value;
+	});
+
+	// unsubscribe from the store when page navigated away from
+	onDestroy(() => casePlaySub());
 </script>
 
 <svelte:head>
