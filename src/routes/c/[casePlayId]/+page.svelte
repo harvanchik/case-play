@@ -114,7 +114,7 @@
 		<div class="flex flex-col space-y-1.5">
 			<!-- START: Case Play Name -->
 			<h1
-				class="mx-auto text-center border-b-4 border-stone-900 px-5 pb-3 text-2xl sm:3xl lg:text-5xl">
+				class="text-center border-b-4 border-stone-900 px-5 pb-3 text-2xl sm:3xl lg:text-5xl mx-5 lg:mx-auto">
 				{casePlay.name}
 			</h1>
 			<!-- END: Case Play Name -->
