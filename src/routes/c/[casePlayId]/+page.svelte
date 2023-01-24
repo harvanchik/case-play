@@ -42,22 +42,22 @@
 		const TEAM_REGEX = /Team ([ABKR])|[ABKR]-[0-9]{1,2}/g;
 		// replace the matched text with a u element
 		text = text.replace(TEAM_REGEX, match => {
-			// create a u element (and replace hyphens with non-breaking hyphens)
-			return `<u>${match}</u>`.replace(/-/g, '&#8209;');
+			// create a u element (use non-breaking hyphens and spaces)
+			return `<u>${match}</u>`.replace(/-/g, '&#8209;').replace(' ', '&nbsp;');
 		});
 		// create a regular expression to match team yardage lines
 		const YARD_REGEX = /([ABKR]'s\s[1-4]?[0-9])|([ABKR]'s)/g;
 		// replace the matched text with a bold element
 		text = text.replace(YARD_REGEX, match => {
 			// create a bold element
-			return `<b>${match}</b>`;
+			return `<b>${match}</b>`.replace(' ', '&nbsp;');
 		});
 		// create a regular expression to match a rule reference
 		const RULE_REGEX = /Rule ([0-9]{1,2}-[0-9]{1,2}-[0-9]{1,2}[A-Z]{0,1})/g;
 		// replace the matched text with a u element
 		text = text.replace(RULE_REGEX, match => {
 			// create a u element
-			return `<u>${match}</u>`;
+			return `<u>${match}</u>`.replace(/-/g, '&#8209;').replace(' ', '&nbsp;');
 		});
 		// if text matched 'accept', make the text green
 		text = text.replace(/accepts|accepted|accept/gi, '<span class="accept">$&</span>');
