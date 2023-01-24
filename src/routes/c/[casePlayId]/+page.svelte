@@ -42,8 +42,8 @@
 		const TEAM_REGEX = /Team ([ABKR])|[ABKR]-[0-9]{1,2}/g;
 		// replace the matched text with a u element
 		text = text.replace(TEAM_REGEX, match => {
-			// create a u element
-			return `<u>${match}</u>`;
+			// create a u element (and replace hyphens with non-breaking hyphens)
+			return `<u>${match}</u>`.replace(/-/g, '&#8209;');
 		});
 		// create a regular expression to match team yardage lines
 		const YARD_REGEX = /([ABKR]'s\s[1-4]?[0-9])|([ABKR]'s)/g;
@@ -127,7 +127,7 @@
 		</div>
 		<!-- END: Case Play Info -->
 		<div
-			class="mx-auto flex flex-col space-y-5 px-3 text-lg text-stone-900 lg:w-2/5 lg:px-0 leading-[1.425]">
+			class="mx-auto flex flex-col space-y-5 px-3 text-lg text-stone-900 lg:w-1/2 lg:px-0 leading-[1.425]">
 			<!-- START: Case Play Prompt -->
 			<p
 				id="prompt"
