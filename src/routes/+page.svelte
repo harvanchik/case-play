@@ -55,12 +55,12 @@
 					class="underline">Jake Harvanchik</a>
 			</h2>
 		</div>
-		<div class="flex flex-col space-y-5 w-5/12 mx-auto">
+		<div class="flex flex-col space-y-5 w-[90%] lg:w-5/12 mx-auto">
 			{#each casePlays as casePlay}
 				<a href="c/{casePlay.id}" data-sveltekit-preload-data="hover" class="group">
 					<div
 						class="p-3 flex-col space-y-2 flex cursor-pointer border-2 border-stone-900 bg-white group-hover:bg-stone-100/50 shadow-lg ">
-						<span class="flex">
+						<span class="flex space-x-2">
 							<h2
 								class="mr-auto inline select-none text-lg font-semibold group-hover:text-xl transition-[font-size_150ms] duration-150 ease-out">
 								{casePlay.name}
@@ -68,7 +68,7 @@
 							<iconify-icon class="ml-auto" icon="noto:american-football" width="25" height="25" />
 						</span>
 						<span class="flex items-end">
-							<span class="line-clamp-2 w-10/12">{casePlay.prompt}</span>
+							<span class="line-clamp-3 lg:line-clamp-3 w-9/12 lg:w-10/12">{casePlay.prompt}</span>
 							<span class="flex flex-col ml-auto">
 								<span
 									class="ml-auto rounded-full text-sm w-max px-2 text-white bg-opacity-80 group-hover:bg-opacity-100 transition duration-150 ease-out"
