@@ -20,21 +20,22 @@
 		// replace newline with br element
 		text = text.replace(NEWLINE_REGEX, '<br>');
 		// create a regular expression to match letters in parentheses
-		const LETTER_REGEX = /\(([a-z])\)/g;
+		// const LETTER_REGEX = /\(([a-z])\)/g;
+		const LETTER_REGEX = /\((?=[mdclxvi])m*(c[md]|d?c{0,3})(x[cl]|l?x{0,3})(i[xv]|v?i{0,3})\)/g;
 		// replace the matched text with a mark element
-		text = text.replace(LETTER_REGEX, (match, p1) => {
+		text = text.replace(LETTER_REGEX, match => {
 			// create a mark element
 			let mark = '<mark ';
+			// set the color of the mark element
+			if (match === '(i)') mark = `${mark}green`;
+			else if (match === '(ii)') mark = `${mark}blue`;
+			else if (match === '(iii)') mark = `${mark}orange`;
+			else if (match === '(iv)') mark = `${mark}indigo`;
+			else if (match === '(v)') mark = `${mark}red`;
+			else if (match === '(vi)') mark = `${mark}violet`;
+			else mark = `${mark}yellow`;
 			// get character after the parentheses
 			const char = text[text.indexOf(match) + match.length];
-			// set the color of the mark element
-			if (p1 === 'a') mark = `${mark}green`;
-			else if (p1 === 'b') mark = `${mark}blue`;
-			else if (p1 === 'c') mark = `${mark}orange`;
-			else if (p1 === 'd') mark = `${mark}indigo`;
-			else if (p1 === 'e') mark = `${mark}red`;
-			else if (p1 === 'f') mark = `${mark}violet`;
-			else mark = `${mark}yellow`;
 			// return the mark element as a string (add margin right if comma is after)
 			return `${mark}${char === ',' ? ' class="mr-[2px]">' : '>'}${match}</mark>`;
 		});
