@@ -1,0 +1,16 @@
+{
+  "id": "mig_cj9eh0n2nsp6kurg9t5g",
+  "parentID": "mig_cj9egn72nsp6kurg9t4g",
+  "checksum": "1:50155db7be7e4a6dd50d9ed186d64cd3f200e43f76984987a2791564d644be59",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "case_plays",
+          "type": "multiple"
+        },
+        "table": "playlist"
+      }
+    }
+  ]
+}

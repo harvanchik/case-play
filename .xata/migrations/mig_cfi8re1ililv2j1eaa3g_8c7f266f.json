@@ -1,0 +1,16 @@
+{
+  "id": "mig_cfi8re1ililv2j1eaa3g",
+  "parentID": "mig_cfi8rc9ililv2j1eaa30",
+  "checksum": "1:8c7f266f095ac37a913266e9fba35eba52ef500e9e9e6619bb4b6d9dcc84ffee",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "authors",
+          "type": "multiple"
+        },
+        "table": "test"
+      }
+    }
+  ]
+}

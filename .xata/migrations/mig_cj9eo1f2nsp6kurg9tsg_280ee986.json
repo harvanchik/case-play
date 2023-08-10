@@ -1,0 +1,13 @@
+{
+  "id": "mig_cj9eo1f2nsp6kurg9tsg",
+  "parentID": "mig_cj9ekkcia1mv41jssvr0",
+  "checksum": "1:280ee986838a8ef00fe0580970bf5608c9ae2efb547cce92919003bdc7d51520",
+  "operations": [
+    {
+      "renameTable": {
+        "newName": "case_play",
+        "oldName": "case-play"
+      }
+    }
+  ]
+}

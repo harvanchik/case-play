@@ -1,0 +1,13 @@
+{
+  "id": "mig_cfi86haf2mo6u2s9frf0",
+  "parentID": "mig_cfi868af2mo6u2s9fr4g",
+  "checksum": "1:bc3ce0952ab46bb869df230736e21edc5fb4010cf3a55781ac5d5931a44f4597",
+  "operations": [
+    {
+      "renameTable": {
+        "newName": "rulebook",
+        "oldName": "rule-book"
+      }
+    }
+  ]
+}
