@@ -1,13 +1,4 @@
-import { start_mongo } from '$db/mongo';
 import { minify, type Options } from 'html-minifier-terser';
-
-start_mongo()
-	.then(() => {
-		console.info('MongoDB connected!');
-	})
-	.catch(error => {
-		console.error(error);
-	});
 
 const MINIFY_OPTIONS: Options = {
 	collapseWhitespace: true,
