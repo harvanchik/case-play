@@ -4,9 +4,11 @@ export default {
 	theme: {
 		extend: {
 			fontFamily: {
-				barriecito: ['Barriecito', 'sans-serif']
+				barriecito: ['Barriecito', 'sans-serif'],
+				neucha: ['Neucha', 'sans-serif'],
+				dokdo: ['Dokdo', 'sans-serif']
 			}
 		}
 	},
-	plugins: [require('tailwind-scrollbar')]
+	plugins: [require('tailwind-scrollbar'), require('tailwindcss-textshadow')]
 };

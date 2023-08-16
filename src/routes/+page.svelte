@@ -21,7 +21,8 @@
 
 	/**
 	 * Returns the difficulty of the case play (i.e., Easy, Moderate, Hard)
-	 * @param difficulty
+	 * @param difficulty difficulty number
+	 * @returns difficulty in English as string
 	 */
 	const getDifficulty = (difficulty: number) => {
 		switch (difficulty) {
@@ -50,23 +51,14 @@
 	<script src="https://code.iconify.design/iconify-icon/1.0.3/iconify-icon.min.js"></script>
 </svelte:head>
 
-<main
-	class="scrollbar scrollbar-track-stone-800 scrollbar-thumb-black min-h-screen overflow-hidden bg-stone-100/[97%]"
->
+<main class="min-h-screen overflow-hidden bg-stone-100/[97%] scrollbar scrollbar-track-stone-800 scrollbar-thumb-black">
 	<!-- Background -->
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 	<!-- START: Search Bar -->
 	<section id="search">
 		<div class="mt-16 flex flex-col space-y-3">
-			<div class="flex flex-col space-y-6">
-				<div class="mx-auto flex flex-col space-y-3">
-					<h1 class="font-barriecito mx-auto text-6xl uppercase tracking-wider">caseplay.org</h1>
-					<h2 class="mx-auto">
-						created by <a href="https://jake.harvanchik.me" target="_blank" class="underline"
-							>Jake Harvanchik</a
-						>
-					</h2>
-				</div>
+			<div class="flex flex-col space-y-2">
+				<h1 class="mx-auto font-dokdo text-7xl font-semibold uppercase text-stone-800 text-shadow-lg">caseplay.org</h1>
 				<form method="POST" action="?/search" use:enhance={sendQuery} class="flex">
 					<div class="relative mx-auto flex w-[33%] items-center focus:w-[37%]">
 						<input
@@ -79,19 +71,10 @@
 						<!-- START: Query Input Box Icons -->
 						{#if isQuerying}
 							<!-- Loading Spinner -->
-							<Icon
-								icon="mdi:loading"
-								height="25"
-								class="absolute right-0 mx-3 flex animate-spin"
-							/>
+							<Icon icon="mdi:loading" height="25" class="absolute right-0 mx-3 flex animate-spin" />
 						{:else}
 							<!-- Search Icon -->
-							<Icon
-								icon="line-md:search-twotone"
-								height="25"
-								hFlip={true}
-								class="absolute right-0 mx-3 flex"
-							/>
+							<Icon icon="line-md:search-twotone" height="25" hFlip={true} class="absolute right-0 mx-3 flex" />
 						{/if}
 						<!-- END: Query Input Box Icons -->
 					</div>
@@ -109,16 +92,14 @@
 				<span class="text-stone-600">{form?.casePlays?.length} case plays found</span>
 				<!-- END: Number of Results -->
 				<div
-					class="scrollbar scrollbar-track-stone-400 scrollbar-thumb-stone-900 mt-1 flex flex-col space-y-6 overflow-y-auto border border-stone-400 p-2"
+					class="mt-1 flex flex-col space-y-6 overflow-y-auto border border-stone-400 p-2 scrollbar scrollbar-track-stone-400 scrollbar-thumb-stone-900"
 				>
 					{#each form.casePlays as casePlay}
 						<div
 							class="group mr-10 flex cursor-pointer flex-col space-y-2 border border-stone-300 px-4 py-2 transition-all duration-300 hover:border-stone-400 hover:backdrop-blur-sm"
 						>
 							<div class="flex flex-row items-baseline justify-between">
-								<a
-									href="#"
-									class="line-clamp-1 text-3xl font-bold text-stone-800 transition-colors duration-300 group-hover:text-black"
+								<a href="#" class="line-clamp-1 text-3xl font-bold text-stone-800 transition-colors duration-300 group-hover:text-black"
 									>{casePlay.title}</a
 								>
 								<div
