@@ -24,7 +24,8 @@
 		'illegal motion',
 		'backward pass',
 		'illegal shift',
-		'illegal batting'
+		'illegal batting',
+		'inadvertent whistle'
 	];
 
 	const sendQuery: SubmitFunction = (input) => {
