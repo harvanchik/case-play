@@ -121,7 +121,7 @@
 				>
 					{#each form.casePlays as casePlay}
 						<div
-							class="group mr-10 flex cursor-pointer flex-col space-y-2 border border-stone-300 px-4 py-2 transition-colors duration-300 hover:border-stone-400 hover:backdrop-blur-sm"
+							class="group flex cursor-pointer flex-col space-y-2 border border-stone-300 px-4 py-2 transition-colors duration-300 hover:border-stone-400 hover:backdrop-blur-sm"
 						>
 							<div class="flex flex-row items-baseline justify-between">
 								<a href="#" class="line-clamp-1 text-3xl font-bold text-stone-800 transition-colors duration-300 group-hover:text-black"
