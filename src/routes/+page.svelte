@@ -2,13 +2,30 @@
 	import { enhance } from '$app/forms';
 	import type { ActionData, PageData, SubmitFunction } from './$types';
 	import Icon from '@iconify/svelte';
+	import Typewriter from 'svelte-typewriter';
 
 	export let data: PageData;
 	export let form: ActionData;
 
 	let searchRef: HTMLInputElement;
+	let searchQuery: string = '';
 
 	export let isQuerying = false;
+
+	const phrases = [
+		'flag guarding',
+		'roughing the passer',
+		'touchdown',
+		'fumble',
+		'interception',
+		'pass interference',
+		'holding',
+		'illegal forward pass',
+		'illegal motion',
+		'backward pass',
+		'illegal shift',
+		'illegal batting'
+	];
 
 	const sendQuery: SubmitFunction = (input) => {
 		isQuerying = true;
@@ -36,32 +53,6 @@
 				return 'Unknown';
 		}
 	};
-
-	import { onMount } from 'svelte';
-
-	const phrases = [
-		'flag guarding',
-		'roughing the passer',
-		'touchdown',
-		'fumble',
-		'interception',
-		'pass interference',
-		'holding',
-		'illegal forward pass',
-		'illegal motion',
-		'backward pass',
-		'illegal shift',
-		'illegal batting'
-	];
-	let randomSearchPhrase = phrases[Math.floor(Math.random() * phrases.length)];
-
-	onMount(async () => {
-		setInterval(async () => {
-			randomSearchPhrase = phrases[Math.floor(Math.random() * phrases.length)];
-		}, 2000);
-	});
-
-	const casePlays = data.records;
 </script>
 
 <svelte:head>
@@ -89,10 +80,17 @@
 							name="query"
 							type="search"
 							class="mx-auto h-12 w-full rounded-md border border-stone-400 bg-stone-200 px-3 text-lg shadow-lg transition-colors duration-300 ease-in-out placeholder:text-black/60 hover:bg-stone-300/60 hover:shadow-xl focus:border-stone-600 focus:bg-stone-300/80 focus:outline-none focus:ring-0 focus:drop-shadow-2xl"
-							placeholder={randomSearchPhrase}
 							disabled={isQuerying}
 							bind:this={searchRef}
+							bind:value={searchQuery}
 						/>
+						<div class="absolute ml-3">
+							<Typewriter mode="loopRandom" disabled={!!searchQuery} delay={500} interval={60} cursor={false}>
+								{#each phrases as phrase}
+									<span class="text-lg text-black/60">{phrase}</span>
+								{/each}
+							</Typewriter>
+						</div>
 						<!-- START: Query Input Box Icons -->
 						{#if isQuerying}
 							<!-- Loading Spinner -->
@@ -124,7 +122,7 @@
 							class="group flex cursor-pointer flex-col space-y-2 border border-stone-300 px-4 py-2 transition-colors duration-300 hover:border-stone-400 hover:backdrop-blur-sm"
 						>
 							<div class="flex flex-row items-baseline justify-between">
-								<a href="#" class="line-clamp-1 text-3xl font-bold text-stone-800 transition-colors duration-300 group-hover:text-black"
+								<a href="" class="line-clamp-1 text-3xl font-bold text-stone-800 transition-colors duration-300 group-hover:text-black"
 									>{casePlay.title}</a
 								>
 								<div
