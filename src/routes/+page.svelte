@@ -12,22 +12,6 @@
 
 	export let isQuerying = false;
 
-	const phrases = [
-		'flag guarding',
-		'roughing the passer',
-		'touchdown',
-		'fumble',
-		'interception',
-		'pass interference',
-		'holding',
-		'illegal forward pass',
-		'illegal motion',
-		'backward pass',
-		'illegal shift',
-		'illegal batting',
-		'inadvertent whistle'
-	];
-
 	const sendQuery: SubmitFunction = (input) => {
 		isQuerying = true;
 		return async ({ update }) => {
@@ -87,7 +71,7 @@
 						/>
 						<div class="absolute ml-3">
 							<Typewriter mode="loopRandom" disabled={!!searchQuery} delay={500} interval={60} cursor={false}>
-								{#each phrases as phrase}
+								{#each data.phrases as phrase}
 									<span class="text-lg text-black/60">{phrase}</span>
 								{/each}
 							</Typewriter>
@@ -123,7 +107,7 @@
 							class="group flex cursor-pointer flex-col space-y-2 border border-stone-300 px-4 py-2 transition-colors duration-300 hover:border-stone-400 hover:backdrop-blur-sm"
 						>
 							<div class="flex flex-row items-baseline justify-between">
-								<a href="" class="line-clamp-1 text-3xl font-bold text-stone-800 transition-colors duration-300 group-hover:text-black"
+								<a href="c/{casePlay.id}" class="line-clamp-1 text-3xl font-bold text-stone-800 transition-colors duration-300 group-hover:text-black"
 									>{casePlay.title}</a
 								>
 								<div

@@ -1,13 +1,30 @@
 import type { Actions, PageServerLoad } from './$types';
 import { xata } from '$lib/xata';
 
+// search phrases
+const phrases = [
+	'flag guarding',
+	'roughing the passer',
+	'touchdown',
+	'fumble',
+	'interception',
+	'pass interference',
+	'holding',
+	'illegal forward pass',
+	'illegal motion',
+	'backward pass',
+	'illegal shift',
+	'illegal batting',
+	'inadvertent whistle'
+];
+
 export const load = (async () => {
 	const page = await xata.db.case_play.getPaginated({
 		pagination: {
 			size: 10
 		}
 	});
-	return { records: page.records };
+	return { records: page.records, phrases };
 }) satisfies PageServerLoad;
 
 export const actions = {
