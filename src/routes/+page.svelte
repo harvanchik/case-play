@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import type { ActionData, PageData, SubmitFunction } from './$types';
+	import type { ActionData, PageData } from './$types';
 	import Icon from '@iconify/svelte';
 	import Typewriter from 'svelte-typewriter';
 
@@ -8,18 +8,6 @@
 	export let form: ActionData;
 
 	let searchRef: HTMLInputElement;
-	let searchQuery: string = '';
-
-	export let isQuerying = false;
-
-	const sendQuery: SubmitFunction = (input) => {
-		isQuerying = true;
-		return async ({ update }) => {
-			await update();
-			isQuerying = false;
-			searchRef.focus();
-		};
-	};
 
 	/**
 	 * Returns the difficulty of the case play (i.e., Easy, Moderate, Hard)
@@ -59,25 +47,32 @@
 		<div class="mt-16 flex flex-col space-y-3">
 			<div class="flex flex-col space-y-2">
 				<h1 class="mx-auto font-dokdo text-7xl font-semibold uppercase text-stone-800 text-shadow-lg">caseplay.org</h1>
-				<form method="POST" action="?/search" use:enhance class="flex">
+				<form
+					method="POST"
+					action="?/search"
+					use:enhance={() => {
+						data.isQuerying = true;
+					}}
+					class="flex"
+				>
 					<div class="group relative mx-auto flex w-[33%] items-center focus:w-[37%]">
 						<input
 							name="query"
 							type="search"
 							class="mx-auto h-12 w-full rounded-md border border-stone-400 bg-stone-200 px-3 text-lg shadow-lg transition-colors duration-300 ease-in-out placeholder:text-black/60 group-hover:bg-stone-300/60 group-hover:shadow-xl focus:border-stone-600 focus:bg-stone-300/80 focus:outline-none focus:ring-0 focus:drop-shadow-2xl"
-							disabled={isQuerying}
+							disabled={data.isQuerying}
 							bind:this={searchRef}
-							bind:value={searchQuery}
+							bind:value={data.searchQuery}
 						/>
-						<div class="absolute ml-3">
-							<Typewriter mode="loopRandom" disabled={!!searchQuery} delay={500} interval={60} cursor={false}>
+						<div class="pointer-events-none absolute ml-[14px]">
+							<Typewriter mode="loopRandom" disabled={!!data.searchQuery} delay={500} interval={60} cursor={false}>
 								{#each data.phrases as phrase}
-									<span class="text-lg text-black/60">{phrase}</span>
+									<span class="cursor-text select-none text-lg text-black/60">{phrase}</span>
 								{/each}
 							</Typewriter>
 						</div>
 						<!-- START: Query Input Box Icons -->
-						{#if isQuerying}
+						{#if data.isQuerying}
 							<!-- Loading Spinner -->
 							<Icon icon="mdi:loading" height="25" class="absolute right-0 mx-3 flex animate-spin cursor-wait" />
 						{:else}
@@ -95,14 +90,14 @@
 	<!-- START: Search Results -->
 	<section id="results">
 		<div class="mx-auto mt-5 flex max-h-[41rem] w-7/12 flex-col">
-			{#if form?.casePlays && form?.casePlays.length > 0}
+			{#if data?.casePlays && data?.casePlays.length > 0}
 				<!-- START: Number of Results -->
-				<span class="text-stone-600">{form?.casePlays?.length} case plays found</span>
+				<span class="text-stone-600">{data?.casePlays?.length} case plays found</span>
 				<!-- END: Number of Results -->
 				<div
 					class="mt-1 flex flex-col space-y-6 overflow-y-auto border border-stone-400 p-2 scrollbar scrollbar-track-stone-400 scrollbar-thumb-stone-900"
 				>
-					{#each form.casePlays as casePlay}
+					{#each data.casePlays as casePlay}
 						<div
 							class="group flex cursor-pointer flex-col space-y-2 border border-stone-300 px-4 py-2 transition-colors duration-300 hover:border-stone-400 hover:backdrop-blur-sm"
 						>
