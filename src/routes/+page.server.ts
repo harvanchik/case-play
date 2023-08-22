@@ -84,7 +84,6 @@ export const _search = async (query: string) => {
 		fuzziness: 1,
 		prefix: 'phrase'
 	});
-	console.log('searched');
 	// return all queried records from case_play table
 	return { casePlays: result.case_play };
 };
