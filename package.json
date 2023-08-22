@@ -6,7 +6,7 @@
 		"dev": "vite dev --open",
 		"build": "vite build",
 		"pnpm": "pnpm install",
-		"updates": "npm i -g npm-check-updates && ncu"
+		"updates": "npm i -g npm-check-updates && ncu -u && pnpm install"
 	},
 	"devDependencies": {
 		"@iconify/svelte": "^3.1.4",
