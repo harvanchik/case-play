@@ -1,5 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { xata } from '$lib/xata';
+import type { SearchXataRecord, SelectedPick } from '@xata.io/client';
+import type { CasePlayRecord } from '../xata';
 
 // search phrases
 const phrases = [
@@ -19,7 +21,7 @@ const phrases = [
 ];
 // case plays
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let casePlays: any;
+let casePlays: SearchXataRecord<SelectedPick<CasePlayRecord, ['*']>>[] | undefined;
 let isQuerying = false;
 
 export const load = (async ({ url }) => {
