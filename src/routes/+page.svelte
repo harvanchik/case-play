@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import type { ActionData, PageData } from './$types';
+	import { onMount } from 'svelte';
+	import type { PageData } from './$types';
 	import Icon from '@iconify/svelte';
 	import Typewriter from 'svelte-typewriter';
 
 	export let data: PageData;
-	export let form: ActionData;
 
 	let searchRef: HTMLInputElement;
 
@@ -26,6 +26,10 @@
 				return 'Unknown';
 		}
 	};
+
+	onMount(() => {
+		searchRef.focus();
+	});
 </script>
 
 <svelte:head>
@@ -101,7 +105,7 @@
 						<div
 							class="group flex cursor-pointer flex-col space-y-2 border border-stone-300 px-4 py-2 transition-colors duration-300 hover:border-stone-400 hover:backdrop-blur-sm"
 						>
-							<div class="flex flex-row items-baseline justify-between">
+							<div class="flex flex-row items-center justify-between">
 								<a
 									href="c/{casePlay.id}"
 									class="line-clamp-1 text-3xl font-bold leading-10 text-stone-800 transition-colors duration-300 group-hover:text-black"
@@ -121,6 +125,8 @@
 						</div>
 					{/each}
 				</div>
+			{:else if data?.casePlays}
+				<div>No results</div>
 			{/if}
 		</div>
 	</section>

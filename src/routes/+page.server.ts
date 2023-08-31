@@ -20,7 +20,6 @@ const phrases = [
 	'inadvertent whistle'
 ];
 // case plays
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let casePlays: SearchXataRecord<SelectedPick<CasePlayRecord, ['*']>>[] | undefined;
 let isQuerying = false;
 
