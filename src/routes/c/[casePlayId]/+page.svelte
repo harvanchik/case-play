@@ -17,8 +17,10 @@
 		// mark the letters in parentheses
 		instance.markRegExp(LETTER_REGEX, {
 			each(element) {
+				// get text
+				const text = element.textContent as string;
 				// get roman numeral
-				const romanNumeral = element.textContent?.toLowerCase().replace(/[()]/g, '');
+				const romanNumeral = text?.toLowerCase().replace(/[()]/g, '');
 				// if roman numeral is i, mark it green
 				if (romanNumeral === 'i') element.setAttribute('green', '');
 				// if roman numeral is ii, mark it blue
@@ -33,6 +35,10 @@
 				else if (romanNumeral === 'vi') element.setAttribute('violet', '');
 				// otherwise, mark it yellow
 				else element.setAttribute('yellow', '');
+				// get the next character
+				const char = element.nextSibling?.textContent?.trim().charAt(0);
+				// if the character is a comma, add right margin between it and the comma
+				if (char === ',') element.classList.add('mr-[2px]');
 			}
 		});
 		// regex to match team yardage lines
@@ -63,6 +69,10 @@
 		const CLOSED_REGEX = /closes|closed|close/gi;
 		// mark variants of word 'closed'
 		instance.markRegExp(CLOSED_REGEX, { element: 'span', className: 'closed' });
+		// regex to match newlines
+		const NEWLINE_REGEX = /\n/g;
+		// replace newline with br element
+		instance.markRegExp(NEWLINE_REGEX, { element: 'br' });
 	});
 </script>
 
@@ -81,8 +91,29 @@
 <main class="min-h-screen overflow-hidden bg-stone-100/[97%] scrollbar scrollbar-track-stone-800 scrollbar-thumb-black">
 	<!-- Background -->
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
-	<p class="context">{data.casePlay?.prompt}</p>
-	<br /><br />
-	<p class="context">{data.casePlay?.answer}</p>
+
+	<div class="mt-20 flex flex-col">
+		<h1 class="mx-auto mb-5 border-b-4 border-stone-900 px-5 pb-3 text-4xl font-semibold text-stone-800">{data.casePlay?.title}</h1>
+		<h1>authored by {data.casePlay?.author?.id}</h1>
+		<div class="mx-auto flex w-1/2 flex-col space-y-5 leading-[1.425]">
+			<p
+				id="prompt"
+				class="scrollbar-w-3 max-h-48 border-2 border-stone-900 bg-white p-4 shadow-lg scrollbar scrollbar-track-stone-300 scrollbar-thumb-stone-700 selection:bg-black/20"
+				contenteditable="false"
+			>
+				{data.casePlay?.prompt}
+			</p>
+
+			<!-- START: Case Play Answer -->
+			<spoiler
+				id="answer"
+				class="scrollbar-w-3 group max-h-80 border-2 border-stone-900 scrollbar scrollbar-track-black/70 scrollbar-thumb-stone-200"
+				contenteditable="false"
+			>
+				{data.casePlay?.answer}
+			</spoiler>
+			<!-- END: Case Play Answer -->
+		</div>
+	</div>
 </main>
 <!-- END: Search Bar -->

@@ -59,7 +59,7 @@
 					}}
 					class="flex"
 				>
-					<div class="group relative mx-auto flex w-[33%] items-center focus:w-[37%]">
+					<div class="group relative mx-auto flex w-1/3 items-center focus:w-[37%]">
 						<input
 							name="query"
 							type="search"
