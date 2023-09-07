@@ -1,0 +1,16 @@
+{
+  "id": "mig_cfi86nqf2mo6u2s9frlg",
+  "parentID": "mig_cfi86ikk23gt6it6bbg0",
+  "checksum": "1:a3247eac39f72b1d775f884ef2eafda98b4a89e887d10d42d830e803daa957c7",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "edition",
+          "type": "string"
+        },
+        "table": "case-play"
+      }
+    }
+  ]
+}

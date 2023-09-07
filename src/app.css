@@ -1,10 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Barriecito&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Neucha&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Dokdo&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
 	mark {
-		@apply bg-current font-extrabold px-[1px] text-stone-900 transition-colors duration-[1.25s] ease-in selection:bg-yellow-200 group-hover:bg-yellow-300 pb-0.5;
+		@apply bg-current px-[1px] pb-0.5 font-extrabold text-stone-900 transition-colors duration-[1.25s] ease-in selection:bg-yellow-200 group-hover:bg-yellow-300;
 	}
 	mark[green] {
 		@apply selection:bg-lime-200 group-hover:bg-lime-300;
@@ -49,13 +53,21 @@
 		@apply font-semibold;
 	}
 	br {
-		@apply block content-['_'] mb-3;
+		@apply mb-3 block content-['_'];
 	}
 	spoiler span {
 		@apply font-medium text-stone-900 transition-colors duration-[1.25s] ease-in;
 	}
 	p#prompt span {
 		@apply font-medium;
+	}
+
+	/* clears the ‘X’ from text box */
+	input[type='search']::-webkit-search-decoration,
+	input[type='search']::-webkit-search-cancel-button,
+	input[type='search']::-webkit-search-results-button,
+	input[type='search']::-webkit-search-results-decoration {
+		display: none;
 	}
 }
 

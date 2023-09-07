@@ -1,0 +1,13 @@
+{
+  "id": "mig_cj9ekjkia1mv41jssvq0",
+  "parentID": "mig_cj9ek4f2nsp6kurg9t6g",
+  "checksum": "1:b48be50ccef56aeb35df8994798166d3c520f283fa882b86e5091ef69771886c",
+  "operations": [
+    {
+      "removeColumn": {
+        "column": "test_2",
+        "table": "playlist"
+      }
+    }
+  ]
+}
