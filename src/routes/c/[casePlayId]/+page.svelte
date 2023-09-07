@@ -93,9 +93,9 @@
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 
 	<div class="mt-20 flex flex-col">
-		<h1 class="mx-auto mb-5 border-b-4 border-stone-900 px-5 pb-3 text-4xl font-semibold text-stone-800">{data.casePlay?.title}</h1>
-		<h1>authored by {data.casePlay?.author?.id}</h1>
-		<div class="mx-auto flex w-1/2 flex-col space-y-5 leading-[1.425]">
+		<h1 class="mx-auto mb-2 border-b-4 border-stone-900 px-5 text-4xl font-semibold text-stone-800">{data.casePlay?.title}</h1>
+		<h2 class="mx-auto pb-3">authored by {data.casePlay?.author?.first_name + ' ' + data.casePlay?.author?.last_name}</h2>
+		<div class="mx-auto flex w-1/2 flex-col space-y-5 text-lg leading-[1.425]">
 			<p
 				id="prompt"
 				class="scrollbar-w-3 max-h-48 border-2 border-stone-900 bg-white p-4 shadow-lg scrollbar scrollbar-track-stone-300 scrollbar-thumb-stone-700 selection:bg-black/20"
