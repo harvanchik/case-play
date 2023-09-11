@@ -93,12 +93,16 @@
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 
 	<div class="mt-20 flex flex-col">
-		<h1 class="mx-auto mb-2 border-b-4 border-stone-900 px-5 text-4xl font-semibold text-stone-800">{data.casePlay?.title}</h1>
+		<h1
+			class="mx-3 mb-2 border-b-2 border-stone-900 px-0 text-center text-3xl font-semibold text-stone-800 sm:mx-auto sm:border-b-4 sm:px-5 sm:text-4xl"
+		>
+			{data.casePlay?.title}
+		</h1>
 		<h2 class="mx-auto pb-3">authored by {data.casePlay?.author?.first_name + ' ' + data.casePlay?.author?.last_name}</h2>
-		<div class="mx-auto flex w-1/2 flex-col space-y-5 text-lg leading-[1.425]">
+		<div class="mx-3 flex flex-col space-y-5 text-lg leading-[1.425] sm:mx-auto sm:w-1/2">
 			<p
 				id="prompt"
-				class="scrollbar-w-3 max-h-48 border-2 border-stone-900 bg-white p-4 shadow-lg scrollbar scrollbar-track-stone-300 scrollbar-thumb-stone-700 selection:bg-black/20"
+				class="scrollbar-w-3 max-h-48 overflow-y-auto border-2 border-stone-900 bg-white p-4 shadow-lg scrollbar scrollbar-track-stone-300 scrollbar-thumb-stone-700 selection:bg-black/20"
 				contenteditable="false"
 			>
 				{data.casePlay?.prompt}
@@ -107,7 +111,7 @@
 			<!-- START: Case Play Answer -->
 			<spoiler
 				id="answer"
-				class="scrollbar-w-3 group max-h-80 border-2 border-stone-900 scrollbar scrollbar-track-black/70 scrollbar-thumb-stone-200"
+				class="scrollbar-w-3 group max-h-80 overflow-y-auto border-2 border-stone-900 scrollbar scrollbar-track-black/70 scrollbar-thumb-stone-200"
 				contenteditable="false"
 			>
 				{data.casePlay?.answer}

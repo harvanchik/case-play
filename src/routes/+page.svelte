@@ -48,9 +48,9 @@
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 	<!-- START: Search Bar -->
 	<section id="search">
-		<div class="mt-16 flex flex-col space-y-3">
+		<div class="mt-10 flex flex-col space-y-3 sm:mt-16">
 			<div class="flex flex-col space-y-2">
-				<h1 class="mx-auto font-dokdo text-7xl font-semibold uppercase text-stone-800 text-shadow-lg">caseplay.org</h1>
+				<h1 class="mx-auto font-dokdo text-5xl font-semibold uppercase text-stone-800 text-shadow-lg sm:text-7xl">caseplay.org</h1>
 				<form
 					method="POST"
 					action="?/search"
@@ -59,7 +59,7 @@
 					}}
 					class="flex"
 				>
-					<div class="group relative mx-auto flex w-1/3 items-center focus:w-[37%]">
+					<div class="group relative mx-5 flex w-full items-center focus:w-[37%] sm:mx-auto sm:w-1/3">
 						<input
 							name="query"
 							type="search"
@@ -93,7 +93,7 @@
 
 	<!-- START: Search Results -->
 	<section id="results">
-		<div class="mx-auto mt-5 flex max-h-[41rem] w-7/12 flex-col">
+		<div class="mx-5 my-5 flex max-h-[41rem] flex-col sm:mx-auto sm:w-7/12">
 			{#if data?.casePlays && data?.casePlays.length > 0}
 				<!-- START: Number of Results -->
 				<span class="text-stone-600">{data?.casePlays?.length} case plays found</span>
