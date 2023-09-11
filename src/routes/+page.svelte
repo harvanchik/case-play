@@ -50,7 +50,9 @@
 	<section id="search">
 		<div class="mt-10 flex flex-col space-y-3 sm:mt-16">
 			<div class="flex flex-col space-y-2">
-				<h1 class="mx-auto font-dokdo text-5xl font-semibold uppercase text-stone-800 text-shadow-lg sm:text-7xl">caseplay.org</h1>
+				<h1 class="mx-auto select-none font-dokdo text-5xl font-semibold uppercase text-stone-800 text-shadow-md sm:text-7xl sm:text-shadow-lg">
+					caseplay.org
+				</h1>
 				<form
 					method="POST"
 					action="?/search"
@@ -99,20 +101,22 @@
 				<span class="text-stone-600">{data?.casePlays?.length} case plays found</span>
 				<!-- END: Number of Results -->
 				<div
-					class="mt-1 flex flex-col space-y-6 overflow-y-auto border border-stone-400 p-2 scrollbar scrollbar-track-stone-400 scrollbar-thumb-stone-900"
+					class="mt-1 flex flex-col space-y-4 overflow-y-auto border border-stone-400 p-2 scrollbar scrollbar-track-stone-400 scrollbar-thumb-stone-900"
 				>
 					{#each data.casePlays as casePlay}
-						<div
-							class="group flex cursor-pointer flex-col space-y-2 border border-stone-300 px-4 py-2 transition-colors duration-300 hover:border-stone-400 hover:backdrop-blur-sm"
+						<a
+							href="c/{casePlay.id}"
+							class="group flex cursor-pointer select-none flex-col space-y-1 border border-stone-300 px-2 py-1 transition-colors duration-300 hover:border-stone-400 hover:backdrop-blur-sm sm:px-4 sm:py-2"
 						>
-							<div class="flex flex-row items-center justify-between">
+							<div class="flex flex-row items-start justify-between sm:items-center">
 								<a
-									href="c/{casePlay.id}"
-									class="line-clamp-1 text-3xl font-bold leading-10 text-stone-800 transition-colors duration-300 group-hover:text-black"
-									>{casePlay.title}</a
+									id="title"
+									class="line-clamp-2 pb-1 text-xl font-bold leading-tight text-stone-800 transition-colors duration-300 group-hover:text-black sm:line-clamp-1 sm:text-3xl"
 								>
+									{casePlay.title}
+								</a>
 								<div
-									class="w-max rounded-full bg-opacity-80 px-2 py-0.5 text-sm text-white transition-colors duration-300 group-hover:bg-opacity-100"
+									class="mt-1 w-max rounded-full bg-opacity-80 px-2 py-0.5 text-xs text-white transition-colors duration-300 group-hover:bg-opacity-100 sm:mt-0 sm:text-sm"
 									class:bg-green-600={casePlay.difficulty == 1}
 									class:bg-yellow-400={casePlay.difficulty == 2}
 									class:!text-black={casePlay.difficulty == 2}
@@ -121,8 +125,10 @@
 									{getDifficulty(casePlay.difficulty)}
 								</div>
 							</div>
-							<div class="line-clamp-3 text-xl text-stone-600">{casePlay.prompt}</div>
-						</div>
+							<div id="prompt" class="line-clamp-4 text-base leading-tight text-stone-600 sm:line-clamp-3 sm:text-xl sm:leading-snug">
+								{casePlay.prompt}
+							</div>
+						</a>
 					{/each}
 				</div>
 			{:else if data?.casePlays}
