@@ -62,7 +62,7 @@ export const _search = async (query: string) => {
 				target: [
 					{ column: 'title', weight: 3 },
 					{ column: 'prompt', weight: 2 },
-					{ column: 'answer' },
+					{ column: 'answer', weight: 2 },
 					{ column: 'author', weight: 1 },
 					{ column: 'rulebook' },
 					{ column: 'edition' }
@@ -78,6 +78,10 @@ export const _search = async (query: string) => {
 			{
 				table: 'rulebook',
 				target: [{ column: 'title' }, { column: 'slug' }]
+			},
+			{
+				table: 'sport',
+				target: [{ column: 'name' }, { column: 'slug' }]
 			}
 		],
 		fuzziness: 1,
