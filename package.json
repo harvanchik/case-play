@@ -5,6 +5,7 @@
 	"scripts": {
 		"dev": "vite dev --open",
 		"build": "vite build",
+		"codegen": "xata codegen",
 		"pnpm": "pnpm install",
 		"updates": "npm i -g npm-check-updates && ncu -u && pnpm install"
 	},
