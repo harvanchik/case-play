@@ -9,7 +9,7 @@
 		// get the mark instance of the main element
 		const instance = new Mark('main');
 		// regex to match teams/players (e.g., Team A, Team B, A-1, B-2)
-		const TEAM_REGEX = /Team ([ABKR])|[ABKR]-[0-9]{1,2}/g;
+		const TEAM_REGEX = /Team ([ABKR])('s)*|[ABKR]-[0-9]{1,2}('s)*/g;
 		// mark the teams/players
 		instance.markRegExp(TEAM_REGEX, { element: 'u' });
 		// regex to match letters in parentheses
