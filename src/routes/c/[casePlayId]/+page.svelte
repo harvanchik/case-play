@@ -119,7 +119,7 @@
 					target="_blank"
 					class="my-auto mb-3 ml-5 h-8 opacity-85 transition-transform duration-150 hover:scale-110 hover:opacity-100"
 				>
-					<img class="h-full" src="/src/lib/svg/youtube.svg" alt="youtube" />
+					<img class="h-full" src="../../../../src/lib/svg/youtube.svg" alt="youtube" />
 				</a>
 			{/if}
 			<!-- END: YouTube Link -->
