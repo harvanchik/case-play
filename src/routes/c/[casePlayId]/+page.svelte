@@ -87,7 +87,7 @@
 </script>
 
 <svelte:head>
-	<title>Case Plays</title>
+	<title>{data.casePlay?.title}</title>
 	<meta name="description" content="Sports case play database for referee education" />
 	<meta
 		name="keywords"
