@@ -5,6 +5,8 @@
 
 	export let data: PageData;
 
+	let isClicked = false;
+
 	onMount(() => {
 		// get the mark instance of the main element
 		const instance = new Mark('main');
@@ -74,6 +76,14 @@
 		// replace newline with br element
 		instance.markRegExp(NEWLINE_REGEX, { element: 'br' });
 	});
+
+	const copyLink = () => {
+		isClicked = true;
+		navigator.clipboard.writeText(window.location.href);
+		setTimeout(() => {
+			isClicked = false;
+		}, 2000);
+	};
 </script>
 
 <svelte:head>
@@ -137,6 +147,18 @@
 				{data.casePlay?.answer}
 			</spoiler>
 			<!-- END: Case Play Answer -->
+
+			<!-- START: Copy Link Button -->
+			<div class="ml-auto mt-5">
+				<button
+					class="ml-auto flex border border-transparent bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-stone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-500 focus-visible:ring-offset-2"
+					on:click={copyLink}
+					class:!bg-green-500={isClicked}
+					class:!bg-stone-900={!isClicked}
+					>SHARE
+					<!-- END: Copy Link Button -->
+				</button>
+			</div>
 		</div>
 	</div>
 </main>
