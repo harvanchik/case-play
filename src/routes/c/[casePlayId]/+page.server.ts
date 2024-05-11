@@ -6,6 +6,7 @@ export const load = (async (url) => {
 	const id = url.params.casePlayId;
 	// get case play by id
 	const casePlay = await xata.db['case_play'].select(['*', 'author.first_name', 'author.last_name']).filter({ id: id }).getFirst();
+	console.log(casePlay);
 	// return case play
 	return { casePlay };
 }) satisfies PageServerLoad;

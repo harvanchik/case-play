@@ -30,6 +30,7 @@ const tables = [
         defaultValue: "1970-12-23T00:00:00Z",
       },
       { name: "sport", type: "link", link: { table: "sport" } },
+      { name: "film", type: "string" },
     ],
   },
   {
@@ -53,7 +54,13 @@ const tables = [
     ],
     revLinks: [{ column: "", table: "case_play" }],
   },
-  { name: "playlist", columns: [{ name: "case_plays", type: "multiple" }] },
+  {
+    name: "playlist",
+    columns: [
+      { name: "case_plays", type: "multiple" },
+      { name: "title", type: "string", defaultValue: "Untitled Playlist" },
+    ],
+  },
   {
     name: "sport",
     columns: [

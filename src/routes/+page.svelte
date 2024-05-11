@@ -111,9 +111,21 @@
 							<div class="flex flex-row items-start justify-between sm:items-center">
 								<a
 									id="title"
-									class="line-clamp-2 pb-1 text-xl font-bold leading-tight text-stone-800 transition-colors duration-300 group-hover:text-black sm:line-clamp-1 sm:text-3xl"
+									class="line-clamp-2 flex flex-row pb-1 text-xl font-bold leading-tight text-stone-800 transition-colors duration-300 group-hover:text-black sm:text-3xl"
 								>
-									{casePlay.title}
+									<p>{casePlay.title}</p>
+
+									<!-- START: YouTube Link -->
+									{#if casePlay?.film}
+										<a
+											href={casePlay?.film}
+											target="_blank"
+											class="my-auto mb-1.5 ml-4 opacity-85 transition-transform duration-150 hover:scale-110 hover:opacity-100"
+										>
+											<img class="h-5" src="/src/lib/svg/youtube.svg" alt="youtube" />
+										</a>
+									{/if}
+									<!-- END: YouTube Link -->
 								</a>
 								<div
 									class="mt-1 w-max rounded-full bg-opacity-80 px-2 py-0.5 text-xs text-white transition-colors duration-300 group-hover:bg-opacity-100 sm:mt-0 sm:text-sm"

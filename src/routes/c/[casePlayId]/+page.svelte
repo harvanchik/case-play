@@ -93,13 +93,32 @@
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 
 	<div class="mt-20 flex flex-col">
-		<h1
-			class="mx-3 mb-2 border-b-2 border-stone-900 px-0 text-center text-3xl font-semibold text-stone-800 sm:mx-auto sm:border-b-4 sm:px-5 sm:text-4xl"
-		>
-			{data.casePlay?.title}
-		</h1>
+		<div class="mx-auto flex flex-row text-center">
+			<!-- START: Case Play Title -->
+			<h1
+				class="mx-3 mb-2 flex border-b-2 border-stone-900 px-0 text-center text-3xl font-semibold text-stone-800 sm:mx-auto sm:border-b-4 sm:px-5 sm:text-4xl"
+			>
+				{data.casePlay?.title}
+			</h1>
+			<!-- END: Case Play Title -->
+
+			<!-- START: YouTube Link -->
+			{#if data.casePlay?.film}
+				<a
+					href={data.casePlay?.film}
+					target="_blank"
+					class="my-auto mb-3 ml-5 h-8 opacity-85 transition-transform duration-150 hover:scale-110 hover:opacity-100"
+				>
+					<img class="h-full" src="/src/lib/svg/youtube.svg" alt="youtube" />
+				</a>
+			{/if}
+			<!-- END: YouTube Link -->
+		</div>
+		<!-- START: Author -->
 		<h2 class="mx-auto pb-3">authored by {data.casePlay?.author?.first_name + ' ' + data.casePlay?.author?.last_name}</h2>
+		<!-- END: Author -->
 		<div class="mx-3 flex flex-col space-y-5 text-lg leading-[1.425] sm:mx-auto sm:w-1/2">
+			<!-- START: Case Play Prompt -->
 			<p
 				id="prompt"
 				class="scrollbar-w-3 max-h-48 overflow-y-auto border-2 border-stone-900 bg-white p-4 shadow-lg scrollbar scrollbar-track-stone-300 scrollbar-thumb-stone-700 selection:bg-black/20"
@@ -107,6 +126,7 @@
 			>
 				{data.casePlay?.prompt}
 			</p>
+			<!-- END: Case Play Prompt -->
 
 			<!-- START: Case Play Answer -->
 			<spoiler
