@@ -1,0 +1,17 @@
+{
+  "id": "mig_cv51c4pd9l5p1s85ud30",
+  "parentID": "mig_covrpbatbn11ba9le6g0",
+  "checksum": "1:b3e57485a89adcbf73f57ed096d962f184fe3980895b67771a77037d5c6f2746",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "nickname",
+          "type": "text",
+          "defaultValue": ""
+        },
+        "table": "rulebook"
+      }
+    }
+  ]
+}

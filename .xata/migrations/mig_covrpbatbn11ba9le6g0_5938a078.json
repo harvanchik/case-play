@@ -1,0 +1,16 @@
+{
+  "id": "mig_covrpbatbn11ba9le6g0",
+  "parentID": "mig_covbkbitbn11ba9ldu80",
+  "checksum": "1:5938a0782c3468271f4b00086642113fdb5703e8fe0082936cdd0f9781068fb4",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "film",
+          "type": "string"
+        },
+        "table": "case_play"
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "mig_ck21bll62jrqegmgmmug",
+  "parentID": "mig_cj9eo1f2nsp6kurg9tsg",
+  "checksum": "1:158336c6cce16caace9ca537c8d342cd271d63ae642fff2a8dad1ca03dcac0ca",
+  "operations": [
+    {
+      "addTable": {
+        "table": "sport"
+      }
+    }
+  ]
+}
