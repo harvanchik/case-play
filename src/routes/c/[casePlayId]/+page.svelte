@@ -124,9 +124,16 @@
 			{/if}
 			<!-- END: YouTube Link -->
 		</div>
+		<!-- START: Subtitle -->
+		<h2 class="mx-auto flex space-x-3 pb-3">
 		<!-- START: Author -->
-		<h2 class="mx-auto pb-3">authored by {data.casePlay?.author?.first_name + ' ' + data.casePlay?.author?.last_name}</h2>
+			<p class="text-stone-600 hover:text-stone-800">authored by {data.casePlay?.author?.first_name + ' ' + data.casePlay?.author?.last_name}</p>
+			<!-- divider symbol -->
+			<p class="text-stone-700">•</p>
 		<!-- END: Author -->
+			<p class="text-stone-600 hover:text-stone-800">{data.casePlay?.rulebook?.nickname + ' ' + data.casePlay?.edition + ' Edition'}</p>
+		</h2>
+		<!-- END: Subtitle -->
 		<div class="mx-3 flex flex-col space-y-5 text-lg leading-[1.425] sm:mx-auto sm:w-1/2">
 			<!-- START: Case Play Prompt -->
 			<p
