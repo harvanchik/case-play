@@ -12,6 +12,7 @@
 	"devDependencies": {
 		"@iconify/svelte": "^4.0.2",
 		"@sveltejs/adapter-auto": "^3.2.0",
+		"@sveltejs/adapter-vercel": "^5.6.3",
 		"@sveltejs/kit": "^2.5.7",
 		"@types/mark.js": "^8.11.12",
 		"@typescript-eslint/eslint-plugin": "^7.8.0",
