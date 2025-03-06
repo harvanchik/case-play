@@ -51,6 +51,7 @@ const tables = [
         notNull: true,
         defaultValue: "nirsa-flag",
       },
+      { name: "nickname", type: "text", defaultValue: "" },
     ],
     revLinks: [{ column: "", table: "case_play" }],
   },
