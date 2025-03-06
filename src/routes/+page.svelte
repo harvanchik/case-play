@@ -26,10 +26,6 @@
 				return 'Unknown';
 		}
 	};
-
-	onMount(() => {
-		searchRef.focus();
-	});
 </script>
 
 <svelte:head>
@@ -46,52 +42,11 @@
 <main class="min-h-screen overflow-hidden bg-stone-100/[97%] scrollbar scrollbar-track-stone-800 scrollbar-thumb-black">
 	<!-- Background -->
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
-	<!-- START: Search Bar -->
-	<section id="search">
-		<div class="mt-10 flex flex-col space-y-3 sm:mt-16">
-			<div class="flex flex-col space-y-2">
-				<h1 class="mx-auto select-none font-dokdo text-5xl font-semibold uppercase text-stone-800 text-shadow-md sm:text-7xl sm:text-shadow-lg">
-					caseplay.org
-				</h1>
-				<form
-					method="POST"
-					action="?/search"
-					use:enhance={() => {
-						data.isQuerying = true;
-					}}
-					class="flex"
-				>
-					<div class="group relative mx-5 flex w-full items-center focus:w-[37%] sm:mx-auto sm:w-1/3">
-						<input
-							name="query"
-							type="search"
-							class="mx-auto h-12 w-full rounded-md border border-stone-400 bg-stone-200 px-3 text-lg shadow-lg transition-colors duration-300 ease-in-out placeholder:text-black/60 group-hover:bg-stone-300/60 group-hover:shadow-xl focus:border-stone-600 focus:bg-stone-300/80 focus:outline-none focus:ring-0 focus:drop-shadow-2xl"
-							disabled={data.isQuerying}
-							bind:this={searchRef}
-							bind:value={data.searchQuery}
-						/>
-						<div class="pointer-events-none absolute ml-[14px]">
-							<Typewriter mode="loopRandom" disabled={!!data.searchQuery} delay={500} interval={60} cursor={false}>
-								{#each data.phrases as phrase}
-									<span class="cursor-text select-none text-lg text-black/60">{phrase}</span>
-								{/each}
-							</Typewriter>
-						</div>
-						<!-- START: Query Input Box Icons -->
-						{#if data.isQuerying}
-							<!-- Loading Spinner -->
-							<Icon icon="mdi:loading" height="25" class="absolute right-0 mx-3 flex animate-spin cursor-wait" />
-						{:else}
-							<!-- Search Icon -->
-							<Icon icon="line-md:search-twotone" height="25" hFlip={true} class="absolute right-0 mx-3 flex cursor-pointer" />
-						{/if}
-						<!-- END: Query Input Box Icons -->
-					</div>
-				</form>
-			</div>
-		</div>
-	</section>
-	<!-- END: Search Bar -->
+	<div class="mt-10 flex w-full">
+		<h1 class="mx-auto select-none font-dokdo text-5xl font-semibold uppercase text-stone-800 text-shadow-md sm:text-7xl sm:text-shadow-lg">
+			caseplay.org
+		</h1>
+	</div>
 
 	<!-- START: Search Results -->
 	<section id="results">
