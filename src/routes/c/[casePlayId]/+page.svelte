@@ -13,11 +13,12 @@
 		// regex to match teams/players (e.g., Team A, Team B, A-1, B-2)
 		const TEAM_REGEX = /Team ([ABKR])('s)*|[ABKR]-[0-9]{1,2}('s)*/g;
 		// mark the teams/players
-		instance.markRegExp(TEAM_REGEX, { element: 'u' });
+		instance.markRegExp(TEAM_REGEX, { element: 'u', exclude: ['h1', 'h2'] });
 		// regex to match letters in parentheses
 		const LETTER_REGEX = /\((?=[mdclxvi])m*(c[md]|d?c{0,3})(x[cl]|l?x{0,3})(i[xv]|v?i{0,3})\)/g;
 		// mark the letters in parentheses
 		instance.markRegExp(LETTER_REGEX, {
+			exclude: ['h1', 'h2'],
 			each(element) {
 				// get text
 				const text = element.textContent as string;
@@ -46,35 +47,35 @@
 		// regex to match team yardage lines
 		const YARD_REGEX = /([ABKR]'s\s[1-4]?[0-9])|([ABKR]'s)/g;
 		// mark the team yardage lines
-		instance.markRegExp(YARD_REGEX, { element: 'b' });
+		instance.markRegExp(YARD_REGEX, { element: 'b', exclude: ['h1', 'h2'] });
 		// regex to match a rule reference
 		const RULE_REGEX = /Rule ([0-9]{1,2}-[0-9]{1,2}-[0-9]{1,2}[A-Z]{0,1})/g;
 		// mark the rule reference
-		instance.markRegExp(RULE_REGEX, { element: 'u' });
+		instance.markRegExp(RULE_REGEX, { element: 'u', exclude: ['h1', 'h2'] });
 		// regex to match variants of word 'accept'
 		const ACCEPT_REGEX = /accepts|accepted|accept/gi;
 		// mark the variants of word 'accept'
-		instance.markRegExp(ACCEPT_REGEX, { element: 'span', className: 'accept' });
+		instance.markRegExp(ACCEPT_REGEX, { element: 'span', className: 'accept', exclude: ['h1', 'h2'] });
 		// regex to match variants of word 'decline'
 		const DECLINE_REGEX = /declines|declined|decline/gi;
 		// mark the variants of word 'decline'
-		instance.markRegExp(DECLINE_REGEX, { element: 'span', className: 'decline' });
+		instance.markRegExp(DECLINE_REGEX, { element: 'span', className: 'decline', exclude: ['h1', 'h2'] });
 		// regex to match variants of word 'offset'
 		const OFFSET_REGEX = /offsets|offsetted|offset/gi;
 		// mark variants of word 'offset'
-		instance.markRegExp(OFFSET_REGEX, { element: 'span', className: 'offset' });
+		instance.markRegExp(OFFSET_REGEX, { element: 'span', className: 'offset', exclude: ['h1', 'h2'] });
 		// regex to match variants of word 'open'
 		const OPEN_REGEX = /opens|opened|open/gi;
 		// mark variants of word 'open'
-		instance.markRegExp(OPEN_REGEX, { element: 'span', className: 'open' });
+		instance.markRegExp(OPEN_REGEX, { element: 'span', className: 'open', exclude: ['h1', 'h2'] });
 		// regex to match variants of word 'closed'
 		const CLOSED_REGEX = /closes|closed|close/gi;
 		// mark variants of word 'closed'
-		instance.markRegExp(CLOSED_REGEX, { element: 'span', className: 'closed' });
+		instance.markRegExp(CLOSED_REGEX, { element: 'span', className: 'closed', exclude: ['h1', 'h2'] });
 		// regex to match newlines
 		const NEWLINE_REGEX = /\n/g;
 		// replace newline with br element
-		instance.markRegExp(NEWLINE_REGEX, { element: 'br' });
+		instance.markRegExp(NEWLINE_REGEX, { element: 'br', exclude: ['h1', 'h2'] });
 	});
 
 	const copyLink = () => {
@@ -126,11 +127,11 @@
 		</div>
 		<!-- START: Subtitle -->
 		<h2 class="mx-auto flex space-x-3 pb-3">
-		<!-- START: Author -->
+			<!-- START: Author -->
 			<p class="text-stone-600 hover:text-stone-800">authored by {data.casePlay?.author?.first_name + ' ' + data.casePlay?.author?.last_name}</p>
 			<!-- divider symbol -->
 			<p class="text-stone-700">•</p>
-		<!-- END: Author -->
+			<!-- END: Author -->
 			<p class="text-stone-600 hover:text-stone-800">{data.casePlay?.rulebook?.nickname + ' ' + data.casePlay?.edition + ' Edition'}</p>
 		</h2>
 		<!-- END: Subtitle -->
