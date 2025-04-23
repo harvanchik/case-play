@@ -39,11 +39,11 @@
 	<script src="https://code.iconify.design/iconify-icon/1.0.3/iconify-icon.min.js"></script>
 </svelte:head>
 
-<main class="min-h-screen overflow-hidden bg-stone-100/[97%] scrollbar scrollbar-track-stone-800 scrollbar-thumb-black">
+<main class="scrollbar scrollbar-track-stone-800 scrollbar-thumb-black min-h-screen overflow-hidden bg-stone-100/[97%]">
 	<!-- Background -->
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 	<div class="mt-10 flex w-full">
-		<h1 class="mx-auto select-none font-dokdo text-5xl font-semibold uppercase text-stone-800 text-shadow-md sm:text-7xl sm:text-shadow-lg">
+		<h1 class="font-dokdo text-shadow-md sm:text-shadow-lg mx-auto text-5xl font-semibold text-stone-800 uppercase select-none sm:text-7xl">
 			caseplay.org
 		</h1>
 	</div>
@@ -56,17 +56,17 @@
 				<span class="text-stone-600">{data?.casePlays?.length} case plays found</span>
 				<!-- END: Number of Results -->
 				<div
-					class="mt-1 flex flex-col space-y-4 overflow-y-auto border border-stone-400 p-2 scrollbar scrollbar-track-stone-400 scrollbar-thumb-stone-900"
+					class="scrollbar scrollbar-track-stone-400 scrollbar-thumb-stone-900 mt-1 flex flex-col space-y-4 overflow-y-auto border border-stone-400 p-2"
 				>
 					{#each data.casePlays as casePlay}
 						<a
 							href="c/{casePlay.id}"
-							class="group flex cursor-pointer select-none flex-col space-y-1 border border-stone-300 px-2 py-1 transition-colors duration-300 hover:border-stone-400 hover:backdrop-blur-sm sm:px-4 sm:py-2"
+							class="group flex cursor-pointer flex-col space-y-1 border border-stone-300 px-2 py-1 transition-colors duration-300 select-none hover:border-stone-400 hover:backdrop-blur-sm sm:px-4 sm:py-2"
 						>
 							<div class="flex flex-row items-start justify-between sm:items-center">
-								<a
+								<div
 									id="title"
-									class="line-clamp-2 flex flex-row pb-1 text-xl font-bold leading-tight text-stone-800 transition-colors duration-300 group-hover:text-black sm:text-3xl"
+									class="line-clamp-2 flex flex-row pb-1 text-xl leading-tight font-bold text-stone-800 transition-colors duration-300 group-hover:text-black sm:text-3xl"
 								>
 									<p>{casePlay.title}</p>
 
@@ -81,9 +81,9 @@
 										</a>
 									{/if}
 									<!-- END: YouTube Link -->
-								</a>
+								</div>
 								<div
-									class="mt-1 w-max rounded-full bg-opacity-80 px-2 py-0.5 text-xs text-white transition-colors duration-300 group-hover:bg-opacity-100 sm:mt-0 sm:text-sm"
+									class="bg-opacity-80 group-hover:bg-opacity-100 mt-1 w-max rounded-full px-2 py-0.5 text-xs text-white transition-colors duration-300 sm:mt-0 sm:text-sm"
 									class:bg-green-600={casePlay.difficulty == 1}
 									class:bg-yellow-400={casePlay.difficulty == 2}
 									class:!text-black={casePlay.difficulty == 2}
