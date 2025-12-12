@@ -102,7 +102,7 @@
 	<!-- Background -->
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 
-	<div class="mt-20 flex flex-col">
+	<div class="my-10 flex flex-col">
 		<form method="POST" action="?/upload" class="mx-3 flex flex-col space-y-5 text-lg leading-[1.425] sm:mx-auto sm:w-1/2">
 			<!-- START: Title -->
 			<div class="flex flex-col space-y-1">
