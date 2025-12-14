@@ -181,6 +181,7 @@
 							<div
 								class="absolute right-0 z-10 mt-2 w-48 border border-stone-200 bg-white p-2 shadow-lg"
 								on:mouseleave={() => (showDifficultyDropdown = false)}
+								role="group"
 							>
 								{#each difficultyOptions as option}
 									<button

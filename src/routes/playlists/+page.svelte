@@ -46,12 +46,12 @@
 							class="group flex cursor-pointer select-none flex-col space-y-1 border border-stone-300 px-2 py-1 transition-colors duration-300 hover:border-stone-400 hover:backdrop-blur-sm sm:px-4 sm:py-2"
 						>
 							<div class="flex flex-row items-start justify-between sm:items-center">
-								<a
+								<span
 									id="title"
 									class="line-clamp-2 pb-1 text-xl font-bold leading-tight text-stone-800 transition-colors duration-300 group-hover:text-black sm:line-clamp-1 sm:text-3xl"
 								>
 									{playlist.title}
-								</a>
+								</span>
 							</div>
 						</a>
 					{/each}
