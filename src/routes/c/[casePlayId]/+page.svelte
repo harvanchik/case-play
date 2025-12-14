@@ -159,7 +159,7 @@
 			<!-- START: Copy Link Button -->
 			<div class="ml-auto mt-5">
 				<button
-					class="ml-auto flex border border-transparent bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-stone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-500 focus-visible:ring-offset-2"
+					class="ml-auto flex cursor-pointer border border-transparent bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-stone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-500 focus-visible:ring-offset-2"
 					on:click={copyLink}
 					class:!bg-green-500={isClicked}
 					class:!bg-stone-900={!isClicked}
