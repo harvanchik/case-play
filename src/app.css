@@ -2,9 +2,23 @@
 @import url('https://fonts.googleapis.com/css2?family=Neucha&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Dokdo&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@plugin "tailwind-scrollbar";
+
+@theme {
+  --font-barriecito: 'Barriecito', sans-serif;
+  --font-neucha: 'Neucha', sans-serif;
+  --font-dokdo: 'Dokdo', sans-serif;
+}
+
+@utility text-shadow-md {
+	text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+@utility text-shadow-lg {
+	text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.4);
+}
 
 @layer base {
 	mark {

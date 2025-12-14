@@ -164,13 +164,14 @@
 
 									<!-- START: YouTube Link -->
 									{#if casePlay?.film}
-										<a
-											href={casePlay?.film}
-											target="_blank"
-											class="my-auto mb-1.5 ml-4 opacity-85 transition-transform duration-150 hover:scale-110 hover:opacity-100"
+										<!-- svelte-ignore a11y-click-events-have-key-events -->
+										<!-- svelte-ignore a11y-no-static-element-interactions -->
+										<div
+											on:click|preventDefault={() => window.open(casePlay.film, '_blank')}
+											class="my-auto mb-1.5 ml-4 cursor-pointer opacity-85 transition-transform duration-150 hover:scale-110 hover:opacity-100"
 										>
 											<img class="h-5" src="./../../src/lib/svg/youtube.svg" alt="youtube" />
-										</a>
+										</div>
 									{/if}
 									<!-- END: YouTube Link -->
 								</div>
