@@ -76,7 +76,7 @@
 				aria-labelledby="modal-title"
 			>
 				<button
-					class="absolute right-4 top-4 text-stone-500 transition-colors hover:text-stone-800"
+					class="absolute right-4 top-4 cursor-pointer text-stone-500 transition-colors hover:text-stone-800"
 					on:click={() => (showCreateModal = false)}
 					aria-label="Close modal"
 				>
@@ -91,12 +91,12 @@
 
 				<div class="mb-6 flex flex-row items-center justify-center space-x-2 rounded-md bg-stone-200 p-3">
 					<Icon icon="material-symbols:mail" class="text-xl text-stone-600" />
-					<code class="select-all text-lg font-semibold text-stone-800">create@caseplay.org</code>
+					<code class="cursor-pointer select-all text-lg font-semibold text-stone-800">create@caseplay.org</code>
 				</div>
 
 				<div class="flex flex-row justify-end space-x-3">
 					<button
-						class="rounded-md border border-stone-300 px-4 py-2 text-stone-700 transition-colors hover:bg-stone-200"
+						class="cursor-pointer rounded-md border border-stone-300 px-4 py-2 text-stone-700 transition-colors hover:bg-stone-200"
 						on:click={() => (showCreateModal = false)}
 					>
 						Close
@@ -134,7 +134,7 @@
 					/>
 				</div>
 				<button
-					class="flex items-center justify-center rounded-lg border border-stone-300 bg-stone-50 px-4 text-stone-900 transition-colors duration-200 hover:bg-stone-100 hover:text-black focus:ring-2 focus:ring-stone-500"
+					class="flex cursor-pointer items-center justify-center rounded-lg border border-stone-300 bg-stone-50 px-4 text-stone-900 transition-colors duration-200 hover:bg-stone-100 hover:text-black focus:ring-2 focus:ring-stone-500"
 					on:click={() => (showCreateModal = true)}
 					title="Add Case Play"
 				>
