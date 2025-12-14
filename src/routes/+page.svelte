@@ -263,11 +263,12 @@
 	<!-- START: Footer -->
 	<footer class="mt-auto w-full py-6 text-center text-stone-600">
 		<div class="mb-2">
-			<p class="text-sm">This database was created in 2024 for the purpose of training intramural officials.</p>
+			<p class="text-sm">This database was created in 2023 for the purpose of training intramural officials.</p>
 		</div>
 		<div class="flex flex-row justify-center space-x-4 text-sm font-semibold">
 			<span>&copy; {new Date().getFullYear()} caseplay.org</span>
 			<button on:click={() => (showCreateModal = true)} class="cursor-pointer hover:underline">Contribute</button>
+			<a href="mailto:contact@caseplay.org" target="_blank" class="cursor-pointer hover:underline">Contact</a>
 		</div>
 	</footer>
 	<!-- END: Footer -->
