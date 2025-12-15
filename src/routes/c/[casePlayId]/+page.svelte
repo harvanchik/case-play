@@ -6,6 +6,7 @@
 	export let data: PageData;
 
 	let isClicked = false;
+	let isRevealed = false;
 
 	onMount(() => {
 		// get the mark instance of the main element
@@ -160,6 +161,11 @@
 			<spoiler
 				id="answer"
 				class="scrollbar-w-3 group max-h-80 overflow-y-auto border-2 border-stone-900 scrollbar scrollbar-track-black/70 scrollbar-thumb-stone-200"
+				class:revealed={isRevealed}
+				on:click={() => (isRevealed = !isRevealed)}
+				on:keydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (isRevealed = !isRevealed)}
+				role="button"
+				tabindex="0"
 				contenteditable="false"
 			>
 				{data.casePlay?.answer}
