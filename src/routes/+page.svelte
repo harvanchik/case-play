@@ -215,7 +215,7 @@
 							href="c/{casePlay.id}"
 							class="group flex cursor-pointer select-none flex-col space-y-1 border border-stone-300 px-2 py-1 transition-colors duration-300 hover:border-stone-400 hover:backdrop-blur-sm sm:px-4 sm:py-2"
 						>
-							<div class="flex flex-row items-start justify-between sm:items-center">
+							<div class="flex flex-row items-start justify-start">
 								<div
 									id="title"
 									class="line-clamp-2 flex flex-1 flex-row pb-1 text-xl font-bold leading-tight text-stone-800 transition-colors duration-300 group-hover:text-black sm:text-2xl"
@@ -223,7 +223,7 @@
 									<p>{casePlay.title}</p>
 								</div>
 
-								<div class="ml-2 flex flex-shrink-0 flex-row items-center space-x-2">
+								<div class="ml-2 flex flex-shrink-0 flex-row items-start space-x-2">
 									<!-- START: YouTube Link -->
 									{#if casePlay?.film}
 										<!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -238,7 +238,7 @@
 									<!-- END: YouTube Link -->
 
 									<div
-										class="w-max bg-opacity-80 px-2 py-0.5 text-xs text-white transition-colors duration-300 group-hover:bg-opacity-100 sm:text-sm"
+										class="mt-[4px] w-max bg-opacity-80 px-2 py-0.5 text-xs text-white transition-colors duration-300 group-hover:bg-opacity-100 sm:text-sm"
 										class:bg-green-600={casePlay.difficulty == 1}
 										class:bg-yellow-400={casePlay.difficulty == 2}
 										class:!text-black={casePlay.difficulty == 2}

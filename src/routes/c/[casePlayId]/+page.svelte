@@ -136,7 +136,7 @@
 			<!-- END: YouTube Link -->
 		</div>
 		<!-- START: Subtitle -->
-		<h2 class="mx-auto flex space-x-3 pb-3">
+		<h2 class="mx-auto flex space-x-2 pb-3 text-sm md:space-x-3 md:text-base">
 			<!-- START: Author -->
 			<p class="text-stone-600 hover:text-stone-800">authored by {data.casePlay?.author?.first_name + ' ' + data.casePlay?.author?.last_name}</p>
 			<!-- divider symbol -->
