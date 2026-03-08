@@ -1,0 +1,19 @@
+{
+  "id": "mig_cfi85qck23gt6it6aj7g",
+  "parentID": "mig_cfi85gif2mo6u2s9flig",
+  "checksum": "1:05e0f59c076c153d70d211bd9879f698de9898d719476535f2f162006a6f9235",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "author",
+          "type": "link",
+          "link": {
+            "table": "user"
+          }
+        },
+        "table": "case-play"
+      }
+    }
+  ]
+}

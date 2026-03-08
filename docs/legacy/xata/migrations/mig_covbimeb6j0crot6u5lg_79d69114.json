@@ -1,0 +1,19 @@
+{
+  "id": "mig_covbimeb6j0crot6u5lg",
+  "parentID": "mig_covb396b6j0crot6u57g",
+  "checksum": "1:79d691145f2ef9d6203ca9047282c2877d3cead1c09e4cf65b18afc32d6819c7",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "test",
+          "type": "link",
+          "link": {
+            "table": "case_play"
+          }
+        },
+        "table": "playlist"
+      }
+    }
+  ]
+}

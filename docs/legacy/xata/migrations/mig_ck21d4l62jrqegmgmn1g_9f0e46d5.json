@@ -1,0 +1,19 @@
+{
+  "id": "mig_ck21d4l62jrqegmgmn1g",
+  "parentID": "mig_ck21c0t62jrqegmgmn0g",
+  "checksum": "1:9f0e46d536dd9bf0802a7cdd72d13e65adf5c061a432d63b1a102e79b0e750df",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "sport",
+          "type": "link",
+          "link": {
+            "table": "sport"
+          }
+        },
+        "table": "case_play"
+      }
+    }
+  ]
+}

@@ -1,38 +1,123 @@
-# create-svelte
+# case-play
 
-Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/master/packages/create-svelte).
+`case-play` is a SvelteKit app for browsing and authoring sports officiating case plays. The project now uses `Turso + Drizzle ORM` instead of Xata and includes a protected admin area for managing content.
 
-## Creating a project
+## Stack
 
-If you're seeing this, you've probably already done this step. Congrats!
+- SvelteKit with `@sveltejs/adapter-vercel`
+- Turso / libSQL
+- Drizzle ORM with checked-in SQL migrations
+- Cookie-based admin auth using hashed passwords and hashed session tokens
 
-```bash
-# create a new project in the current directory
-npm create svelte@latest
+## Environment
 
-# create a new project in my-app
-npm create svelte@latest my-app
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Copy `.env.example` to `.env` and fill in:
 
 ```bash
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+TURSO_DATABASE_URL=libsql://your-database-name.turso.io
+TURSO_AUTH_TOKEN=your-turso-auth-token
+ADMIN_BOOTSTRAP_EMAIL=admin@example.com
+ADMIN_BOOTSTRAP_PASSWORD=replace-me-with-a-strong-password
+SESSION_COOKIE_SECRET=replace-me-with-a-long-random-string
 ```
 
-## Building
-
-To create a production version of your app:
+## Local Setup
 
 ```bash
-npm run build
+pnpm install
+pnpm db:migrate
+pnpm db:bootstrap-admin
+pnpm dev
 ```
 
-You can preview the production build with `npm run preview`.
+Then:
 
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+- Public site: `/`
+- Admin login: `/admin/login`
+- New case play entry point: `/admin/case-plays/new`
+
+## Database Workflow
+
+- `pnpm db:migrate`: applies checked-in SQL files from [`drizzle/0000_initial.sql`](/Users/jh6/Documents/GitHub/case-play/drizzle/0000_initial.sql)
+- `pnpm db:generate`: generates new Drizzle migration artifacts from the schema for future changes
+- `pnpm db:bootstrap-admin`: creates the first admin user only when no admin exists
+
+## Importing Recovered Content
+
+The importer accepts partial JSON payloads so recovery can happen incrementally:
+
+```bash
+pnpm import:caseplays ./path/to/import.json
+```
+
+Expected JSON shape:
+
+```json
+{
+  "casePlays": [
+    {
+      "sourceKey": "legacy-001",
+      "title": "Touchdown on Final Play",
+      "prompt": "Prompt text",
+      "answer": "Answer text",
+      "edition": "21st",
+      "difficulty": 2,
+      "filmUrl": "https://example.com/video",
+      "author": {
+        "firstName": "Jake",
+        "lastName": "Harvanchik"
+      },
+      "rulebook": {
+        "title": "NIRSA Flag Football",
+        "slug": "nirsa-flag",
+        "nickname": "NIRSA Flag"
+      },
+      "sport": {
+        "name": "Flag Football",
+        "slug": "flag-football"
+      }
+    }
+  ],
+  "playlists": [
+    {
+      "sourceKey": "playlist-flag-intro",
+      "title": "Flag Football Basics",
+      "casePlaySourceKeys": ["legacy-001"]
+    }
+  ]
+}
+```
+
+The importer upserts:
+
+- authors by exact first/last name
+- rulebooks by slug
+- sports by slug
+- case plays by `sourceKey`
+- playlists by `sourceKey`
+
+## Recovery Strategy
+
+The app no longer depends on live Xata access. If historical content needs to be restored later, use the importer with data gathered from:
+
+1. private exports or backups
+2. prior local files
+3. old Vercel build artifacts
+4. browser history/cache
+5. Wayback/search engine captures
+6. manual re-entry through the admin UI
+
+## Deployment
+
+1. Create a Turso database and auth token.
+2. Set the environment variables in Vercel.
+3. Run `pnpm db:migrate`.
+4. Run `pnpm db:bootstrap-admin`.
+5. Deploy the app.
+6. Verify `/`, `/playlists`, `/admin/login`, and an authenticated `/admin` session.
+
+## Notes
+
+- `/upload` now redirects to the protected admin flow.
+- Public account registration is intentionally out of scope.
+- Legacy Xata migration history is preserved under [`docs/legacy/xata`](/Users/jh6/Documents/GitHub/case-play/docs/legacy/xata).

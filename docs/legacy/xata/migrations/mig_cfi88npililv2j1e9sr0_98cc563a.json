@@ -1,0 +1,18 @@
+{
+  "id": "mig_cfi88npililv2j1e9sr0",
+  "parentID": "mig_cfi88dsk23gt6it6bc90",
+  "checksum": "1:98cc563ab10aecd7b4f858bcb233c5699924a6268b51019bd7507593e267dfe7",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "title",
+          "type": "string",
+          "notNull": true,
+          "defaultValue": ""
+        },
+        "table": "rulebook"
+      }
+    }
+  ]
+}

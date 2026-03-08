@@ -1,0 +1,19 @@
+{
+  "id": "mig_cj9ek4f2nsp6kurg9t6g",
+  "parentID": "mig_cj9ejr4ia1mv41jssvp0",
+  "checksum": "1:33985ba6cc68e83a4e44093c334941fa9efdde72ac3469c9f2436afdeb424311",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "test_2",
+          "type": "vector",
+          "vector": {
+            "dimension": 7
+          }
+        },
+        "table": "playlist"
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "mig_cfi884ck23gt6it6bc8g",
+  "parentID": "mig_cfi871pililv2j1e9sp0",
+  "checksum": "1:e440ccf347c7b998e857c24005e9343f9ab12f8e6e2e6079944f26bdedac74f2",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "date_created",
+          "type": "datetime",
+          "notNull": true,
+          "defaultValue": "1970-12-23T00:00:00Z"
+        },
+        "table": "case-play"
+      }
+    }
+  ]
+}

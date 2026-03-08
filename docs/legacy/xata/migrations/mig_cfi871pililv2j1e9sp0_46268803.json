@@ -1,0 +1,18 @@
+{
+  "id": "mig_cfi871pililv2j1e9sp0",
+  "parentID": "mig_cfi86nqf2mo6u2s9frlg",
+  "checksum": "1:46268803ef2e7f54cc4f11701324beecda723ecd2d79153053eb08d65faa9a32",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "difficulty",
+          "type": "int",
+          "notNull": true,
+          "defaultValue": "1"
+        },
+        "table": "case-play"
+      }
+    }
+  ]
+}

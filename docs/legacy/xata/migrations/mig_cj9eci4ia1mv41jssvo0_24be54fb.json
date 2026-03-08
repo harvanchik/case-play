@@ -1,0 +1,18 @@
+{
+  "id": "mig_cj9eci4ia1mv41jssvo0",
+  "parentID": "mig_cfi8ugkk23gt6it6de30",
+  "checksum": "1:24be54fbf5e9e76f3c1bbaacec28fb871466ed8bd127e0a749d02c0df58ab229",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "slug",
+          "type": "string",
+          "notNull": true,
+          "defaultValue": "nirsa-flag"
+        },
+        "table": "rulebook"
+      }
+    }
+  ]
+}

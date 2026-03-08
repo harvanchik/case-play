@@ -1,0 +1,18 @@
+{
+  "id": "mig_cfi84aqf2mo6u2s9fku0",
+  "parentID": "mig_cfi847if2mo6u2s9fktg",
+  "checksum": "1:81d8f9dfc63258f8f246d374aef1ee5b0a1c3a90ade34ce4d81db9b5399ac1c0",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "answer",
+          "type": "text",
+          "notNull": true,
+          "defaultValue": ""
+        },
+        "table": "case-play"
+      }
+    }
+  ]
+}

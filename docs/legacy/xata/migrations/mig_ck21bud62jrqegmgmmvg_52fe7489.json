@@ -1,0 +1,17 @@
+{
+  "id": "mig_ck21bud62jrqegmgmmvg",
+  "parentID": "mig_ck21bll62jrqegmgmmug",
+  "checksum": "1:52fe7489c854f70cd2b1ca4e04dcbeca8014dc9c69399470aaa251d512693292",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "slug",
+          "type": "string",
+          "unique": true
+        },
+        "table": "sport"
+      }
+    }
+  ]
+}

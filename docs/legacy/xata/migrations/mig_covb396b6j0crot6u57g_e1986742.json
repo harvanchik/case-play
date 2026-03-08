@@ -1,0 +1,17 @@
+{
+  "id": "mig_covb396b6j0crot6u57g",
+  "parentID": "mig_ck21d4l62jrqegmgmn1g",
+  "checksum": "1:e1986742671088f599ced38ce60864f1e26656fe3528a57cbd774ebb450433ce",
+  "operations": [
+    {
+      "addColumn": {
+        "column": {
+          "name": "title",
+          "type": "string",
+          "defaultValue": "Untitled Playlist"
+        },
+        "table": "playlist"
+      }
+    }
+  ]
+}

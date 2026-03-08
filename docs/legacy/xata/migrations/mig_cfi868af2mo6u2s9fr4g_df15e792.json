@@ -1,0 +1,12 @@
+{
+  "id": "mig_cfi868af2mo6u2s9fr4g",
+  "parentID": "mig_cfi85qck23gt6it6aj7g",
+  "checksum": "1:df15e792dbc9f46dcc472b45644e4bd255776960d5fb3cedc05fa4a033f6cd2e",
+  "operations": [
+    {
+      "addTable": {
+        "table": "rule-book"
+      }
+    }
+  ]
+}

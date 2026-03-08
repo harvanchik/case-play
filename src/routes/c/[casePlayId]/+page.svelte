@@ -8,74 +8,49 @@
 	let isClicked = false;
 	let isRevealed = false;
 
+	$: authorName = data.casePlay?.author
+		? `${data.casePlay.author.first_name} ${data.casePlay.author.last_name}`.trim()
+		: 'Unknown author';
+	$: rulebookName = data.casePlay?.rulebook
+		? `${data.casePlay.rulebook.nickname || data.casePlay.rulebook.title}${data.casePlay?.edition ? ` ${data.casePlay.edition} Edition` : ''}`
+		: 'Unknown rulebook';
+
 	onMount(() => {
-		// get the mark instance of the main element
 		const instance = new Mark('main');
-		// regex to match teams/players (e.g., Team A, Team B, A-1, B-2)
 		const TEAM_REGEX = /Team ([ABKR])('s)*|[ABKR]-[0-9]{1,2}('s)*/g;
-		// mark the teams/players
 		instance.markRegExp(TEAM_REGEX, { element: 'u', exclude: ['h1', 'h2'] });
-		// regex to match letters in parentheses
 		const LETTER_REGEX = /\((?=[mdclxvi])m*(c[md]|d?c{0,3})(x[cl]|l?x{0,3})(i[xv]|v?i{0,3})\)/g;
-		// mark the letters in parentheses
 		instance.markRegExp(LETTER_REGEX, {
 			exclude: ['h1', 'h2'],
 			each(element) {
-				// get text
 				const text = element.textContent as string;
-				// get roman numeral
 				const romanNumeral = text?.toLowerCase().replace(/[()]/g, '');
-				// if roman numeral is i, mark it green
 				if (romanNumeral === 'i') element.setAttribute('green', '');
-				// if roman numeral is ii, mark it blue
 				else if (romanNumeral === 'ii') element.setAttribute('blue', '');
-				// if roman numeral is iii, mark it orange
 				else if (romanNumeral === 'iii') element.setAttribute('orange', '');
-				// if roman numeral is iv, mark it indigo
 				else if (romanNumeral === 'iv') element.setAttribute('indigo', '');
-				// if roman numeral is v, mark it red
 				else if (romanNumeral === 'v') element.setAttribute('red', '');
-				// if roman numeral is vi, mark it violet
 				else if (romanNumeral === 'vi') element.setAttribute('violet', '');
-				// otherwise, mark it yellow
 				else element.setAttribute('yellow', '');
-				// get the next character
 				const char = element.nextSibling?.textContent?.trim().charAt(0);
-				// if the character is a comma, add right margin between it and the comma
 				if (char === ',') element.classList.add('mr-[2px]');
 			}
 		});
-		// regex to match team yardage lines
 		const YARD_REGEX = /([ABKR]'s\s[1-4]?[0-9])|([ABKR]'s)/g;
-		// mark the team yardage lines
 		instance.markRegExp(YARD_REGEX, { element: 'b', exclude: ['h1', 'h2'] });
-		// regex to match a rule reference
 		const RULE_REGEX = /Rule ([0-9]{1,2}-[0-9]{1,2}-[0-9]{1,2}[A-Z]{0,1})/g;
-		// mark the rule reference
 		instance.markRegExp(RULE_REGEX, { element: 'u', exclude: ['h1', 'h2'] });
-		// regex to match variants of word 'accept'
 		const ACCEPT_REGEX = /accepts|accepted|accept/gi;
-		// mark the variants of word 'accept'
 		instance.markRegExp(ACCEPT_REGEX, { element: 'span', className: 'accept', exclude: ['h1', 'h2'] });
-		// regex to match variants of word 'decline'
 		const DECLINE_REGEX = /declines|declined|decline/gi;
-		// mark the variants of word 'decline'
 		instance.markRegExp(DECLINE_REGEX, { element: 'span', className: 'decline', exclude: ['h1', 'h2'] });
-		// regex to match variants of word 'offset'
 		const OFFSET_REGEX = /offsets|offsetted|offset/gi;
-		// mark variants of word 'offset'
 		instance.markRegExp(OFFSET_REGEX, { element: 'span', className: 'offset', exclude: ['h1', 'h2'] });
-		// regex to match variants of word 'open'
 		const OPEN_REGEX = /opens|opened|open/gi;
-		// mark variants of word 'open'
 		instance.markRegExp(OPEN_REGEX, { element: 'span', className: 'open', exclude: ['h1', 'h2'] });
-		// regex to match variants of word 'closed'
 		const CLOSED_REGEX = /closes|closed|close/gi;
-		// mark variants of word 'closed'
 		instance.markRegExp(CLOSED_REGEX, { element: 'span', className: 'closed', exclude: ['h1', 'h2'] });
-		// regex to match newlines
 		const NEWLINE_REGEX = /\n/g;
-		// replace newline with br element
 		instance.markRegExp(NEWLINE_REGEX, { element: 'br', exclude: ['h1', 'h2'] });
 	});
 
@@ -101,30 +76,24 @@
 </svelte:head>
 
 <main class="min-h-screen overflow-hidden bg-stone-100/[97%] scrollbar scrollbar-track-stone-800 scrollbar-thumb-black">
-	<!-- Background -->
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 
-	<!-- START: Back Button -->
 	<a
 		href="/"
 		class="absolute left-10 top-5 flex cursor-pointer flex-row items-center space-x-1 text-stone-600 transition-colors duration-200 hover:text-stone-900"
 	>
-		<span class="text-xl font-bold">←</span>
+		<span class="text-xl font-bold">&larr;</span>
 		<span class="text-lg font-semibold">Back</span>
 	</a>
-	<!-- END: Back Button -->
 
 	<div class="mt-20 flex flex-col">
 		<div class="mx-auto flex flex-row text-center">
-			<!-- START: Case Play Title -->
 			<h1
 				class="mx-3 mb-2 flex border-b-2 border-stone-900 px-0 text-center text-3xl font-semibold text-stone-800 sm:mx-auto sm:border-b-4 sm:px-5 sm:text-4xl"
 			>
 				{data.casePlay?.title}
 			</h1>
-			<!-- END: Case Play Title -->
 
-			<!-- START: YouTube Link -->
 			{#if data.casePlay?.film}
 				<a
 					href={data.casePlay?.film}
@@ -134,20 +103,15 @@
 					<img class="h-full" src="./../../../src/lib/svg/youtube.svg" alt="youtube" />
 				</a>
 			{/if}
-			<!-- END: YouTube Link -->
 		</div>
-		<!-- START: Subtitle -->
+
 		<h2 class="mx-auto flex space-x-2 pb-3 text-sm md:space-x-3 md:text-base">
-			<!-- START: Author -->
-			<p class="text-stone-600 hover:text-stone-800">authored by {data.casePlay?.author?.first_name + ' ' + data.casePlay?.author?.last_name}</p>
-			<!-- divider symbol -->
-			<p class="text-stone-700">•</p>
-			<!-- END: Author -->
-			<p class="text-stone-600 hover:text-stone-800">{data.casePlay?.rulebook?.nickname + ' ' + data.casePlay?.edition + ' Edition'}</p>
+			<p class="text-stone-600 hover:text-stone-800">authored by {authorName}</p>
+			<p class="text-stone-700">&bull;</p>
+			<p class="text-stone-600 hover:text-stone-800">{rulebookName}</p>
 		</h2>
-		<!-- END: Subtitle -->
+
 		<div class="mx-3 flex flex-col text-lg leading-[1.425] sm:mx-auto sm:w-1/2">
-			<!-- START: Case Play Prompt -->
 			<p
 				id="prompt"
 				class="scrollbar-w-3 mb-5 max-h-48 overflow-y-auto border-2 border-stone-900 bg-white p-4 shadow-lg scrollbar scrollbar-track-stone-300 scrollbar-thumb-stone-700 selection:bg-black/20"
@@ -155,9 +119,7 @@
 			>
 				{data.casePlay?.prompt}
 			</p>
-			<!-- END: Case Play Prompt -->
 
-			<!-- START: Case Play Answer -->
 			<spoiler
 				id="answer"
 				class="scrollbar-w-3 group max-h-80 overflow-y-auto border-2 border-stone-900 scrollbar scrollbar-track-black/70 scrollbar-thumb-stone-200"
@@ -170,17 +132,13 @@
 			>
 				{data.casePlay?.answer}
 			</spoiler>
-			<!-- END: Case Play Answer -->
 
-			<!-- START: Answer Hint -->
 			<div class="flex flex-row items-center justify-start space-x-1 pt-1 text-left">
 				<span class="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-stone-500 text-xs font-bold text-stone-500">i</span>
 				<span class="text-xs text-stone-500 sm:hidden">click black box to reveal answer</span>
 				<span class="hidden text-xs text-stone-500 sm:inline">hover over black box to reveal answer</span>
 			</div>
-			<!-- END: Answer Hint -->
 
-			<!-- START: Copy Link Button -->
 			<div class="ml-auto flex w-full flex-row justify-end">
 				<button
 					class="ml-auto flex w-20 cursor-pointer items-center justify-center border border-transparent bg-stone-900 px-4 py-2 text-center text-sm font-medium text-white transition-colors duration-200 hover:bg-stone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-500 focus-visible:ring-offset-2"

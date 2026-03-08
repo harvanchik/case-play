@@ -229,7 +229,7 @@
 										<!-- svelte-ignore a11y-click-events-have-key-events -->
 										<!-- svelte-ignore a11y-no-static-element-interactions -->
 										<div
-											on:click|preventDefault={() => window.open(casePlay.film, '_blank')}
+											on:click|preventDefault={() => casePlay.film && window.open(casePlay.film, '_blank')}
 											class="cursor-pointer opacity-85 transition-transform duration-150 hover:scale-110 hover:opacity-100"
 										>
 											<img class="h-5" src="./../../src/lib/svg/youtube.svg" alt="youtube" />

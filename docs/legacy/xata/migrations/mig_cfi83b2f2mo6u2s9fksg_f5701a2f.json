@@ -1,0 +1,12 @@
+{
+  "id": "mig_cfi83b2f2mo6u2s9fksg",
+  "parentID": "mig_cfi830pf52uc0nkon5fg",
+  "checksum": "1:f5701a2fc637b357fdd4fc56d81706fee3364a7011fd9401daf9d45af0d95cc9",
+  "operations": [
+    {
+      "addTable": {
+        "table": "case-play"
+      }
+    }
+  ]
+}
