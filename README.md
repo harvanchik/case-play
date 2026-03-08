@@ -1,6 +1,6 @@
 # case-play
 
-`case-play` is a SvelteKit app for browsing and authoring sports officiating case plays. The project now uses `Turso + Drizzle ORM` instead of Xata and includes a protected admin area for managing content.
+`case-play` is a SvelteKit app for browsing and authoring sports officiating case plays with a protected admin area for managing content.
 
 ## Stack
 
@@ -96,17 +96,6 @@ The importer upserts:
 - case plays by `sourceKey`
 - playlists by `sourceKey`
 
-## Recovery Strategy
-
-The app no longer depends on live Xata access. If historical content needs to be restored later, use the importer with data gathered from:
-
-1. private exports or backups
-2. prior local files
-3. old Vercel build artifacts
-4. browser history/cache
-5. Wayback/search engine captures
-6. manual re-entry through the admin UI
-
 ## Deployment
 
 1. Create a Turso database and auth token.
@@ -120,4 +109,3 @@ The app no longer depends on live Xata access. If historical content needs to be
 
 - `/upload` now redirects to the protected admin flow.
 - Public account registration is intentionally out of scope.
-- Legacy Xata migration history is preserved under [`docs/legacy/xata`](/Users/jh6/Documents/GitHub/case-play/docs/legacy/xata).

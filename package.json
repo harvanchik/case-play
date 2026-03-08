@@ -16,7 +16,6 @@
 	"devDependencies": {
 		"@libsql/client": "^0.15.15",
 		"@iconify/svelte": "^5.1.0",
-		"@sveltejs/adapter-auto": "^7.0.0",
 		"@sveltejs/adapter-vercel": "^6.2.0",
 		"@sveltejs/kit": "^2.49.2",
 		"@tailwindcss/postcss": "^4.1.18",
@@ -37,7 +36,6 @@
 		"prettier-plugin-tailwindcss": "^0.7.2",
 		"svelte": "^5.46.0",
 		"svelte-check": "^4.3.4",
-		"svelte-typewriter": "^3.2.3",
 		"tailwind-scrollbar": "^4.0.2",
 		"tailwindcss": "^4.1.18",
 		"tsx": "^4.20.6",

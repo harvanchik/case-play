@@ -1,9 +1,6 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import Icon from '@iconify/svelte';
-	import Typewriter from 'svelte-typewriter';
 
 	export let data: PageData;
 
