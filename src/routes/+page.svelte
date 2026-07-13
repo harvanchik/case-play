@@ -63,7 +63,6 @@
 		content="case,play,plays,db,database,sports,intramural,extramural,official,referee,education,learning,training,flag,tackle,football,basketball,baseball,soccer,volleyball,ice,roller,hockey,flash,cards,coach,player,umpire,ref,ump,zebra,stripes,whistle,rule,rules,interpretation,rule book,edition,spoiler,tool"
 	/>
 	<meta name="author" content="Jake Harvanchik" />
-	<script src="https://code.iconify.design/iconify-icon/1.0.3/iconify-icon.min.js"></script>
 </svelte:head>
 
 <main class="flex min-h-screen flex-col overflow-hidden bg-stone-100/[97%] scrollbar scrollbar-track-stone-800 scrollbar-thumb-black">

@@ -2,7 +2,7 @@ import { relations, sql } from 'drizzle-orm';
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable(
-	'users',
+	'caseplay_users',
 	{
 		id: text('id').primaryKey(),
 		email: text('email').notNull(),
@@ -19,7 +19,7 @@ export const users = sqliteTable(
 );
 
 export const sessions = sqliteTable(
-	'sessions',
+	'caseplay_sessions',
 	{
 		id: text('id').primaryKey(),
 		userId: text('user_id')

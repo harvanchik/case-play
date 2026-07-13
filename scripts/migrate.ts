@@ -46,14 +46,13 @@ for (const migrationFile of migrationFiles) {
 		.map((statement) => statement.trim())
 		.filter(Boolean);
 
-	for (const statement of statements) {
-		await client.execute(statement);
-	}
-
-	await client.execute({
-		sql: 'INSERT INTO __caseplay_migrations (id, name, applied_at) VALUES (?, ?, ?)',
-		args: [randomUUID(), migrationFile, new Date().toISOString()]
-	});
+	await client.migrate([
+		...statements,
+		{
+			sql: 'INSERT INTO __caseplay_migrations (id, name, applied_at) VALUES (?, ?, ?)',
+			args: [randomUUID(), migrationFile, new Date().toISOString()]
+		}
+	]);
 
 	console.log(`Applied migration ${migrationFile}`);
 }
