@@ -1,14 +1,16 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import Icon from '@iconify/svelte';
+	import { replaceState } from '$app/navigation';
+	import { updateFilterSearchParams } from '$lib/case-play-filter-state';
 
 	export let data: PageData;
 
-	let searchTerm = '';
+	let searchTerm = data.initialFilters.searchTerm;
 	let searchRef: HTMLInputElement;
 	let showCreateModal = false;
 	let showDifficultyDropdown = false;
-	let selectedDifficulties: number[] = [];
+	let selectedDifficulties = data.initialFilters.difficulties;
 
 	const difficultyOptions = [
 		{ value: 1, label: 'Easy', color: 'bg-green-600' },
@@ -22,7 +24,21 @@
 		} else {
 			selectedDifficulties = [...selectedDifficulties, value];
 		}
+		syncFilterUrl();
 	};
+
+	const syncFilterUrl = () => {
+		const url = new URL(window.location.href);
+		url.search = updateFilterSearchParams(url.searchParams, searchTerm, selectedDifficulties).toString();
+		replaceState(url, {});
+	};
+
+	const handleSearchInput = (event: Event) => {
+		searchTerm = (event.currentTarget as HTMLInputElement).value;
+		syncFilterUrl();
+	};
+
+	$: activeFilterQuery = updateFilterSearchParams(new URLSearchParams(), searchTerm, selectedDifficulties).toString();
 
 	$: filteredCasePlays = data?.casePlays?.filter((play) => {
 		const matchesSearch =
@@ -143,6 +159,7 @@
 					<input
 						bind:this={searchRef}
 						bind:value={searchTerm}
+						on:input={handleSearchInput}
 						type="search"
 						id="search"
 						class="block w-full border border-stone-300 bg-stone-50 p-4 pl-10 text-sm text-stone-900 focus:border-stone-500 focus:ring-stone-500"
@@ -210,7 +227,7 @@
 				>
 					{#each filteredCasePlays as casePlay}
 						<a
-							href="c/{casePlay.id}"
+							href={`/c/${casePlay.id}${activeFilterQuery ? `?${activeFilterQuery}` : ''}`}
 							class="group flex cursor-pointer flex-col space-y-1 border border-stone-300 px-2 py-1 transition-colors duration-300 select-none hover:border-stone-400 hover:backdrop-blur-sm sm:px-4 sm:py-2"
 						>
 							<div class="flex flex-row items-start justify-start">

@@ -72,7 +72,7 @@
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 
 	<a
-		href="/"
+		href={data.backHref}
 		class="absolute top-5 left-10 flex cursor-pointer flex-row items-center space-x-1 text-stone-600 transition-colors duration-200 hover:text-stone-900"
 	>
 		<span class="text-xl font-bold">&larr;</span>
