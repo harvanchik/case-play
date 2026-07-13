@@ -29,6 +29,8 @@
 			!searchTerm ||
 			play.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
 			play.prompt.toLowerCase().includes(searchTerm.toLowerCase()) ||
+			play.ruleReference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+			play.edition?.toLowerCase().includes(searchTerm.toLowerCase()) ||
 			getDifficulty(play.difficulty).toLowerCase().includes(searchTerm.toLowerCase());
 
 		const matchesDifficulty = selectedDifficulties.length === 0 || selectedDifficulties.includes(play.difficulty);
@@ -65,11 +67,11 @@
 	<meta name="author" content="Jake Harvanchik" />
 </svelte:head>
 
-<main class="flex min-h-screen flex-col overflow-hidden bg-stone-100/[97%] scrollbar scrollbar-track-stone-800 scrollbar-thumb-black">
+<main class="scrollbar scrollbar-track-stone-800 scrollbar-thumb-black flex min-h-screen flex-col overflow-hidden bg-stone-100/[97%]">
 	<!-- Background -->
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 	<div class="mt-10 flex w-full flex-col items-center justify-center">
-		<h1 class="mx-auto select-none font-dokdo text-5xl font-semibold uppercase text-stone-800 text-shadow-md sm:text-7xl sm:text-shadow-lg">
+		<h1 class="font-dokdo mx-auto text-5xl font-semibold text-stone-800 uppercase select-none text-shadow-md sm:text-7xl sm:text-shadow-lg">
 			caseplay.org
 		</h1>
 		<p class="font-neucha text-xl text-stone-600 sm:text-2xl">a case play database created by Jake Harvanchik</p>
@@ -91,7 +93,7 @@
 				aria-labelledby="modal-title"
 			>
 				<button
-					class="absolute right-4 top-4 cursor-pointer text-stone-500 transition-colors hover:text-stone-800"
+					class="absolute top-4 right-4 cursor-pointer text-stone-500 transition-colors hover:text-stone-800"
 					on:click={() => (showCreateModal = false)}
 					aria-label="Close modal"
 				>
@@ -106,7 +108,7 @@
 
 				<div class="mb-6 flex flex-row items-center justify-center space-x-2 bg-stone-200 p-3">
 					<Icon icon="material-symbols:mail" class="text-xl text-stone-600" />
-					<code class="cursor-pointer select-all text-lg font-semibold text-stone-800">create@caseplay.org</code>
+					<code class="cursor-pointer text-lg font-semibold text-stone-800 select-all">create@caseplay.org</code>
 				</div>
 
 				<div class="flex flex-row justify-end space-x-3">
@@ -204,17 +206,17 @@
 				<!-- END: Results Header -->
 
 				<div
-					class="mt-1 grid max-h-[calc(100vh-16rem)] grid-cols-1 gap-4 overflow-y-auto border border-stone-400 p-2 scrollbar scrollbar-track-stone-400 scrollbar-thumb-stone-900 sm:grid-cols-2 lg:grid-cols-3"
+					class="scrollbar scrollbar-track-stone-400 scrollbar-thumb-stone-900 mt-1 grid max-h-[calc(100vh-16rem)] grid-cols-1 gap-4 overflow-y-auto border border-stone-400 p-2 sm:grid-cols-2 lg:grid-cols-3"
 				>
 					{#each filteredCasePlays as casePlay}
 						<a
 							href="c/{casePlay.id}"
-							class="group flex cursor-pointer select-none flex-col space-y-1 border border-stone-300 px-2 py-1 transition-colors duration-300 hover:border-stone-400 hover:backdrop-blur-sm sm:px-4 sm:py-2"
+							class="group flex cursor-pointer flex-col space-y-1 border border-stone-300 px-2 py-1 transition-colors duration-300 select-none hover:border-stone-400 hover:backdrop-blur-sm sm:px-4 sm:py-2"
 						>
 							<div class="flex flex-row items-start justify-start">
 								<div
 									id="title"
-									class="line-clamp-2 flex flex-1 flex-row pb-1 text-xl font-bold leading-tight text-stone-800 transition-colors duration-300 group-hover:text-black sm:text-2xl"
+									class="line-clamp-2 flex flex-1 flex-row pb-1 text-xl leading-tight font-bold text-stone-800 transition-colors duration-300 group-hover:text-black sm:text-2xl"
 								>
 									<p>{casePlay.title}</p>
 								</div>
@@ -234,7 +236,7 @@
 									<!-- END: YouTube Link -->
 
 									<div
-										class="mt-[4px] w-max bg-opacity-80 px-2 py-0.5 text-xs text-white transition-colors duration-300 group-hover:bg-opacity-100 sm:text-sm"
+										class="bg-opacity-80 group-hover:bg-opacity-100 mt-[4px] w-max px-2 py-0.5 text-xs text-white transition-colors duration-300 sm:text-sm"
 										class:bg-green-600={casePlay.difficulty == 1}
 										class:bg-yellow-400={casePlay.difficulty == 2}
 										class:!text-black={casePlay.difficulty == 2}

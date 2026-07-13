@@ -1,0 +1,550 @@
+[
+	{
+		"sourceKey": "nirsa-flag-football-22e-001",
+		"title": "Missing Flag Belt or Untucked Jersey",
+		"ruleReference": "1-4-3",
+		"pageNumber": 20,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-002", "title": "Illegal Equipment Timing", "ruleReference": "1-6", "pageNumber": 23, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-003",
+		"title": "Expiring-Period Touchdown Spike",
+		"ruleReference": "3-2-3",
+		"pageNumber": 35,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-004", "title": "Timeout Before Try", "ruleReference": "3-2-5", "pageNumber": 35, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-005",
+		"title": "First Down, Flag Guarding & Sideline",
+		"ruleReference": "3-2-7",
+		"pageNumber": 37,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-006", "title": "Uncorrected Game Clock", "ruleReference": "3-2-8", "pageNumber": 37, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-007", "title": "Injury Near Period End", "ruleReference": "3-4-8", "pageNumber": 40, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-008", "title": "Stalling as Clock Expires", "ruleReference": "3-6", "pageNumber": 41, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-009", "title": "Early Snap to Conserve Time", "ruleReference": "3-6", "pageNumber": 41, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-010", "title": "False Start to Consume Time", "ruleReference": "3-6", "pageNumber": 41, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-011",
+		"title": "Delayed Punt to Consume Time",
+		"ruleReference": "3-6",
+		"pageNumber": 41,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-012", "title": "Eighth Player Exits Field", "ruleReference": "3-7-1", "pageNumber": 42, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-013", "title": "Ball Grounded While Held", "ruleReference": "4-1-2", "pageNumber": 43, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-014", "title": "Tag on Loose Shirt Tail", "ruleReference": "4-1-2", "pageNumber": 44, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-015", "title": "Deflag During Muffed Pass", "ruleReference": "4-1-2", "pageNumber": 44, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-016",
+		"title": "Airborne Catch Contacts Pylon",
+		"ruleReference": "4-3-1",
+		"pageNumber": 45,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-017",
+		"title": "Catch After Leaving End Zone",
+		"ruleReference": "4-3-4",
+		"pageNumber": 46,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-018",
+		"title": "Flag Guarding During Long Run",
+		"ruleReference": "5-2-1",
+		"pageNumber": 48,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-019", "title": "Fourth-Down Illegal Pass", "ruleReference": "5-2-1", "pageNumber": 48, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-020",
+		"title": "Foul During Interception Return",
+		"ruleReference": "5-2-3",
+		"pageNumber": 49,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-021",
+		"title": "Delayed Fourth-Down Decision",
+		"ruleReference": "6-1-2",
+		"pageNumber": 50,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-022",
+		"title": "Blocked Punt Recovered by K",
+		"ruleReference": "6-1-5",
+		"pageNumber": 51,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-023", "title": "K Advances Muffed Punt", "ruleReference": "6-1-6", "pageNumber": 51, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-024", "title": "K Touches Grounded Punt", "ruleReference": "6-1-7", "pageNumber": 52, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-025", "title": "K Catches R-Touched Punt", "ruleReference": "6-2", "pageNumber": 52, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-026", "title": "Obstructed Punt Catch", "ruleReference": "6-2", "pageNumber": 52, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-027", "title": "K Touches Airborne Punt", "ruleReference": "6-2", "pageNumber": 52, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-028", "title": "Intentional Encroachment", "ruleReference": "7-2-1", "pageNumber": 54, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-029", "title": "Loud Defensive Signals", "ruleReference": "7-2-4", "pageNumber": 54, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-030", "title": "Motion After Full Set", "ruleReference": "7-3-3", "pageNumber": 55, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-031",
+		"title": "Snap Past QB to Motion Player",
+		"ruleReference": "7-3-4",
+		"pageNumber": 55,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-032",
+		"title": "Motion During Backfield Shift",
+		"ruleReference": "7-3-5",
+		"pageNumber": 55,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-033",
+		"title": "Advancement Before Forward Pass",
+		"ruleReference": "7-5",
+		"pageNumber": 56,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-034", "title": "Fourth-Down Backward Pass", "ruleReference": "7-6-5", "pageNumber": 57, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-035",
+		"title": "Fumble Into Either End Zone",
+		"ruleReference": "7-6-5",
+		"pageNumber": 57,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-036",
+		"title": "End-Zone Fumble Out of Bounds",
+		"ruleReference": "7-6-5",
+		"pageNumber": 57,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-037",
+		"title": "Retreat Before Forward Pass",
+		"ruleReference": "7-7-1",
+		"pageNumber": 58,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-038",
+		"title": "Wind-Altered Backward Pass",
+		"ruleReference": "7-7-1",
+		"pageNumber": 58,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-039",
+		"title": "Airborne Receiver Redirects Pass",
+		"ruleReference": "7-7-1",
+		"pageNumber": 58,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-040", "title": "Passer Catches Own Pass", "ruleReference": "7-7-2", "pageNumber": 59, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-041",
+		"title": "Immediate Spike to Stop Clock",
+		"ruleReference": "7-7-2",
+		"pageNumber": 59,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-042",
+		"title": "Closed Play to Woman Receiver",
+		"ruleReference": "7-7-3",
+		"pageNumber": 60,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-043",
+		"title": "Flag Guard After Gender Completion",
+		"ruleReference": "7-7-3",
+		"pageNumber": 60,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-044",
+		"title": "Double Foul After Gender Completion",
+		"ruleReference": "7-7-3",
+		"pageNumber": 60,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-045",
+		"title": "Closed Man-to-Man Completion",
+		"ruleReference": "7-7-3",
+		"pageNumber": 60,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-046", "title": "Low Catch Near Ground", "ruleReference": "7-8-1", "pageNumber": 61, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-047",
+		"title": "Receiver Steps Out Before Catch",
+		"ruleReference": "7-8-1",
+		"pageNumber": 61,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-048",
+		"title": "Airborne Catch After Stepping Out",
+		"ruleReference": "7-9",
+		"pageNumber": 61,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-049",
+		"title": "Deflagging Intended Receiver",
+		"ruleReference": "7-10-1",
+		"pageNumber": 62,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-050",
+		"title": "Face Guarding Without Contact",
+		"ruleReference": "7-10-1",
+		"pageNumber": 62,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-051",
+		"title": "Contact After Muffed Pass",
+		"ruleReference": "7-10-3",
+		"pageNumber": 62,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-052", "title": "DPI Near Mercy Threshold", "ruleReference": "8-3-1", "pageNumber": 63, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-053",
+		"title": "Touchdown Near Mercy Threshold",
+		"ruleReference": "8-3-1",
+		"pageNumber": 64,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-054",
+		"title": "Batted Backward Pass Into End Zone",
+		"ruleReference": "8-7-1",
+		"pageNumber": 65,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-055",
+		"title": "Interception Momentum Into End Zone",
+		"ruleReference": "8-8-1",
+		"pageNumber": 66,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-056",
+		"title": "Punt Momentum Into End Zone",
+		"ruleReference": "8-8-1",
+		"pageNumber": 66,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-057",
+		"title": "Deflag with Ball Above Goal Line",
+		"ruleReference": "8-8-1",
+		"pageNumber": 66,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-058",
+		"title": "Interception Run Within End Zone",
+		"ruleReference": "8-8-2",
+		"pageNumber": 67,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-059",
+		"title": "Fumble Forward Into End Zone",
+		"ruleReference": "8-8-2",
+		"pageNumber": 67,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-060", "title": "Muffed Punt Into End Zone", "ruleReference": "8-8-2", "pageNumber": 67, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-061", "title": "Abusive Bench Language", "ruleReference": "9-1-3", "pageNumber": 70, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-062", "title": "Deceptive Snap Calls", "ruleReference": "9-2-2", "pageNumber": 71, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-063", "title": "Diving Across Goal Line", "ruleReference": "9-3-1", "pageNumber": 72, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-064", "title": "Stripping the Ball", "ruleReference": "9-3-1", "pageNumber": 73, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-065",
+		"title": "Diving Runner Contacts Defender",
+		"ruleReference": "9-3-1",
+		"pageNumber": 73,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-066",
+		"title": "Ball Knocked from Airborne Receiver",
+		"ruleReference": "9-3-1",
+		"pageNumber": 73,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-067",
+		"title": "Contact While Blocking Pass",
+		"ruleReference": "9-3-2",
+		"pageNumber": 73,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-068",
+		"title": "Contact Alters Pass Attempt",
+		"ruleReference": "9-3-2",
+		"pageNumber": 73,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-069", "title": "Delayed Flag Belt Release", "ruleReference": "9-4-1", "pageNumber": 75, "edition": "22nd" },
+	{ "sourceKey": "nirsa-flag-football-22e-070", "title": "Ball Covering Flag Belt", "ruleReference": "9-4-2", "pageNumber": 76, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-071",
+		"title": "Runner Collides with Deflagger",
+		"ruleReference": "9-4-6",
+		"pageNumber": 76,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-072",
+		"title": "Receiver Returns from Out of Bounds",
+		"ruleReference": "9-6",
+		"pageNumber": 77,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-073",
+		"title": "Roughing on Third-Down Incompletion",
+		"ruleReference": "10-1-2",
+		"pageNumber": 78,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-074",
+		"title": "Flag Guard After Interception",
+		"ruleReference": "10-1-2",
+		"pageNumber": 79,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-075", "title": "Live and Dead Ball Fouls", "ruleReference": "10-1-5", "pageNumber": 79, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-076",
+		"title": "Snap Before Ready After First Down",
+		"ruleReference": "10-1-5",
+		"pageNumber": 79,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-077",
+		"title": "Early Snap vs False Start",
+		"ruleReference": "10-1-5",
+		"pageNumber": 80,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-078",
+		"title": "Flag Guard Before Incomplete Pass",
+		"ruleReference": "10-2-1",
+		"pageNumber": 80,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-079",
+		"title": "Illegal Contact Behind Runner",
+		"ruleReference": "10-2-1",
+		"pageNumber": 80,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-080",
+		"title": "Grounding Near Own Goal Line",
+		"ruleReference": "10-2-1",
+		"pageNumber": 80,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-081",
+		"title": "Flag Guard Before Deep Advance",
+		"ruleReference": "10-2-1",
+		"pageNumber": 80,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-082",
+		"title": "Returned Punt After K Foul",
+		"ruleReference": "10-2-1",
+		"pageNumber": 81,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-083", "title": "Muffed Punt After K Foul", "ruleReference": "10-2-1", "pageNumber": 81, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-084",
+		"title": "A Foul During Completed Pass",
+		"ruleReference": "10-2-4",
+		"pageNumber": 82,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-085",
+		"title": "Roughing with Varied Pass Results",
+		"ruleReference": "10-2-4",
+		"pageNumber": 82,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-086", "title": "R Foul During Punt", "ruleReference": "10-2-4", "pageNumber": 82, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-087",
+		"title": "Kick-Catch Interference During Return",
+		"ruleReference": "10-2-4",
+		"pageNumber": 83,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-088",
+		"title": "Flag Guard During Punt Return",
+		"ruleReference": "10-2-5",
+		"pageNumber": 83,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-089",
+		"title": "Illegal Contact During Punt Return",
+		"ruleReference": "10-2-5",
+		"pageNumber": 83,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-090",
+		"title": "Pass Beyond Scrimmage Line",
+		"ruleReference": "10-2-5",
+		"pageNumber": 84,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-091",
+		"title": "Flag Guard After Long Completion",
+		"ruleReference": "10-2-5",
+		"pageNumber": 84,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-092", "title": "Taunting and Retaliation", "ruleReference": "10-3-2", "pageNumber": 84, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-093",
+		"title": "Taunting, Fighting & Third Foul",
+		"ruleReference": "10-3-2",
+		"pageNumber": 84,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-094",
+		"title": "Illegal Pass and Holding After Punt",
+		"ruleReference": "10-3-3",
+		"pageNumber": 85,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-095",
+		"title": "Offset Fouls After End-Zone Interception",
+		"ruleReference": "10-3-3",
+		"pageNumber": 85,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-096",
+		"title": "A Foul After End-Zone Interception",
+		"ruleReference": "10-3-4",
+		"pageNumber": 86,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-097", "title": "B Foul in A's End Zone", "ruleReference": "10-3-4", "pageNumber": 86, "edition": "22nd" },
+	{
+		"sourceKey": "nirsa-flag-football-22e-098",
+		"title": "B Foul After End-Zone Interception",
+		"ruleReference": "10-3-4",
+		"pageNumber": 86,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-099",
+		"title": "Illegal Pass Near Own Goal Line",
+		"ruleReference": "10-3-5",
+		"pageNumber": 86,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-100",
+		"title": "Expiring Touchdown with Roughing",
+		"ruleReference": "10-3-6",
+		"pageNumber": 86,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-101",
+		"title": "Pass Interference and Illegal Equipment",
+		"ruleReference": "10-3-8",
+		"pageNumber": 87,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-102",
+		"title": "Flag Guarding in Own End Zone",
+		"ruleReference": "10-3-9",
+		"pageNumber": 87,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-103",
+		"title": "Try Spike Before Onside Conversion",
+		"ruleReference": "10-3-10",
+		"pageNumber": 87,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-104",
+		"title": "Pre-Snap Fouls on Onside Conversion",
+		"ruleReference": "10-3-10",
+		"pageNumber": 87,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-105",
+		"title": "Fouls During Onside Conversion",
+		"ruleReference": "10-3-10",
+		"pageNumber": 87,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-106",
+		"title": "Defensive Foul Before Touchdown",
+		"ruleReference": "10-3-11",
+		"pageNumber": 88,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-107",
+		"title": "Touchdown Spike Enforcement Choice",
+		"ruleReference": "10-3-12",
+		"pageNumber": 89,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-108",
+		"title": "Holding During Successful Try",
+		"ruleReference": "10-3-12",
+		"pageNumber": 89,
+		"edition": "22nd"
+	},
+	{
+		"sourceKey": "nirsa-flag-football-22e-109",
+		"title": "K Foul with Returned Punt",
+		"ruleReference": "10-3-13",
+		"pageNumber": 89,
+		"edition": "22nd"
+	},
+	{ "sourceKey": "nirsa-flag-football-22e-110", "title": "K Foul with Muffed Punt", "ruleReference": "10-3-13", "pageNumber": 90, "edition": "22nd" }
+]

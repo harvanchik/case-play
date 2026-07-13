@@ -18,6 +18,21 @@ export const readOptionalId = (formData: FormData, key: string) => {
 	return value ? value : null;
 };
 
+export const readOptionalPositiveInteger = (formData: FormData, key: string) => {
+	const value = formData.get(key)?.toString().trim();
+
+	if (!value) {
+		return null;
+	}
+
+	const number = Number(value);
+	if (!Number.isInteger(number) || number < 1) {
+		throw new Error(`${key} must be a positive whole number.`);
+	}
+
+	return number;
+};
+
 export const readDifficulty = (formData: FormData) => {
 	const difficulty = Number(formData.get('difficulty')?.toString() || 0);
 

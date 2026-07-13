@@ -5,14 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { createDatabase } from '../src/lib/server/db/connection';
-import {
-	authors,
-	casePlays,
-	playlistCasePlays,
-	playlists,
-	rulebooks,
-	sports
-} from '../src/lib/server/db/schema';
+import { authors, casePlays, playlistCasePlays, playlists, rulebooks, sports } from '../src/lib/server/db/schema';
 import { normalizeSlug } from '../src/lib/server/db/repositories/reference-data';
 
 type ImportAuthor = {
@@ -37,6 +30,8 @@ type ImportCasePlay = {
 	prompt: string;
 	answer: string;
 	edition?: string | null;
+	ruleReference?: string | null;
+	pageNumber?: number | null;
 	difficulty: 1 | 2 | 3;
 	filmUrl?: string | null;
 	author?: ImportAuthor | null;
@@ -68,9 +63,7 @@ if (!importPathArg) {
 	throw new Error('Usage: pnpm import:caseplays <path-to-import.json>');
 }
 
-const absoluteImportPath = path.isAbsolute(importPathArg)
-	? importPathArg
-	: path.join(projectRoot, importPathArg);
+const absoluteImportPath = path.isAbsolute(importPathArg) ? importPathArg : path.join(projectRoot, importPathArg);
 
 const payload = JSON.parse(await readFile(absoluteImportPath, 'utf8')) as ImportPayload;
 const { db, client } = createDatabase({
@@ -115,11 +108,7 @@ const getOrCreateRulebookId = async (rulebook: ImportRulebook | null | undefined
 	}
 
 	const slug = normalizeSlug(rulebook.slug || rulebook.title);
-	const existing = await db
-		.select({ id: rulebooks.id })
-		.from(rulebooks)
-		.where(eq(rulebooks.slug, slug))
-		.limit(1);
+	const existing = await db.select({ id: rulebooks.id }).from(rulebooks).where(eq(rulebooks.slug, slug)).limit(1);
 
 	if (existing[0]) {
 		await db
@@ -152,11 +141,7 @@ const getOrCreateSportId = async (sport: ImportSport | null | undefined) => {
 	}
 
 	const slug = normalizeSlug(sport.slug || sport.name);
-	const existing = await db
-		.select({ id: sports.id })
-		.from(sports)
-		.where(eq(sports.slug, slug))
-		.limit(1);
+	const existing = await db.select({ id: sports.id }).from(sports).where(eq(sports.slug, slug)).limit(1);
 
 	if (existing[0]) {
 		await db
@@ -185,11 +170,7 @@ for (const entry of payload.casePlays ?? []) {
 	const authorId = await getOrCreateAuthorId(entry.author);
 	const rulebookId = await getOrCreateRulebookId(entry.rulebook);
 	const sportId = await getOrCreateSportId(entry.sport);
-	const existing = await db
-		.select({ id: casePlays.id })
-		.from(casePlays)
-		.where(eq(casePlays.sourceKey, entry.sourceKey))
-		.limit(1);
+	const existing = await db.select({ id: casePlays.id }).from(casePlays).where(eq(casePlays.sourceKey, entry.sourceKey)).limit(1);
 
 	if (existing[0]) {
 		await db
@@ -199,6 +180,8 @@ for (const entry of payload.casePlays ?? []) {
 				prompt: entry.prompt.trim(),
 				answer: entry.answer.trim(),
 				edition: entry.edition?.trim() || null,
+				ruleReference: entry.ruleReference?.trim() || null,
+				pageNumber: entry.pageNumber ?? null,
 				difficulty: entry.difficulty,
 				filmUrl: entry.filmUrl?.trim() || null,
 				authorId,
@@ -218,6 +201,8 @@ for (const entry of payload.casePlays ?? []) {
 		prompt: entry.prompt.trim(),
 		answer: entry.answer.trim(),
 		edition: entry.edition?.trim() || null,
+		ruleReference: entry.ruleReference?.trim() || null,
+		pageNumber: entry.pageNumber ?? null,
 		difficulty: entry.difficulty,
 		filmUrl: entry.filmUrl?.trim() || null,
 		authorId,
@@ -229,11 +214,7 @@ for (const entry of payload.casePlays ?? []) {
 }
 
 for (const playlist of payload.playlists ?? []) {
-	const existingPlaylist = await db
-		.select({ id: playlists.id })
-		.from(playlists)
-		.where(eq(playlists.sourceKey, playlist.sourceKey))
-		.limit(1);
+	const existingPlaylist = await db.select({ id: playlists.id }).from(playlists).where(eq(playlists.sourceKey, playlist.sourceKey)).limit(1);
 
 	const playlistId = existingPlaylist[0]?.id ?? randomUUID();
 	const timestamp = now();
@@ -258,11 +239,7 @@ for (const playlist of payload.playlists ?? []) {
 	}
 
 	for (const [index, sourceKey] of playlist.casePlaySourceKeys.entries()) {
-		const linkedCasePlay = await db
-			.select({ id: casePlays.id })
-			.from(casePlays)
-			.where(eq(casePlays.sourceKey, sourceKey))
-			.limit(1);
+		const linkedCasePlay = await db.select({ id: casePlays.id }).from(casePlays).where(eq(casePlays.sourceKey, sourceKey)).limit(1);
 
 		if (!linkedCasePlay[0]) {
 			console.warn(`Skipping missing case play sourceKey ${sourceKey} for playlist ${playlist.title}`);

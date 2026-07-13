@@ -29,10 +29,7 @@ export const sessions = sqliteTable(
 		expiresAt: text('expires_at').notNull(),
 		createdAt: text('created_at').notNull()
 	},
-	(table) => [
-		uniqueIndex('sessions_hash_unique').on(table.sessionHash),
-		index('sessions_user_id_idx').on(table.userId)
-	]
+	(table) => [uniqueIndex('sessions_hash_unique').on(table.sessionHash), index('sessions_user_id_idx').on(table.userId)]
 );
 
 export const authors = sqliteTable(
@@ -81,6 +78,8 @@ export const casePlays = sqliteTable(
 		prompt: text('prompt').notNull(),
 		answer: text('answer').notNull(),
 		edition: text('edition'),
+		ruleReference: text('rule_reference'),
+		pageNumber: integer('page_number'),
 		difficulty: integer('difficulty').notNull(),
 		filmUrl: text('film_url'),
 		authorId: text('author_id').references(() => authors.id, { onDelete: 'set null' }),

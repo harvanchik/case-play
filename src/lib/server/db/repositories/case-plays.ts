@@ -9,6 +9,8 @@ export type CasePlayMutationInput = {
 	prompt: string;
 	answer: string;
 	edition?: string | null;
+	ruleReference?: string | null;
+	pageNumber?: number | null;
 	difficulty: 1 | 2 | 3;
 	filmUrl?: string | null;
 	authorId?: string | null;
@@ -28,6 +30,8 @@ export const listCasePlays = async (database?: Database) => {
 			prompt: casePlays.prompt,
 			answer: casePlays.answer,
 			edition: casePlays.edition,
+			ruleReference: casePlays.ruleReference,
+			pageNumber: casePlays.pageNumber,
 			difficulty: casePlays.difficulty,
 			date_created: casePlays.createdAt,
 			date_updated: casePlays.updatedAt,
@@ -45,6 +49,8 @@ export const listCasePlaysForAdmin = async (database?: Database) => {
 			title: casePlays.title,
 			difficulty: casePlays.difficulty,
 			edition: casePlays.edition,
+			ruleReference: casePlays.ruleReference,
+			pageNumber: casePlays.pageNumber,
 			updatedAt: casePlays.updatedAt,
 			sourceKey: casePlays.sourceKey,
 			authorFirstName: authors.firstName,
@@ -81,6 +87,8 @@ export const getCasePlayById = async (id: string, database?: Database) => {
 			prompt: casePlays.prompt,
 			answer: casePlays.answer,
 			edition: casePlays.edition,
+			ruleReference: casePlays.ruleReference,
+			pageNumber: casePlays.pageNumber,
 			difficulty: casePlays.difficulty,
 			film: casePlays.filmUrl,
 			filmUrl: casePlays.filmUrl,
@@ -128,6 +136,8 @@ export const createCasePlay = async (input: CasePlayMutationInput, database?: Da
 		prompt: input.prompt.trim(),
 		answer: input.answer.trim(),
 		edition: input.edition?.trim() || null,
+		ruleReference: input.ruleReference?.trim() || null,
+		pageNumber: input.pageNumber ?? null,
 		difficulty: input.difficulty,
 		filmUrl: input.filmUrl?.trim() || null,
 		authorId: input.authorId || null,
@@ -151,6 +161,8 @@ export const updateCasePlay = async (id: string, input: CasePlayMutationInput, d
 			prompt: input.prompt.trim(),
 			answer: input.answer.trim(),
 			edition: input.edition?.trim() || null,
+			ruleReference: input.ruleReference?.trim() || null,
+			pageNumber: input.pageNumber ?? null,
 			difficulty: input.difficulty,
 			filmUrl: input.filmUrl?.trim() || null,
 			authorId: input.authorId || null,

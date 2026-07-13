@@ -8,12 +8,15 @@
 	let isClicked = false;
 	let isRevealed = false;
 
-	$: authorName = data.casePlay?.author
-		? `${data.casePlay.author.first_name} ${data.casePlay.author.last_name}`.trim()
-		: 'Unknown author';
-	$: rulebookName = data.casePlay?.rulebook
-		? `${data.casePlay.rulebook.nickname || data.casePlay.rulebook.title}${data.casePlay?.edition ? ` ${data.casePlay.edition} Edition` : ''}`
-		: 'Unknown rulebook';
+	$: authorName = data.casePlay?.author?.id ? `${data.casePlay.author.first_name} ${data.casePlay.author.last_name}`.trim() : null;
+	$: rulebookName = data.casePlay?.rulebook?.id ? data.casePlay.rulebook.nickname || data.casePlay.rulebook.title : null;
+	$: metadataItems = [
+		authorName ? `authored by ${authorName}` : null,
+		rulebookName,
+		data.casePlay?.edition ? (/edition$/i.test(data.casePlay.edition) ? data.casePlay.edition : `${data.casePlay.edition} Edition`) : null,
+		data.casePlay?.ruleReference ? `Rule ${data.casePlay.ruleReference}` : null,
+		data.casePlay?.pageNumber ? `Page ${data.casePlay.pageNumber}` : null
+	].filter((item): item is string => Boolean(item));
 
 	onMount(() => {
 		const instance = new Mark('main');
@@ -69,12 +72,12 @@
 	<meta name="author" content="Jake Harvanchik" />
 </svelte:head>
 
-<main class="min-h-screen overflow-hidden bg-stone-100/[97%] scrollbar scrollbar-track-stone-800 scrollbar-thumb-black">
+<main class="scrollbar scrollbar-track-stone-800 scrollbar-thumb-black min-h-screen overflow-hidden bg-stone-100/[97%]">
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 
 	<a
 		href="/"
-		class="absolute left-10 top-5 flex cursor-pointer flex-row items-center space-x-1 text-stone-600 transition-colors duration-200 hover:text-stone-900"
+		class="absolute top-5 left-10 flex cursor-pointer flex-row items-center space-x-1 text-stone-600 transition-colors duration-200 hover:text-stone-900"
 	>
 		<span class="text-xl font-bold">&larr;</span>
 		<span class="text-lg font-semibold">Back</span>
@@ -99,16 +102,19 @@
 			{/if}
 		</div>
 
-		<h2 class="mx-auto flex space-x-2 pb-3 text-sm md:space-x-3 md:text-base">
-			<p class="text-stone-600 hover:text-stone-800">authored by {authorName}</p>
-			<p class="text-stone-700">&bull;</p>
-			<p class="text-stone-600 hover:text-stone-800">{rulebookName}</p>
-		</h2>
+		{#if metadataItems.length > 0}
+			<h2 class="mx-auto flex max-w-[95%] flex-wrap justify-center gap-x-2 pb-3 text-sm md:gap-x-3 md:text-base">
+				{#each metadataItems as item, index}
+					{#if index > 0}<span class="text-stone-700">&bull;</span>{/if}
+					<span class="text-stone-600 hover:text-stone-800">{item}</span>
+				{/each}
+			</h2>
+		{/if}
 
 		<div class="mx-3 flex flex-col text-lg leading-[1.425] sm:mx-auto sm:w-1/2">
 			<p
 				id="prompt"
-				class="scrollbar-w-3 mb-5 max-h-48 overflow-y-auto border-2 border-stone-900 bg-white p-4 shadow-lg scrollbar scrollbar-track-stone-300 scrollbar-thumb-stone-700 selection:bg-black/20"
+				class="scrollbar-w-3 scrollbar scrollbar-track-stone-300 scrollbar-thumb-stone-700 mb-5 max-h-48 overflow-y-auto border-2 border-stone-900 bg-white p-4 shadow-lg selection:bg-black/20"
 				contenteditable="false"
 			>
 				{data.casePlay?.prompt}
@@ -116,7 +122,7 @@
 
 			<spoiler
 				id="answer"
-				class="scrollbar-w-3 group max-h-80 overflow-y-auto border-2 border-stone-900 scrollbar scrollbar-track-black/70 scrollbar-thumb-stone-200"
+				class="scrollbar-w-3 group scrollbar scrollbar-track-black/70 scrollbar-thumb-stone-200 max-h-80 overflow-y-auto border-2 border-stone-900"
 				class:revealed={isRevealed}
 				on:click={() => (isRevealed = !isRevealed)}
 				on:keydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (isRevealed = !isRevealed)}

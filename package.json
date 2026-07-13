@@ -10,6 +10,7 @@
 		"db:migrate": "tsx scripts/migrate.ts",
 		"db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
 		"import:caseplays": "tsx scripts/import-caseplays.ts",
+		"update:nirsa-metadata": "tsx scripts/update-nirsa-metadata.ts",
 		"pnpm": "pnpm install",
 		"updates": "npm i -g npm-check-updates && ncu -u && pnpm install"
 	},

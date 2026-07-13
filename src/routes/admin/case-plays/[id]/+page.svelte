@@ -32,6 +32,28 @@
 				<label for="edition" class="text-sm font-semibold">Edition</label>
 				<input id="edition" name="edition" value={data.casePlay.edition || ''} class="w-full border border-stone-300 px-3 py-2" />
 			</div>
+			<div class="space-y-1">
+				<label for="ruleReference" class="text-sm font-semibold">Rule Reference</label>
+				<input
+					id="ruleReference"
+					name="ruleReference"
+					value={data.casePlay.ruleReference || ''}
+					placeholder="10-4-5F"
+					class="w-full border border-stone-300 px-3 py-2"
+				/>
+			</div>
+			<div class="space-y-1">
+				<label for="pageNumber" class="text-sm font-semibold">Page Number</label>
+				<input
+					id="pageNumber"
+					name="pageNumber"
+					type="number"
+					min="1"
+					step="1"
+					value={data.casePlay.pageNumber || ''}
+					class="w-full border border-stone-300 px-3 py-2"
+				/>
+			</div>
 			<div class="space-y-1 md:col-span-2">
 				<label for="filmUrl" class="text-sm font-semibold">Film URL</label>
 				<input id="filmUrl" name="filmUrl" type="url" value={data.casePlay.filmUrl || ''} class="w-full border border-stone-300 px-3 py-2" />
@@ -42,7 +64,8 @@
 					<option value="">No author selected</option>
 					{#each data.references.authors as author}
 						<option value={author.id} selected={author.id === data.casePlay.authorId}>
-							{author.firstName} {author.lastName}
+							{author.firstName}
+							{author.lastName}
 						</option>
 					{/each}
 				</select>

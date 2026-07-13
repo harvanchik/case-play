@@ -29,6 +29,14 @@
 				<label for="edition" class="text-sm font-semibold">Edition</label>
 				<input id="edition" name="edition" class="w-full border border-stone-300 px-3 py-2" />
 			</div>
+			<div class="space-y-1">
+				<label for="ruleReference" class="text-sm font-semibold">Rule Reference</label>
+				<input id="ruleReference" name="ruleReference" placeholder="10-4-5F" class="w-full border border-stone-300 px-3 py-2" />
+			</div>
+			<div class="space-y-1">
+				<label for="pageNumber" class="text-sm font-semibold">Page Number</label>
+				<input id="pageNumber" name="pageNumber" type="number" min="1" step="1" class="w-full border border-stone-300 px-3 py-2" />
+			</div>
 			<div class="space-y-1 md:col-span-2">
 				<label for="filmUrl" class="text-sm font-semibold">Film URL</label>
 				<input id="filmUrl" name="filmUrl" type="url" class="w-full border border-stone-300 px-3 py-2" />
@@ -82,9 +90,7 @@
 			<button class="cursor-pointer border border-stone-900 bg-stone-900 px-4 py-2 font-semibold text-white hover:bg-stone-700">
 				Create Case Play
 			</button>
-			<a href="/admin/reference" class="border border-stone-300 px-4 py-2 font-semibold hover:bg-stone-100">
-				Manage Reference Data
-			</a>
+			<a href="/admin/reference" class="border border-stone-300 px-4 py-2 font-semibold hover:bg-stone-100"> Manage Reference Data </a>
 		</div>
 	</form>
 </section>
