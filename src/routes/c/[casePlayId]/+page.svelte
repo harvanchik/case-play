@@ -19,19 +19,15 @@
 		const instance = new Mark('main');
 		const TEAM_REGEX = /Team ([ABKR])('s)*|[ABKR]-[0-9]{1,2}('s)*/g;
 		instance.markRegExp(TEAM_REGEX, { element: 'u', exclude: ['h1', 'h2'] });
-		const LETTER_REGEX = /\((?=[mdclxvi])m*(c[md]|d?c{0,3})(x[cl]|l?x{0,3})(i[xv]|v?i{0,3})\)/g;
+		const LETTER_REGEX = /\([a-z]\)/gi;
+		const letterColors = ['green', 'blue', 'orange', 'indigo', 'red', 'violet', 'yellow'] as const;
 		instance.markRegExp(LETTER_REGEX, {
 			exclude: ['h1', 'h2'],
 			each(element) {
 				const text = element.textContent as string;
-				const romanNumeral = text?.toLowerCase().replace(/[()]/g, '');
-				if (romanNumeral === 'i') element.setAttribute('green', '');
-				else if (romanNumeral === 'ii') element.setAttribute('blue', '');
-				else if (romanNumeral === 'iii') element.setAttribute('orange', '');
-				else if (romanNumeral === 'iv') element.setAttribute('indigo', '');
-				else if (romanNumeral === 'v') element.setAttribute('red', '');
-				else if (romanNumeral === 'vi') element.setAttribute('violet', '');
-				else element.setAttribute('yellow', '');
+				const letter = text.toLowerCase().replace(/[()]/g, '');
+				const color = letterColors[(letter.charCodeAt(0) - 'a'.charCodeAt(0)) % letterColors.length];
+				element.setAttribute(color, '');
 				const char = element.nextSibling?.textContent?.trim().charAt(0);
 				if (char === ',') element.classList.add('mr-[2px]');
 			}
