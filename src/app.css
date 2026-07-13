@@ -87,7 +87,7 @@
 
 @layer components {
 	spoiler {
-		@apply cursor-default select-none flex-col space-y-3 bg-stone-900 p-4 text-stone-900 shadow-lg transition-colors duration-[1.25s] ease-in hover:text-white;
+		@apply block w-full cursor-default select-none space-y-3 bg-stone-900 p-4 text-stone-900 shadow-lg transition-colors duration-[1.25s] ease-in hover:text-white;
 	}
 	spoiler.revealed {
 		@apply text-white;
