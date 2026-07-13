@@ -3,6 +3,7 @@
 	import Icon from '@iconify/svelte';
 	import { replaceState } from '$app/navigation';
 	import { updateFilterSearchParams } from '$lib/case-play-filter-state';
+	import CasePlayCard from '$lib/components/CasePlayCard.svelte';
 
 	export let data: PageData;
 
@@ -226,47 +227,7 @@
 					class="scrollbar scrollbar-track-stone-400 scrollbar-thumb-stone-900 mt-1 grid max-h-[calc(100vh-16rem)] grid-cols-1 gap-4 overflow-y-auto border border-stone-400 p-2 sm:grid-cols-2 lg:grid-cols-3"
 				>
 					{#each filteredCasePlays as casePlay}
-						<a
-							href={`/c/${casePlay.id}${activeFilterQuery ? `?${activeFilterQuery}` : ''}`}
-							class="group flex cursor-pointer flex-col space-y-1 border border-stone-300 px-2 py-1 transition-colors duration-300 select-none hover:border-stone-400 hover:backdrop-blur-sm sm:px-4 sm:py-2"
-						>
-							<div class="flex flex-row items-start justify-start">
-								<div
-									id="title"
-									class="line-clamp-2 flex flex-1 flex-row pb-1 text-xl leading-tight font-bold text-stone-800 transition-colors duration-300 group-hover:text-black sm:text-2xl"
-								>
-									<p>{casePlay.title}</p>
-								</div>
-
-								<div class="ml-2 flex flex-shrink-0 flex-row items-start space-x-2">
-									<!-- START: YouTube Link -->
-									{#if casePlay?.film}
-										<!-- svelte-ignore a11y-click-events-have-key-events -->
-										<!-- svelte-ignore a11y-no-static-element-interactions -->
-										<div
-											on:click|preventDefault={() => casePlay.film && window.open(casePlay.film, '_blank')}
-											class="cursor-pointer opacity-85 transition-transform duration-150 hover:scale-110 hover:opacity-100"
-										>
-											<img class="h-5" src="./../../src/lib/svg/youtube.svg" alt="youtube" />
-										</div>
-									{/if}
-									<!-- END: YouTube Link -->
-
-									<div
-										class="bg-opacity-80 group-hover:bg-opacity-100 mt-[4px] w-max px-2 py-0.5 text-xs text-white transition-colors duration-300 sm:text-sm"
-										class:bg-green-600={casePlay.difficulty == 1}
-										class:bg-yellow-400={casePlay.difficulty == 2}
-										class:!text-black={casePlay.difficulty == 2}
-										class:bg-red-600={casePlay.difficulty == 3}
-									>
-										{getDifficulty(casePlay.difficulty)}
-									</div>
-								</div>
-							</div>
-							<div id="prompt" class="line-clamp-6 text-base leading-tight text-stone-600 sm:line-clamp-5 sm:text-lg sm:leading-snug">
-								{casePlay.prompt}
-							</div>
-						</a>
+						<CasePlayCard {casePlay} href={`/c/${casePlay.id}${activeFilterQuery ? `?${activeFilterQuery}` : ''}`} />
 					{/each}
 				</div>
 			{:else if data?.casePlays}
