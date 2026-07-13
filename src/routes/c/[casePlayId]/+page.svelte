@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import Mark from 'mark.js';
+	import { HIGHLIGHT_PATTERNS } from '$lib/highlight-patterns';
 
 	export let data: PageData;
 
@@ -39,16 +40,11 @@
 		instance.markRegExp(YARD_REGEX, { element: 'b', exclude: ['h1', 'h2'] });
 		const RULE_REGEX = /Rule ([0-9]{1,2}-[0-9]{1,2}-[0-9]{1,2}[A-Z]{0,1})/g;
 		instance.markRegExp(RULE_REGEX, { element: 'u', exclude: ['h1', 'h2'] });
-		const ACCEPT_REGEX = /accepts|accepted|accept/gi;
-		instance.markRegExp(ACCEPT_REGEX, { element: 'span', className: 'accept', exclude: ['h1', 'h2'] });
-		const DECLINE_REGEX = /declines|declined|decline/gi;
-		instance.markRegExp(DECLINE_REGEX, { element: 'span', className: 'decline', exclude: ['h1', 'h2'] });
-		const OFFSET_REGEX = /offsets|offsetted|offset/gi;
-		instance.markRegExp(OFFSET_REGEX, { element: 'span', className: 'offset', exclude: ['h1', 'h2'] });
-		const OPEN_REGEX = /opens|opened|open/gi;
-		instance.markRegExp(OPEN_REGEX, { element: 'span', className: 'open', exclude: ['h1', 'h2'] });
-		const CLOSED_REGEX = /closes|closed|close/gi;
-		instance.markRegExp(CLOSED_REGEX, { element: 'span', className: 'closed', exclude: ['h1', 'h2'] });
+		instance.markRegExp(HIGHLIGHT_PATTERNS.accept, { element: 'span', className: 'accept', exclude: ['h1', 'h2'] });
+		instance.markRegExp(HIGHLIGHT_PATTERNS.decline, { element: 'span', className: 'decline', exclude: ['h1', 'h2'] });
+		instance.markRegExp(HIGHLIGHT_PATTERNS.offset, { element: 'span', className: 'offset', exclude: ['h1', 'h2'] });
+		instance.markRegExp(HIGHLIGHT_PATTERNS.open, { element: 'span', className: 'open', exclude: ['h1', 'h2'] });
+		instance.markRegExp(HIGHLIGHT_PATTERNS.closed, { element: 'span', className: 'closed', exclude: ['h1', 'h2'] });
 		const NEWLINE_REGEX = /\n/g;
 		instance.markRegExp(NEWLINE_REGEX, { element: 'br', exclude: ['h1', 'h2'] });
 	});
