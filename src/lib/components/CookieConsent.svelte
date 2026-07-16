@@ -65,6 +65,9 @@
 				<p class="mt-1 text-sm leading-5 text-stone-700">
 					Essential storage keeps requested features and your privacy choice working. Advertising and measurement stay off unless you choose Allow All.
 				</p>
+				<p class="mt-2 text-sm font-semibold leading-5 text-stone-800">
+					Allowing ads helps keep Caseplay free—the revenue pays for the domain, hosting, and database.
+				</p>
 				{#if globalPrivacyControl}
 					<p class="mt-2 text-xs font-semibold text-stone-700">Your browser's Global Privacy Control is on, so optional advertising remains disabled.</p>
 				{/if}
