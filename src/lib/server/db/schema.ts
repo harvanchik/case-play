@@ -110,6 +110,18 @@ export const playlists = sqliteTable(
 	(table) => [uniqueIndex('playlists_source_key_unique').on(table.sourceKey)]
 );
 
+export const playBuilderDiagrams = sqliteTable(
+	'play_builder_diagrams',
+	{
+		id: text('id').primaryKey(),
+		documentJson: text('document_json').notNull(),
+		editTokenHash: text('edit_token_hash').notNull(),
+		createdAt: text('created_at').notNull(),
+		updatedAt: text('updated_at').notNull()
+	},
+	(table) => [index('play_builder_diagrams_updated_at_idx').on(table.updatedAt)]
+);
+
 export const playlistCasePlays = sqliteTable(
 	'playlist_case_plays',
 	{
