@@ -210,7 +210,7 @@
 	let playMenuElement: HTMLElement;
 	let playStripElement: HTMLElement;
 	let playMenuLeft = 0;
-	let drawing: { kind: PathKind; start: Point; end: Point; pointerStart: Point; startMarkerId?: number } | null = null;
+	let drawing: { kind: PathKind; start: Point; end: Point; pointerStart: Point; startMarkerId?: number; hasDragged: boolean } | null = null;
 	let activeFreeStroke: FreeStroke | null = null;
 	let freeDrawColor: GuideColor = 'red';
 	let freeDrawMode: 'draw' | 'erase' = 'draw';
@@ -947,7 +947,30 @@
 	const isPathTool = (value: Tool): value is Exclude<PathKind, 'line'> => ['run', 'pass', 'kick'].includes(value);
 	const isArrowPath = (value: Tool | PathKind): value is Exclude<PathKind, 'line'> => ['run', 'pass', 'kick'].includes(value);
 	const isGuideTool = (value: Tool): value is 'line-of-scrimmage' | 'line-to-gain' => ['line-of-scrimmage', 'line-to-gain'].includes(value);
-	const hasLength = (start: Point, end: Point) => Math.hypot(end.x - start.x, end.y - start.y) > 12;
+	const minimumArrowLength = () => (fieldWidth / fieldLayout.totalYards) * 2;
+	const pointWithMinimumDistance = (anchor: Point, candidate: Point, fallback: Point): Point => {
+		let dx = candidate.x - anchor.x;
+		let dy = candidate.y - anchor.y;
+		let distance = Math.hypot(dx, dy);
+		if (distance >= minimumArrowLength()) return candidate;
+		if (distance < 0.01) {
+			dx = fallback.x - anchor.x;
+			dy = fallback.y - anchor.y;
+			distance = Math.hypot(dx, dy);
+		}
+		if (distance < 0.01) {
+			dx = 1;
+			dy = 0;
+			distance = 1;
+		}
+		const length = minimumArrowLength();
+		const constrained = clampPoint({ x: anchor.x + (dx / distance) * length, y: anchor.y + (dy / distance) * length });
+		if (Math.hypot(constrained.x - anchor.x, constrained.y - anchor.y) >= length - 0.01) return constrained;
+		dx = fallback.x - anchor.x;
+		dy = fallback.y - anchor.y;
+		distance = Math.hypot(dx, dy) || 1;
+		return clampPoint({ x: anchor.x + (dx / distance) * length, y: anchor.y + (dy / distance) * length });
+	};
 	const previewPathFrom = (start: Point) => ({
 		start,
 		end: {
@@ -955,16 +978,16 @@
 			y: start.y
 		}
 	});
-	const drawingPathEnd = (activeDrawing: { start: Point; pointerStart: Point }, pointer: Point): Point => {
+	const drawingPathEnd = (activeDrawing: { start: Point; pointerStart: Point; hasDragged: boolean }, pointer: Point): Point => {
 		const dx = pointer.x - activeDrawing.pointerStart.x;
 		const dy = pointer.y - activeDrawing.pointerStart.y;
 		const pointerDistance = Math.hypot(dx, dy);
-		if (pointerDistance < 4) return previewPathFrom(activeDrawing.start).end;
+		if (pointerDistance < 0.01) return activeDrawing.hasDragged ? activeDrawing.start : previewPathFrom(activeDrawing.start).end;
+		if (pointerDistance < 4 && !activeDrawing.hasDragged) return previewPathFrom(activeDrawing.start).end;
 
-		const length = Math.max(70, pointerDistance);
 		return clampPoint({
-			x: activeDrawing.start.x + (dx / pointerDistance) * length,
-			y: activeDrawing.start.y + (dy / pointerDistance) * length
+			x: activeDrawing.start.x + dx,
+			y: activeDrawing.start.y + dy
 		});
 	};
 	const nextPlayerSequence = (kind: PlayerKind) =>
@@ -1724,7 +1747,7 @@
 
 		if (isPathTool(tool)) {
 			const preview = previewPathFrom(point);
-			drawing = { kind: tool, start: preview.start, end: preview.end, pointerStart: point };
+			drawing = { kind: tool, start: preview.start, end: preview.end, pointerStart: point, hasDragged: false };
 			svg.setPointerCapture(event.pointerId);
 		}
 	};
@@ -1751,7 +1774,8 @@
 				start: preview.start,
 				end: preview.end,
 				pointerStart: pointFromEvent(event),
-				startMarkerId: marker.id
+				startMarkerId: marker.id,
+				hasDragged: false
 			};
 			svg.setPointerCapture(event.pointerId);
 			return;
@@ -1847,7 +1871,10 @@
 			return;
 		}
 		if (!drawing && !dragTarget) return;
-		if (drawing) drawing = { ...drawing, end: drawingPathEnd(drawing, point) };
+		if (drawing) {
+			const pointerDistance = Math.hypot(point.x - drawing.pointerStart.x, point.y - drawing.pointerStart.y);
+			drawing = { ...drawing, end: drawingPathEnd(drawing, point), hasDragged: drawing.hasDragged || pointerDistance >= 4 };
+		}
 		if (!dragTarget) return;
 		const rawDx = point.x - dragTarget.pointerStart.x;
 		const rawDy = point.y - dragTarget.pointerStart.y;
@@ -1872,12 +1899,14 @@
 		if (dragTarget.type === 'path') {
 			const target = dragTarget;
 			if (target.mode === 'end') {
-				const end = clampPoint({ x: target.end.x + rawDx, y: target.end.y + rawDy });
+				const candidate = clampPoint({ x: target.end.x + rawDx, y: target.end.y + rawDy });
+				const end = pointWithMinimumDistance(target.start, candidate, target.end);
 				paths = paths.map((path) => (path.id === target.id ? { ...path, end } : path));
 				return;
 			}
 			if (target.mode === 'start') {
-				const start = clampPoint({ x: target.start.x + rawDx, y: target.start.y + rawDy });
+				const candidate = clampPoint({ x: target.start.x + rawDx, y: target.start.y + rawDy });
+				const start = pointWithMinimumDistance(target.end, candidate, target.start);
 				paths = paths.map((path) => (path.id === target.id ? { ...path, start, startMarkerId: undefined } : path));
 				return;
 			}
@@ -1941,14 +1970,17 @@
 			return;
 		}
 		const droppedTarget: SelectedTarget | null = dragTarget?.moved ? { type: dragTarget.type, id: dragTarget.id } : null;
-		if (drawing && hasLength(drawing.start, drawing.end)) {
+		if (drawing && (!drawing.hasDragged || Math.hypot(drawing.end.x - drawing.start.x, drawing.end.y - drawing.start.y) >= minimumArrowLength())) {
 			saveHistory();
 			const pathId = nextId++;
 			paths = [
 				...paths,
 				{
 					id: pathId,
-					...drawing,
+					kind: drawing.kind,
+					start: drawing.start,
+					end: drawing.end,
+					startMarkerId: drawing.startMarkerId,
 					color: drawing.kind === 'pass' ? 'cyan' : drawing.kind === 'kick' ? 'blue' : drawing.kind === 'run' ? 'white' : 'yellow',
 					style: drawing.kind === 'pass' || drawing.kind === 'kick' ? 'dashed' : 'solid'
 				}
@@ -1996,6 +2028,13 @@
 			x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
 			y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y
 		};
+	};
+	const arrowHitTip = (kind: Exclude<PathKind, 'line'>, start: Point, end: Point): Point => {
+		const beforeEnd = kind === 'pass' || kind === 'kick' ? airbornePoint(kind, start, end, 0.98) : start;
+		const dx = end.x - beforeEnd.x;
+		const dy = end.y - beforeEnd.y;
+		const distance = Math.hypot(dx, dy) || 1;
+		return { x: end.x + (dx / distance) * 24, y: end.y + (dy / distance) * 24 };
 	};
 	const pathData = (kind: 'pass' | 'kick', start: Point, end: Point) => {
 		const controlY = (start.y + end.y) / 2 - airborneLift(kind, start, end) * 2;
@@ -3149,6 +3188,7 @@
 							/>
 						{/if}
 						{#if isArrowPath(path.kind)}
+							{@const arrowTip = arrowHitTip(path.kind, start, path.end)}
 							<circle
 								data-field-element
 								data-field-type="path"
@@ -3169,14 +3209,16 @@
 								on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
 								on:keydown={(event) => handlePathKeydown(event, path)}
 							/>
-							<circle
+							<line
 								data-field-element
 								data-field-type="path"
 								data-path-endpoint="end"
-								cx={path.end.x}
-								cy={path.end.y}
-								r="26"
-								fill="transparent"
+								x1={path.end.x}
+								y1={path.end.y}
+								x2={arrowTip.x}
+								y2={arrowTip.y}
+								stroke="transparent"
+								stroke-width="24"
 								pointer-events="all"
 								role="button"
 								tabindex="-1"
