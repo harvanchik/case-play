@@ -1242,7 +1242,7 @@
 		else if (editingPathId !== null) commitPathEditor();
 	};
 	const startEditingMarker = async (event: Event, marker: FieldMarker) => {
-		if (!isEditableMarker(marker)) return;
+		if (!isEditableMarker(marker) || (tool === 'event' && marker.kind !== 'ball')) return;
 		event.preventDefault();
 		clearDeleteState();
 		editingMarkerId = marker.id;
@@ -1254,6 +1254,7 @@
 		editInput?.select();
 	};
 	const startEditingGuide = (event: Event, guide: FieldGuide) => {
+		if (tool === 'event') return;
 		event.preventDefault();
 		clearDeleteState();
 		editingMarkerId = null;
@@ -1263,6 +1264,7 @@
 		guideEditStyle = guide.style;
 	};
 	const startEditingPath = (event: Event, path: FieldPath) => {
+		if (tool === 'event') return;
 		event.preventDefault();
 		clearDeleteState();
 		editingMarkerId = null;
@@ -1704,6 +1706,20 @@
 		markers = [...markers, marker];
 		raiseLayer('marker', marker.id);
 	};
+	const placeEventTag = async (point: Point) => {
+		clearDeleteState();
+		saveHistory();
+		const marker = createMarker('event', point);
+		markers = [...markers, marker];
+		raiseLayer('marker', marker.id);
+		editingMarkerId = marker.id;
+		editingGuideId = null;
+		editingPathId = null;
+		editValue = marker.label ?? '';
+		await tick();
+		editInput?.focus();
+		editInput?.select();
+	};
 
 	const beginOnField = async (event: PointerEvent) => {
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
@@ -1715,6 +1731,10 @@
 		}
 		if (!isPointOnField(canvasPointFromEvent(event))) return;
 		const point = pointFromEvent(event);
+		if (tool === 'event') {
+			await placeEventTag(point);
+			return;
+		}
 		if (isGuideTool(tool)) {
 			const x = placementSnapX ?? point.x;
 			clearPlacementSnap();
@@ -1733,15 +1753,6 @@
 			const marker = createMarker(tool, markerPoint);
 			markers = [...markers, marker];
 			raiseLayer('marker', marker.id);
-			if (marker.kind === 'event') {
-				editingMarkerId = marker.id;
-				editingGuideId = null;
-				editingPathId = null;
-				editValue = marker.label ?? '';
-				await tick();
-				editInput?.focus();
-				editInput?.select();
-			}
 			return;
 		}
 
@@ -1751,12 +1762,16 @@
 			svg.setPointerCapture(event.pointerId);
 		}
 	};
-	const beginOnMarker = (event: PointerEvent, marker: FieldMarker) => {
+	const beginOnMarker = async (event: PointerEvent, marker: FieldMarker) => {
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
 		const snappedX = placementSnapX;
 		clearPlacementSnap();
 		lastPlacementHoverPoint = null;
+		if (tool === 'event' && marker.kind !== 'ball') {
+			await placeEventTag(pointFromEvent(event));
+			return;
+		}
 		if (isGuideTool(tool) && marker.kind === 'ball') {
 			placeGuide(tool, snappedX ?? marker.x);
 			return;
@@ -1783,10 +1798,14 @@
 		setDeleteTargetAtPointer({ type: 'marker', id: marker.id }, event);
 		dragTarget = { type: 'marker', id: marker.id, pointerStart: pointFromEvent(event), elementStart: { x: marker.x, y: marker.y }, moved: false };
 	};
-	const beginOnPath = (event: PointerEvent, path: FieldPath, mode: 'whole' | 'start' | 'end' = 'whole') => {
+	const beginOnPath = async (event: PointerEvent, path: FieldPath, mode: 'whole' | 'start' | 'end' = 'whole') => {
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
 		clearPlacementSnap();
+		if (tool === 'event') {
+			await placeEventTag(pointFromEvent(event));
+			return;
+		}
 		if (tool === 'free-draw') {
 			beginFreeDrawing(event);
 			return;
@@ -1804,12 +1823,16 @@
 				moved: false
 			};
 	};
-	const beginOnGuide = (event: PointerEvent, guide: FieldGuide) => {
+	const beginOnGuide = async (event: PointerEvent, guide: FieldGuide) => {
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
 		const snappedX = placementSnapX;
 		clearPlacementSnap();
 		lastPlacementHoverPoint = null;
+		if (tool === 'event') {
+			await placeEventTag(pointFromEvent(event));
+			return;
+		}
 		if (tool === 'ball') {
 			const point = pointFromEvent(event);
 			placeBall({ ...point, x: snappedX ?? guide.x });
@@ -1852,7 +1875,11 @@
 		const canSnapThroughHoveredElement =
 			(isGuideTool(tool) && hoveredFieldElement?.getAttribute('data-field-kind') === 'ball') ||
 			(tool === 'ball' && hoveredFieldElement?.getAttribute('data-field-type') === 'guide');
-		hoveringElement = Boolean(hoveredFieldElement) && !canSnapThroughHoveredElement;
+		const canPlaceEventThroughHoveredElement =
+			tool === 'event' &&
+			Boolean(hoveredFieldElement) &&
+			!(hoveredFieldElement?.getAttribute('data-field-type') === 'marker' && hoveredFieldElement?.getAttribute('data-field-kind') === 'ball');
+		hoveringElement = Boolean(hoveredFieldElement) && !canSnapThroughHoveredElement && !canPlaceEventThroughHoveredElement;
 		const placementPointerMoved =
 			!lastPlacementHoverPoint || Math.hypot(point.x - lastPlacementHoverPoint.x, point.y - lastPlacementHoverPoint.y) > 0.1;
 		if (drawing || activeFreeStroke || (dragTarget && placementPointerMoved)) clearPlacementSnap();
@@ -3019,13 +3046,13 @@
 						tabindex="0"
 						aria-label={`${guideLabel(guide)}, double-click to format`}
 						on:pointerdown|stopPropagation={(event) => beginOnGuide(event, guide)}
-						on:pointerenter={() => (hoveringElement = tool !== 'ball')}
+						on:pointerenter={() => (hoveringElement = tool !== 'ball' && tool !== 'event')}
 						on:pointerleave={() => (hoveringElement = false)}
 						on:dblclick|stopPropagation={(event) => startEditingGuide(event, guide)}
 						on:keydown|stopPropagation={(event) => handleGuideKeydown(event, guide)}
 						class="focus:outline-none"
-						class:cursor-pointer={tool !== 'free-draw' && !isDragging('guide', guide.id)}
-						class:cursor-grabbing={tool !== 'free-draw' && isDragging('guide', guide.id)}
+						class:cursor-pointer={tool !== 'free-draw' && tool !== 'event' && !isDragging('guide', guide.id)}
+						class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('guide', guide.id)}
 					>
 						<line x1={guide.x} y1={fieldTop} x2={guide.x} y2={fieldBottom} stroke="transparent" stroke-width="28" />
 						<line
@@ -3124,9 +3151,9 @@
 								tabindex="0"
 								aria-label={`${path.kind} line`}
 								class="focus:outline-none"
-								class:cursor-pointer={tool !== 'free-draw' && !isDragging('path', path.id)}
-								class:cursor-grabbing={tool !== 'free-draw' && isDragging('path', path.id)}
-								on:pointerenter={() => (hoveringElement = true)}
+								class:cursor-pointer={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
+								class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('path', path.id)}
+								on:pointerenter={() => (hoveringElement = tool !== 'event')}
 								on:pointerleave={() => (hoveringElement = false)}
 								on:pointerdown|stopPropagation={(event) => beginOnPath(event, path)}
 								on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
@@ -3166,9 +3193,9 @@
 								tabindex="0"
 								aria-label={`${path.kind} line`}
 								class="focus:outline-none"
-								class:cursor-pointer={tool !== 'free-draw' && !isDragging('path', path.id)}
-								class:cursor-grabbing={tool !== 'free-draw' && isDragging('path', path.id)}
-								on:pointerenter={() => (hoveringElement = true)}
+								class:cursor-pointer={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
+								class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('path', path.id)}
+								on:pointerenter={() => (hoveringElement = tool !== 'event')}
 								on:pointerleave={() => (hoveringElement = false)}
 								on:pointerdown|stopPropagation={(event) => beginOnPath(event, path)}
 								on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
@@ -3201,9 +3228,9 @@
 								role="button"
 								tabindex="-1"
 								aria-label={`Move ${path.kind} origin`}
-								class:cursor-pointer={tool !== 'free-draw' && !isDragging('path', path.id)}
-								class:cursor-grabbing={tool !== 'free-draw' && isDragging('path', path.id)}
-								on:pointerenter={() => (hoveringElement = true)}
+								class:cursor-pointer={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
+								class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('path', path.id)}
+								on:pointerenter={() => (hoveringElement = tool !== 'event')}
 								on:pointerleave={() => (hoveringElement = false)}
 								on:pointerdown|stopPropagation={(event) => beginOnPath(event, path, 'start')}
 								on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
@@ -3223,9 +3250,9 @@
 								role="button"
 								tabindex="-1"
 								aria-label={`Move ${path.kind} destination`}
-								class:cursor-pointer={tool !== 'free-draw' && !isDragging('path', path.id)}
-								class:cursor-grabbing={tool !== 'free-draw' && isDragging('path', path.id)}
-								on:pointerenter={() => (hoveringElement = true)}
+								class:cursor-pointer={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
+								class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('path', path.id)}
+								on:pointerenter={() => (hoveringElement = tool !== 'event')}
 								on:pointerleave={() => (hoveringElement = false)}
 								on:pointerdown|stopPropagation={(event) => beginOnPath(event, path, 'end')}
 								on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
@@ -3287,7 +3314,8 @@
 						data-field-type="marker"
 						data-field-kind={marker.kind}
 						on:pointerdown|stopPropagation={(event) => beginOnMarker(event, marker)}
-						on:pointerenter={() => (hoveringElement = !(isGuideTool(tool) && marker.kind === 'ball'))}
+						on:pointerenter={() =>
+							(hoveringElement = tool === 'event' ? marker.kind === 'ball' : !(isGuideTool(tool) && marker.kind === 'ball'))}
 						on:pointerleave={() => (hoveringElement = false)}
 						on:dblclick|stopPropagation={(event) => startEditingMarker(event, marker)}
 						on:keydown|stopPropagation={(event) => handleMarkerKeydown(event, marker)}
@@ -3304,8 +3332,8 @@
 										: marker.kind === 'ball'
 											? `${marker.label ? `${marker.label}, ` : ''}football, double-click to add text`
 											: marker.kind}
-						class:cursor-pointer={tool !== 'free-draw' && !isDragging('marker', marker.id)}
-						class:cursor-grabbing={tool !== 'free-draw' && isDragging('marker', marker.id)}
+						class:cursor-pointer={tool !== 'free-draw' && (tool !== 'event' || marker.kind === 'ball') && !isDragging('marker', marker.id)}
+						class:cursor-grabbing={tool !== 'free-draw' && (tool !== 'event' || marker.kind === 'ball') && isDragging('marker', marker.id)}
 						class:focus:outline-none={isEditableMarker(marker)}
 					>
 						{#if isTeamMarker(marker)}
