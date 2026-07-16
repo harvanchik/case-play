@@ -250,6 +250,8 @@
 			<span>&copy; {new Date().getFullYear()} caseplay.org</span>
 			<button on:click={() => (showCreateModal = true)} class="cursor-pointer font-semibold hover:underline">Contribute</button>
 			<a href="mailto:contact@caseplay.org" target="_blank" class="cursor-pointer font-semibold hover:underline">Contact</a>
+			<a href="/privacy" class="cursor-pointer font-semibold hover:underline">Privacy</a>
+			<a href="/cookie-policy" class="cursor-pointer font-semibold hover:underline">Cookies</a>
 		</div>
 	</footer>
 	<!-- END: Footer -->

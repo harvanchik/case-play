@@ -4,5 +4,7 @@
 		<span>&copy; {new Date().getFullYear()} caseplay.org</span>
 		<a href="mailto:create@caseplay.org" class="cursor-pointer font-semibold hover:underline">Contribute</a>
 		<a href="mailto:contact@caseplay.org" class="cursor-pointer font-semibold hover:underline">Contact</a>
+		<a href="/privacy" class="cursor-pointer font-semibold hover:underline">Privacy</a>
+		<a href="/cookie-policy" class="cursor-pointer font-semibold hover:underline">Cookies</a>
 	</div>
 </footer>

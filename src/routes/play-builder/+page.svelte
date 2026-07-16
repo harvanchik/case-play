@@ -9,13 +9,13 @@
 	<meta name="description" content="Build a flag football play on a full-screen field diagram." />
 </svelte:head>
 
-<main class="relative flex min-h-screen w-full items-center justify-center bg-stone-100/[97%] p-4 pt-[7.5rem]">
+<main class="relative min-h-screen w-full bg-stone-100/[97%] p-4">
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
-	<div class="absolute right-4 top-4">
+	<div class="grid min-h-[calc(100vh-2rem)] w-full grid-cols-1 items-center gap-4 lg:grid-cols-[minmax(0,1fr)_clamp(180px,18vw,300px)]">
+		<div class="min-w-0 justify-self-start" style="width: min(100%, calc((100vh - 4rem) * 2.1));">
+			<FlagFootballPlayBuilder />
+			<PlayBuilderAttribution />
+		</div>
 		<PlayBuilderAd />
-	</div>
-	<div class="w-full" style="max-width: min(96vw, calc((100vh - 9.5rem) * 2.1));">
-		<FlagFootballPlayBuilder />
-		<PlayBuilderAttribution />
 	</div>
 </main>
