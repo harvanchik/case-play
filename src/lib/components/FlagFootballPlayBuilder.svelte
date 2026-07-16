@@ -72,7 +72,7 @@
 		],
 		[{ id: 'ball', label: 'Football', symbol: '', shortcut: 'o', shortcutKeys: ['O'], caption: 'Football', image: '/images/football.png' }],
 		[{ id: 'flag', label: 'Penalty Flag', symbol: '', shortcut: 'f', shortcutKeys: ['F'], caption: 'Penalty', image: '/images/penalty-flag.png' }],
-		[{ id: 'deflag', label: 'Flag Belt', symbol: '', shortcut: 'd', shortcutKeys: ['D'], caption: 'Flag Belt', image: '/images/flag-belt.png' }],
+		[{ id: 'deflag', label: 'Flag Belt', symbol: '', shortcut: 'l', shortcutKeys: ['L'], caption: 'Flag Belt', image: '/images/flag-belt.png' }],
 		[{ id: 'event', label: 'Event Tag', symbol: '', shortcut: 'e', shortcutKeys: ['E'], caption: 'Event Tag', icon: 'event' }],
 		[
 			{ id: 'run', label: 'Run Arrow', symbol: '', shortcut: 'shift+r', shortcutKeys: ['Shift', 'R'], caption: 'Run', image: '/images/run-arrow.png' }
@@ -93,13 +93,13 @@
 				id: 'line-to-gain',
 				label: 'Line to Gain',
 				symbol: '',
-				shortcut: 'shift+l',
-				shortcutKeys: ['Shift', 'L'],
+				shortcut: 'g',
+				shortcutKeys: ['G'],
 				caption: 'L.T.G.',
 				icon: 'line-to-gain'
 			}
 		],
-		[{ id: 'free-draw', label: 'Free Draw', symbol: '', shortcut: 'g', shortcutKeys: ['G'], caption: 'Draw', image: '/images/draw-pen.png' }]
+		[{ id: 'free-draw', label: 'Free Draw', symbol: '', shortcut: 'd', shortcutKeys: ['D'], caption: 'Draw', image: '/images/draw-pen.png' }]
 	];
 	const tools = toolRows.flat();
 	const helpPlayerTools = tools.filter((item) => ['team-a', 'team-k', 'team-b', 'team-r'].includes(item.id));
@@ -983,12 +983,12 @@
 		const dx = pointer.x - activeDrawing.pointerStart.x;
 		const dy = pointer.y - activeDrawing.pointerStart.y;
 		const pointerDistance = Math.hypot(dx, dy);
-		if (pointerDistance < 0.01) return activeDrawing.hasDragged ? activeDrawing.start : previewPathFrom(activeDrawing.start).end;
-		if (pointerDistance < 4 && !activeDrawing.hasDragged) return previewPathFrom(activeDrawing.start).end;
+		const defaultEnd = previewPathFrom(activeDrawing.start).end;
+		if (pointerDistance < 4 && !activeDrawing.hasDragged) return defaultEnd;
 
 		return clampPoint({
-			x: activeDrawing.start.x + dx,
-			y: activeDrawing.start.y + dy
+			x: defaultEnd.x + dx,
+			y: defaultEnd.y + dy
 		});
 	};
 	const nextPlayerSequence = (kind: PlayerKind) =>
@@ -3062,7 +3062,7 @@
 						class:cursor-pointer={tool !== 'free-draw' && tool !== 'event' && !isDragging('guide', guide.id)}
 						class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('guide', guide.id)}
 					>
-						<line x1={guide.x} y1={fieldTop} x2={guide.x} y2={fieldBottom} stroke="transparent" stroke-width="28" />
+						<line x1={guide.x} y1={fieldTop} x2={guide.x} y2={fieldBottom} stroke="transparent" stroke-width="14" />
 						<line
 							x1={guide.x}
 							y1={fieldTop + guideSidelineInset}
@@ -3894,7 +3894,8 @@
 					<h3 class="mb-2 border-b border-stone-300 pb-1 text-lg font-black">Start Here</h3>
 					<div class="grid gap-3 text-sm leading-relaxed md:grid-cols-2">
 						<p>
-							<strong>Place:</strong> Choose a tool, then click the field. For routes and lines, click and drag from the starting point to the ending point.
+							<strong>Place:</strong> Choose a tool, then click the field. Clicking an arrow tool places the previewed default arrow. If you drag, your
+							movement adjusts its endpoint from that default position to shorten, lengthen, or redirect it.
 						</p>
 						<p>
 							<strong>Move:</strong> Drag any placed element. When an arrow tool is selected, dragging from a player starts the arrow from—and keeps it
