@@ -105,7 +105,8 @@
 		'team-r': 'Places receiving-team players as R-1, R-2, and so on. Double-click to rename.',
 		ball: 'Places the football at the chosen spot on the field. Drag it to move it, or double-click to add an optional description beneath it.',
 		flag: 'Marks a penalty spot. Double-click the flag to add or change the optional foul description shown beneath it.',
-		deflag: 'Marks the deflagging spot. Double-click to add an optional description or choose the flag color; that color becomes the default for the next belts you place.',
+		deflag:
+			'Marks the deflagging spot. Double-click to add an optional description or choose the flag color; that color becomes the default for the next belts you place.',
 		event:
 			'Places a resizable text tag and immediately opens its editor. Use it for catches, first touching, possession changes, or any event that needs a label.',
 		run: 'Drag from any point—or directly from a player—to draw a solid running route. Double-click the route to change its color and line style.',
@@ -945,10 +946,7 @@
 			y: start.y
 		}
 	});
-	const drawingPathEnd = (
-		activeDrawing: { start: Point; pointerStart: Point },
-		pointer: Point
-	): Point => {
+	const drawingPathEnd = (activeDrawing: { start: Point; pointerStart: Point }, pointer: Point): Point => {
 		const dx = pointer.x - activeDrawing.pointerStart.x;
 		const dy = pointer.y - activeDrawing.pointerStart.y;
 		const pointerDistance = Math.hypot(dx, dy);
@@ -1007,7 +1005,7 @@
 	const markerDescriptionName = (marker: FieldMarker) =>
 		marker.kind === 'ball' ? 'Football description' : marker.kind === 'deflag' ? 'Flag belt description' : 'Penalty description';
 	const markerDescriptionPlaceholder = (marker: FieldMarker) =>
-		marker.kind === 'ball' ? 'Football note' : marker.kind === 'deflag' ? 'Deflag note' : 'Penalty';
+		marker.kind === 'ball' ? 'Football Note' : marker.kind === 'deflag' ? 'Flag Belt Note' : 'Penalty';
 	const markerDescriptionY = (marker: FieldMarker) =>
 		marker.y + (marker.kind === 'ball' ? footballSize : marker.kind === 'deflag' ? deflagSize : foulFlagSize) / 2 + 9;
 	const guideDash = (style: GuideStyle) => (style === 'dashed' ? '16 10' : style === 'dotted' ? '2 10' : undefined);
@@ -1376,6 +1374,10 @@
 		if (deleteTarget && !deleteButtonElement?.contains(target)) clearDeleteState();
 		if (editingMarkerId === null && editingGuideId === null && editingPathId === null) return;
 		if (editorElement?.contains(target)) return;
+		if (target instanceof Element && target.closest('[data-builder-tool]')) {
+			commitActiveEditor();
+			return;
+		}
 		event.preventDefault();
 		event.stopImmediatePropagation();
 		suppressNextClick = true;
@@ -1395,7 +1397,8 @@
 		return true;
 	};
 	const selectTool = (nextTool: Tool) => {
-		if (dismissEditorForAction() || suppressNextClick) return;
+		if (suppressNextClick) return;
+		if (editingMarkerId !== null || editingGuideId !== null || editingPathId !== null) commitActiveEditor();
 		clearDeleteState();
 		clearPlacementSnap();
 		lastPlacementHoverPoint = null;
@@ -1591,8 +1594,7 @@
 			eraseFreeStrokeAt({ x: start.x + (end.x - start.x) * amount, y: start.y + (end.y - start.y) * amount });
 		}
 	};
-	const isStylusEraserEvent = (event: PointerEvent) =>
-		event.pointerType === 'pen' && (event.button === 5 || (event.buttons & 32) === 32);
+	const isStylusEraserEvent = (event: PointerEvent) => event.pointerType === 'pen' && (event.button === 5 || (event.buttons & 32) === 32);
 	const selectedTargetAtClientPoint = (clientX: number, clientY: number): SelectedTarget | null => {
 		const hit = document.elementFromPoint(clientX, clientY);
 		const layer = hit?.closest<SVGElement>('[data-layer-type][data-layer-id]');
@@ -1824,17 +1826,12 @@
 		lastPlacementHoverPoint = point;
 		if (activeFreeStroke) {
 			const strokePoint =
-				activeFreeDrawShape === 'straight' && event.shiftKey
-					? snapStraightDrawPoint(activeFreeStroke.points[0], canvasPoint)
-					: canvasPoint;
+				activeFreeDrawShape === 'straight' && event.shiftKey ? snapStraightDrawPoint(activeFreeStroke.points[0], canvasPoint) : canvasPoint;
 			const last = activeFreeStroke.points.at(-1)!;
 			if (Math.hypot(strokePoint.x - last.x, strokePoint.y - last.y) >= 1.5) {
 				activeFreeStroke = {
 					...activeFreeStroke,
-					points:
-						activeFreeDrawShape === 'straight'
-							? [activeFreeStroke.points[0], strokePoint]
-							: [...activeFreeStroke.points, strokePoint]
+					points: activeFreeDrawShape === 'straight' ? [activeFreeStroke.points[0], strokePoint] : [...activeFreeStroke.points, strokePoint]
 				};
 			}
 			return;
@@ -1910,8 +1907,7 @@
 		if (activeFreeStroke) {
 			const first = activeFreeStroke.points[0];
 			const rawFinalPoint = canvasPointFromEvent(event);
-			const finalPoint =
-				activeFreeDrawShape === 'straight' && event.shiftKey ? snapStraightDrawPoint(first, rawFinalPoint) : rawFinalPoint;
+			const finalPoint = activeFreeDrawShape === 'straight' && event.shiftKey ? snapStraightDrawPoint(first, rawFinalPoint) : rawFinalPoint;
 			const last = activeFreeStroke.points.at(-1)!;
 			const points =
 				activeFreeDrawShape === 'straight'
@@ -2066,6 +2062,7 @@
 							<HoverTooltip text={item.label} shortcutKeys={item.shortcutKeys} minWidthPx={0} wrapperClass="flex h-full min-w-0 flex-1">
 								<button
 									type="button"
+									data-builder-tool
 									aria-label={item.label}
 									aria-pressed={tool === item.id}
 									on:pointerdown={() => selectTool(item.id)}
@@ -2113,11 +2110,7 @@
 			</div>
 
 			{#if tool === 'free-draw'}
-				<div
-					class="relative z-30 mt-px w-full border-2 border-stone-900 bg-stone-900 p-px shadow-xl"
-					role="group"
-					aria-label="Drawing options"
-				>
+				<div class="relative z-30 mt-px w-full border-2 border-stone-900 bg-stone-900 p-px shadow-xl" role="group" aria-label="Drawing options">
 					<div class="grid grid-cols-2 gap-px" role="group" aria-label="Drawing line type">
 						<button
 							type="button"
@@ -2252,12 +2245,7 @@
 						<span class="text-[8px] leading-none font-semibold">Undo</span>
 					</button>
 				</HoverTooltip>
-				<HoverTooltip
-					text="Redo"
-					shortcutKeys={[primaryModifierKey, 'Shift', 'Z']}
-					minWidthPx={0}
-					wrapperClass="flex h-9 w-10 shrink-0"
-				>
+				<HoverTooltip text="Redo" shortcutKeys={[primaryModifierKey, 'Shift', 'Z']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
 					<button
 						type="button"
 						aria-label="Redo"
@@ -2572,291 +2560,279 @@
 				</defs>
 
 				{#key fieldSettings.fieldType}
-				{#if fieldSettings.showTeamBoxes && fieldLayout.teamBox}
-					{@const teamBox = fieldLayout.teamBox}
-					{#each [fieldTop - 28, fieldBottom + 8] as teamBoxY}
-						<rect
-							data-pdf-outline
-							x={xForYards(teamBox[0]) - 4}
-							y={teamBoxY - 4}
-							width={xForYards(teamBox[1]) - xForYards(teamBox[0]) + 8}
-							height="28"
-							fill="none"
-							stroke="#1c1917"
-							stroke-width="6"
-							display="none"
-							pointer-events="none"
-						/>
-						<rect
-							data-export-team-box
-							x={xForYards(teamBox[0])}
-							y={teamBoxY}
-							width={xForYards(teamBox[1]) - xForYards(teamBox[0])}
-							height="20"
-							fill="#d2b48c"
-							stroke="rgba(255,255,255,0.82)"
-							stroke-width="2"
-							pointer-events="none"
-						/>
-						<text
-							x={(xForYards(teamBox[0]) + xForYards(teamBox[1])) / 2}
-							y={teamBoxY + 14}
-							text-anchor="middle"
-							fill="#292524"
-							font-size="12"
-							font-weight="800"
-							letter-spacing="2"
-							pointer-events="none">TEAM BOX</text
-						>
-					{/each}
-				{/if}
+					{#if fieldSettings.showTeamBoxes && fieldLayout.teamBox}
+						{@const teamBox = fieldLayout.teamBox}
+						{#each [fieldTop - 28, fieldBottom + 8] as teamBoxY}
+							<rect
+								data-pdf-outline
+								x={xForYards(teamBox[0]) - 4}
+								y={teamBoxY - 4}
+								width={xForYards(teamBox[1]) - xForYards(teamBox[0]) + 8}
+								height="28"
+								fill="none"
+								stroke="#1c1917"
+								stroke-width="6"
+								display="none"
+								pointer-events="none"
+							/>
+							<rect
+								data-export-team-box
+								x={xForYards(teamBox[0])}
+								y={teamBoxY}
+								width={xForYards(teamBox[1]) - xForYards(teamBox[0])}
+								height="20"
+								fill="#d2b48c"
+								stroke="rgba(255,255,255,0.82)"
+								stroke-width="2"
+								pointer-events="none"
+							/>
+							<text
+								x={(xForYards(teamBox[0]) + xForYards(teamBox[1])) / 2}
+								y={teamBoxY + 14}
+								text-anchor="middle"
+								fill="#292524"
+								font-size="12"
+								font-weight="800"
+								letter-spacing="2"
+								pointer-events="none">TEAM BOX</text
+							>
+						{/each}
+					{/if}
 
-				<rect x={fieldLeft} y={fieldTop} width={fieldWidth} height={fieldHeight} fill={fieldPalette.field} />
-				<rect x={fieldLeft} y={fieldTop} width={fieldWidth} height={fieldHeight} fill="url(#builder-grass-stripe)" />
-				<rect
-					x={fieldLeft}
-					y={fieldTop}
-					width={xForYards(fieldLayout.goalLines[0]) - fieldLeft}
-					height={fieldHeight}
-					fill={fieldPalette.endZone}
-				/>
-				<rect
-					x={xForYards(fieldLayout.goalLines[1])}
-					y={fieldTop}
-					width={fieldRight - xForYards(fieldLayout.goalLines[1])}
-					height={fieldHeight}
-					fill={fieldPalette.endZone}
-				/>
-				<rect
-					x={fieldLeft}
-					y={fieldTop}
-					width={xForYards(fieldLayout.goalLines[0]) - fieldLeft}
-					height={fieldHeight}
-					fill="url(#builder-grass-stripe)"
-				/>
-				<rect
-					x={xForYards(fieldLayout.goalLines[1])}
-					y={fieldTop}
-					width={fieldRight - xForYards(fieldLayout.goalLines[1])}
-					height={fieldHeight}
-					fill="url(#builder-grass-stripe)"
-				/>
-				{#each fieldLayout.shadedZones as zone}
+					<rect x={fieldLeft} y={fieldTop} width={fieldWidth} height={fieldHeight} fill={fieldPalette.field} />
+					<rect x={fieldLeft} y={fieldTop} width={fieldWidth} height={fieldHeight} fill="url(#builder-grass-stripe)" />
+					<rect x={fieldLeft} y={fieldTop} width={xForYards(fieldLayout.goalLines[0]) - fieldLeft} height={fieldHeight} fill={fieldPalette.endZone} />
 					<rect
-						x={xForYards(zone[0])}
+						x={xForYards(fieldLayout.goalLines[1])}
 						y={fieldTop}
-						width={xForYards(zone[1]) - xForYards(zone[0])}
+						width={fieldRight - xForYards(fieldLayout.goalLines[1])}
 						height={fieldHeight}
-						fill="rgba(0,0,0,0.06)"
+						fill={fieldPalette.endZone}
 					/>
-				{/each}
-				{#each fieldLayout.noRunZones as zone}
 					<rect
-						x={xForYards(zone[0])}
+						x={fieldLeft}
 						y={fieldTop}
-						width={xForYards(zone[1]) - xForYards(zone[0])}
+						width={xForYards(fieldLayout.goalLines[0]) - fieldLeft}
 						height={fieldHeight}
-						fill="rgba(255,255,255,0.16)"
+						fill="url(#builder-grass-stripe)"
+					/>
+					<rect
+						x={xForYards(fieldLayout.goalLines[1])}
+						y={fieldTop}
+						width={fieldRight - xForYards(fieldLayout.goalLines[1])}
+						height={fieldHeight}
+						fill="url(#builder-grass-stripe)"
+					/>
+					{#each fieldLayout.shadedZones as zone}
+						<rect x={xForYards(zone[0])} y={fieldTop} width={xForYards(zone[1]) - xForYards(zone[0])} height={fieldHeight} fill="rgba(0,0,0,0.06)" />
+					{/each}
+					{#each fieldLayout.noRunZones as zone}
+						<rect
+							x={xForYards(zone[0])}
+							y={fieldTop}
+							width={xForYards(zone[1]) - xForYards(zone[0])}
+							height={fieldHeight}
+							fill="rgba(255,255,255,0.16)"
+							pointer-events="none"
+						/>
+					{/each}
+					<rect
+						data-pdf-outline
+						x={fieldLeft - fieldLineWidth * 2}
+						y={fieldTop - fieldLineWidth * 2}
+						width={fieldWidth + fieldLineWidth * 4}
+						height={fieldHeight + fieldLineWidth * 4}
+						fill="none"
+						stroke="#1c1917"
+						stroke-width={fieldLineWidth * 3}
+						display="none"
 						pointer-events="none"
 					/>
-				{/each}
-				<rect
-					data-pdf-outline
-					x={fieldLeft - fieldLineWidth * 2}
-					y={fieldTop - fieldLineWidth * 2}
-					width={fieldWidth + fieldLineWidth * 4}
-					height={fieldHeight + fieldLineWidth * 4}
-					fill="none"
-					stroke="#1c1917"
-					stroke-width={fieldLineWidth * 3}
-					display="none"
-					pointer-events="none"
-				/>
-				<rect
-					data-export-field-boundary
-					x={fieldLeft}
-					y={fieldTop}
-					width={fieldWidth}
-					height={fieldHeight}
-					fill="none"
-					stroke="#ffffff"
-					stroke-width={fieldLineWidth}
-					pointer-events="none"
-				/>
-
-				{#each fieldLayout.zoneLines as yards}
-					<line
-						x1={xForYards(yards)}
-						y1={fieldTop}
-						x2={xForYards(yards)}
-						y2={fieldBottom}
-						stroke="rgba(255,255,255,0.82)"
+					<rect
+						data-export-field-boundary
+						x={fieldLeft}
+						y={fieldTop}
+						width={fieldWidth}
+						height={fieldHeight}
+						fill="none"
+						stroke="#ffffff"
 						stroke-width={fieldLineWidth}
 						pointer-events="none"
 					/>
-				{/each}
-				{#if fieldSettings.showHashes}
-					{#each fieldLayout.hashLines as yards}
-						{#each fieldLayout.hashYFractions as yFraction}
+
+					{#each fieldLayout.zoneLines as yards}
+						<line
+							x1={xForYards(yards)}
+							y1={fieldTop}
+							x2={xForYards(yards)}
+							y2={fieldBottom}
+							stroke="rgba(255,255,255,0.82)"
+							stroke-width={fieldLineWidth}
+							pointer-events="none"
+						/>
+					{/each}
+					{#if fieldSettings.showHashes}
+						{#each fieldLayout.hashLines as yards}
+							{#each fieldLayout.hashYFractions as yFraction}
+								<line
+									x1={xForYards(yards) - 10}
+									y1={fieldTop + fieldHeight * yFraction}
+									x2={xForYards(yards) + 10}
+									y2={fieldTop + fieldHeight * yFraction}
+									stroke="#fff"
+									stroke-width={fieldLineWidth}
+									pointer-events="none"
+								/>
+							{/each}
+						{/each}
+					{/if}
+					{#if fieldSettings.showThreeYardMarker}
+						{#each fieldLayout.threeYardMarkers as yards}
 							<line
-								x1={xForYards(yards) - 10}
-								y1={fieldTop + fieldHeight * yFraction}
-								x2={xForYards(yards) + 10}
-								y2={fieldTop + fieldHeight * yFraction}
-								stroke="#fff"
+								x1={xForYards(yards)}
+								y1={fieldTop + fieldHeight / 2 - 12}
+								x2={xForYards(yards)}
+								y2={fieldTop + fieldHeight / 2 + 12}
+								stroke="rgba(255,255,255,0.9)"
 								stroke-width={fieldLineWidth}
 								pointer-events="none"
 							/>
 						{/each}
-					{/each}
-				{/if}
-				{#if fieldSettings.showThreeYardMarker}
-					{#each fieldLayout.threeYardMarkers as yards}
+					{/if}
+					{#if fieldSettings.showTenYardMarker}
+						{#each fieldLayout.tenYardMarkers as yards}
+							<line
+								x1={xForYards(yards)}
+								y1={fieldTop + fieldHeight / 2 - 12}
+								x2={xForYards(yards)}
+								y2={fieldTop + fieldHeight / 2 + 12}
+								stroke="rgba(255,255,255,0.9)"
+								stroke-width={fieldLineWidth}
+								pointer-events="none"
+							/>
+						{/each}
+					{/if}
+					{#if fieldSettings.showThirtyYardMarker}
+						{#each fieldLayout.thirtyYardMarkers as yards}
+							<line
+								x1={xForYards(yards)}
+								y1={fieldTop + fieldHeight / 2 - 16}
+								x2={xForYards(yards)}
+								y2={fieldTop + fieldHeight / 2 + 16}
+								stroke="rgba(255,255,255,0.78)"
+								stroke-width={fieldLineWidth}
+								pointer-events="none"
+							/>
+						{/each}
+					{/if}
+					{#each fieldLayout.noRunLines as yards}
 						<line
 							x1={xForYards(yards)}
-							y1={fieldTop + fieldHeight / 2 - 12}
+							y1={fieldTop}
 							x2={xForYards(yards)}
-							y2={fieldTop + fieldHeight / 2 + 12}
-							stroke="rgba(255,255,255,0.9)"
+							y2={fieldBottom}
+							stroke="rgba(255,255,255,0.58)"
 							stroke-width={fieldLineWidth}
+							stroke-dasharray="10 8"
 							pointer-events="none"
 						/>
 					{/each}
-				{/if}
-				{#if fieldSettings.showTenYardMarker}
-					{#each fieldLayout.tenYardMarkers as yards}
-						<line
-							x1={xForYards(yards)}
-							y1={fieldTop + fieldHeight / 2 - 12}
-							x2={xForYards(yards)}
-							y2={fieldTop + fieldHeight / 2 + 12}
-							stroke="rgba(255,255,255,0.9)"
-							stroke-width={fieldLineWidth}
-							pointer-events="none"
-						/>
-					{/each}
-				{/if}
-				{#if fieldSettings.showThirtyYardMarker}
-				{#each fieldLayout.thirtyYardMarkers as yards}
-					<line
-						x1={xForYards(yards)}
-						y1={fieldTop + fieldHeight / 2 - 16}
-						x2={xForYards(yards)}
-						y2={fieldTop + fieldHeight / 2 + 16}
-						stroke="rgba(255,255,255,0.78)"
-						stroke-width={fieldLineWidth}
-						pointer-events="none"
-					/>
-				{/each}
-				{/if}
-				{#each fieldLayout.noRunLines as yards}
-					<line
-						x1={xForYards(yards)}
-						y1={fieldTop}
-						x2={xForYards(yards)}
-						y2={fieldBottom}
-						stroke="rgba(255,255,255,0.58)"
-						stroke-width={fieldLineWidth}
-						stroke-dasharray="10 8"
-						pointer-events="none"
-					/>
-				{/each}
-				{#if fieldSettings.fieldType === 'unified' && fieldSettings.showNoRunZoneText}
-					{#each fieldLayout.noRunZones as zone}
-						{@const noRunCenter = (xForYards(zone[0]) + xForYards(zone[1])) / 2}
+					{#if fieldSettings.fieldType === 'unified' && fieldSettings.showNoRunZoneText}
+						{#each fieldLayout.noRunZones as zone}
+							{@const noRunCenter = (xForYards(zone[0]) + xForYards(zone[1])) / 2}
+							<text
+								x={noRunCenter}
+								y={fieldTop + fieldHeight / 2}
+								transform={`rotate(-90 ${noRunCenter} ${fieldTop + fieldHeight / 2})`}
+								text-anchor="middle"
+								fill="rgba(255,255,255,0.72)"
+								font-size="15"
+								font-weight="900"
+								letter-spacing="1.5"
+								pointer-events="none">NO RUN ZONE</text
+							>
+						{/each}
+					{/if}
+					{#if fieldSettings.showEndZoneText}
 						<text
-							x={noRunCenter}
+							x={xForYards(fieldLayout.endZoneCenters[0])}
 							y={fieldTop + fieldHeight / 2}
-							transform={`rotate(-90 ${noRunCenter} ${fieldTop + fieldHeight / 2})`}
+							transform={`rotate(-90 ${xForYards(fieldLayout.endZoneCenters[0])} ${fieldTop + fieldHeight / 2})`}
 							text-anchor="middle"
-							fill="rgba(255,255,255,0.72)"
-							font-size="15"
-							font-weight="900"
-							letter-spacing="1.5"
-							pointer-events="none">NO RUN ZONE</text
-						>
-					{/each}
-				{/if}
-				{#if fieldSettings.showEndZoneText}
-				<text
-					x={xForYards(fieldLayout.endZoneCenters[0])}
-					y={fieldTop + fieldHeight / 2}
-					transform={`rotate(-90 ${xForYards(fieldLayout.endZoneCenters[0])} ${fieldTop + fieldHeight / 2})`}
-					text-anchor="middle"
-					fill="#ffffff"
-					fill-opacity="0.72"
-					font-size="26"
-					font-weight="800"
-					letter-spacing="4"
-					pointer-events="none">END ZONE</text
-				>
-				<text
-					x={xForYards(fieldLayout.endZoneCenters[1])}
-					y={fieldTop + fieldHeight / 2}
-					transform={`rotate(90 ${xForYards(fieldLayout.endZoneCenters[1])} ${fieldTop + fieldHeight / 2})`}
-					text-anchor="middle"
-					fill="#ffffff"
-					fill-opacity="0.72"
-					font-size="26"
-					font-weight="800"
-					letter-spacing="4"
-					pointer-events="none">END ZONE</text
-				>
-				{/if}
-				{#if fieldSettings.showYardNumbers}
-				{#each [fieldTop + 25, fieldBottom - 5] as yardLabelY}
-					{#each fieldLayout.yardLabels as fieldMarker}
-						<text
-							x={xForYards(fieldMarker.x) - 5}
-							y={yardLabelY}
-							text-anchor="end"
-							fill="rgba(255,255,255,0.72)"
+							fill="#ffffff"
+							fill-opacity="0.72"
 							font-size="26"
-							font-weight="900"
-							pointer-events="none">{fieldMarker.label[0]}</text
+							font-weight="800"
+							letter-spacing="4"
+							pointer-events="none">END ZONE</text
 						>
 						<text
-							x={xForYards(fieldMarker.x) + 5}
-							y={yardLabelY}
-							text-anchor="start"
-							fill="rgba(255,255,255,0.72)"
-							font-size="26"
-							font-weight="900"
-							pointer-events="none">{fieldMarker.label[1]}</text
-						>
-					{/each}
-				{/each}
-				{/if}
-				{#if fieldSettings.showGoalLetters}
-				{#each [fieldTop + 25, fieldBottom - 5] as goalLabelY}
-					{#each fieldLayout.goalLabelYards as goalLabelYards}
-						<text
-							x={xForYards(goalLabelYards)}
-							y={goalLabelY}
+							x={xForYards(fieldLayout.endZoneCenters[1])}
+							y={fieldTop + fieldHeight / 2}
+							transform={`rotate(90 ${xForYards(fieldLayout.endZoneCenters[1])} ${fieldTop + fieldHeight / 2})`}
 							text-anchor="middle"
-							fill="rgba(255,255,255,0.72)"
+							fill="#ffffff"
+							fill-opacity="0.72"
 							font-size="26"
-							font-weight="900"
-							pointer-events="none">G</text
+							font-weight="800"
+							letter-spacing="4"
+							pointer-events="none">END ZONE</text
 						>
-					{/each}
-				{/each}
-				{/if}
+					{/if}
+					{#if fieldSettings.showYardNumbers}
+						{#each [fieldTop + 25, fieldBottom - 5] as yardLabelY}
+							{#each fieldLayout.yardLabels as fieldMarker}
+								<text
+									x={xForYards(fieldMarker.x) - 5}
+									y={yardLabelY}
+									text-anchor="end"
+									fill="rgba(255,255,255,0.72)"
+									font-size="26"
+									font-weight="900"
+									pointer-events="none">{fieldMarker.label[0]}</text
+								>
+								<text
+									x={xForYards(fieldMarker.x) + 5}
+									y={yardLabelY}
+									text-anchor="start"
+									fill="rgba(255,255,255,0.72)"
+									font-size="26"
+									font-weight="900"
+									pointer-events="none">{fieldMarker.label[1]}</text
+								>
+							{/each}
+						{/each}
+					{/if}
+					{#if fieldSettings.showGoalLetters}
+						{#each [fieldTop + 25, fieldBottom - 5] as goalLabelY}
+							{#each fieldLayout.goalLabelYards as goalLabelYards}
+								<text
+									x={xForYards(goalLabelYards)}
+									y={goalLabelY}
+									text-anchor="middle"
+									fill="rgba(255,255,255,0.72)"
+									font-size="26"
+									font-weight="900"
+									pointer-events="none">G</text
+								>
+							{/each}
+						{/each}
+					{/if}
 
-				<g data-field-watermark aria-hidden="true" pointer-events="none">
-					<text
-						x={fieldLeft + fieldWidth / 2}
-						y={fieldTop + fieldHeight / 2}
-						transform={`rotate(${fieldWatermarkAngle} ${fieldLeft + fieldWidth / 2} ${fieldTop + fieldHeight / 2})`}
-						text-anchor="middle"
-						dominant-baseline="middle"
-						fill="#ffffff"
-						fill-opacity="0.1"
-						font-size="52"
-						font-weight="900"
-						letter-spacing="7">CASEPLAY.ORG</text
-					>
-				</g>
+					<g data-field-watermark aria-hidden="true" pointer-events="none">
+						<text
+							x={fieldLeft + fieldWidth / 2}
+							y={fieldTop + fieldHeight / 2}
+							transform={`rotate(${fieldWatermarkAngle} ${fieldLeft + fieldWidth / 2} ${fieldTop + fieldHeight / 2})`}
+							text-anchor="middle"
+							dominant-baseline="middle"
+							fill="#ffffff"
+							fill-opacity="0.1"
+							font-size="52"
+							font-weight="900"
+							letter-spacing="7">CASEPLAY.ORG</text
+						>
+					</g>
 				{/key}
 
 				{#if hoverPoint && !hoveringElement && !drawing && !dragTarget}
@@ -3042,29 +3018,13 @@
 				<!-- Keep fixtures in one layer so z-ordering never detaches them from Svelte's visibility blocks. -->
 				<g data-field-fixtures-layer pointer-events="none">
 					{#key fieldSettings.fieldType}
-					{#if fieldSettings.showPylons}
-						{#each fieldLayout.endZonePylonYards as yards}
-							{#each [fieldTop, fieldBottom] as pylonY}
-								<rect
-									data-field-fixture="pylon"
-									x={xForYards(yards) - 3.5}
-									y={pylonY - 3.5}
-									width="7"
-									height="7"
-									fill="#f97316"
-									stroke="#fff"
-									stroke-width="1.5"
-									pointer-events="none"
-								/>
-							{/each}
-						{/each}
-						{#if fieldSettings.showHashes}
-							{#each fieldLayout.endLinePylonFractions as yFraction}
-								{#each [fieldLeft - 7, fieldRight + 7] as pylonX}
+						{#if fieldSettings.showPylons}
+							{#each fieldLayout.endZonePylonYards as yards}
+								{#each [fieldTop, fieldBottom] as pylonY}
 									<rect
 										data-field-fixture="pylon"
-										x={pylonX - 3.5}
-										y={fieldTop + fieldHeight * yFraction - 3.5}
+										x={xForYards(yards) - 3.5}
+										y={pylonY - 3.5}
 										width="7"
 										height="7"
 										fill="#f97316"
@@ -3074,8 +3034,24 @@
 									/>
 								{/each}
 							{/each}
+							{#if fieldSettings.showHashes}
+								{#each fieldLayout.endLinePylonFractions as yFraction}
+									{#each [fieldLeft - 7, fieldRight + 7] as pylonX}
+										<rect
+											data-field-fixture="pylon"
+											x={pylonX - 3.5}
+											y={fieldTop + fieldHeight * yFraction - 3.5}
+											width="7"
+											height="7"
+											fill="#f97316"
+											stroke="#fff"
+											stroke-width="1.5"
+											pointer-events="none"
+										/>
+									{/each}
+								{/each}
+							{/if}
 						{/if}
-					{/if}
 					{/key}
 				</g>
 
@@ -3403,6 +3379,7 @@
 				<form
 					bind:this={editorElement}
 					class="absolute z-10 -translate-x-1/2 -translate-y-1/2 bg-white p-1 shadow-xl ring-2 ring-stone-900"
+					class:w-48={editingMarker.kind === 'deflag'}
 					style:left={`${editorLeft(editingMarker)}%`}
 					style:top={`${editorTop(editingMarker)}%`}
 					on:submit|preventDefault={commitMarkerEditor}
@@ -3427,7 +3404,8 @@
 								: markerDescriptionName(editingMarker)}
 						class="mx-auto block h-8 border-0 bg-stone-100 px-2 text-center text-sm font-bold text-stone-900 outline-none focus:ring-2 focus:ring-stone-500"
 						class:w-16={isTeamMarker(editingMarker)}
-						class:w-40={!isTeamMarker(editingMarker)}
+						class:w-40={!isTeamMarker(editingMarker) && editingMarker.kind !== 'deflag'}
+						class:w-full={editingMarker.kind === 'deflag'}
 					/>
 					{#if editingMarker.kind === 'deflag'}
 						<div class="mt-1 flex justify-center gap-1" role="group" aria-label="Flag belt color">
@@ -3656,8 +3634,7 @@
 					type="button"
 					aria-label="Close settings"
 					on:click={() => (showSettings = false)}
-					class="flex h-9 w-9 cursor-pointer items-center justify-center bg-white text-xl font-black text-stone-900 hover:bg-stone-200"
-					>×</button
+					class="flex h-9 w-9 cursor-pointer items-center justify-center bg-white text-xl font-black text-stone-900 hover:bg-stone-200">×</button
 				>
 			</header>
 
@@ -3789,8 +3766,8 @@
 							attached to—that player.
 						</p>
 						<p>
-							<strong>Edit:</strong> Double-click players, footballs, event tags, penalty flags, flag belts, routes, arrows, and cross-field lines to open their inline
-							editor.
+							<strong>Edit:</strong> Double-click players, footballs, event tags, penalty flags, flag belts, routes, arrows, and cross-field lines to open
+							their inline editor.
 						</p>
 						<p>
 							<strong>Delete:</strong> Click an element to show its nearby trash button, or press <kbd>Del</kbd>. Use <kbd>Shift</kbd> +
@@ -3876,8 +3853,8 @@
 						</li>
 						<li>Snap points automatically follow the markings available on the selected traditional, 4v4, or Unified field.</li>
 						<li>
-							<strong>Setup</strong> uses the selected field’s proper starting spot and first line to gain: A’s 14 to A’s 20 on traditional, A’s 10 to
-							midfield on 4v4, or A’s 5 to midfield on Unified. A-1 begins five yards behind the football. One Undo restores the previous diagram.
+							<strong>Setup</strong> uses the selected field’s proper starting spot and first line to gain: A’s 14 to A’s 20 on traditional, A’s 10 to midfield
+							on 4v4, or A’s 5 to midfield on Unified. A-1 begins five yards behind the football. One Undo restores the previous diagram.
 						</li>
 					</ul>
 				</section>
@@ -3913,16 +3890,16 @@
 							Try/yard markers, and team boxes. Changes appear immediately and are included in PNG and PDF exports.
 						</p>
 						<p>
-							<strong>Per play:</strong> Every play saves its own field settings. New plays inherit the active play’s settings, while Duplicate copies both the
-							diagram and settings. Revert to Defaults restores the default details and green grass without changing the selected field type.
+							<strong>Per play:</strong> Every play saves its own field settings. New plays inherit the active play’s settings, while Duplicate copies both
+							the diagram and settings. Revert to Defaults restores the default details and green grass without changing the selected field type.
 						</p>
 						<p>
 							<strong>Field types:</strong> Traditional is the 100 × 40-yard NIRSA field. 4v4 uses the 60 × 30-yard layout with a single midfield hash.
 							Unified uses the 60 × 25-yard SONA/NIRSA layout with dashed no-run-zone lines and optional no-run-zone labels.
 						</p>
 						<p>
-							<strong>Saved and shared:</strong> Field settings are stored with all plays under the shareable URL, so another viewer sees the same layout before
-							making a local copy.
+							<strong>Saved and shared:</strong> Field settings are stored with all plays under the shareable URL, so another viewer sees the same layout
+							before making a local copy.
 						</p>
 					</div>
 				</section>
