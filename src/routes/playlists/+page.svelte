@@ -14,12 +14,12 @@
 	<meta name="author" content="Jake Harvanchik" />
 </svelte:head>
 
-<main class="min-h-screen overflow-hidden bg-stone-100/[97%] scrollbar scrollbar-track-stone-800 scrollbar-thumb-black">
+<main class="min-h-screen overflow-hidden bg-stone-100/[97%]">
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 	<section id="search">
 		<div class="mt-10 flex flex-col space-y-3 sm:mt-16">
 			<div class="flex flex-col space-y-2">
-				<h1 class="mx-auto select-none font-dokdo text-5xl font-semibold uppercase text-stone-800 text-shadow-md sm:text-7xl sm:text-shadow-lg">
+				<h1 class="font-dokdo mx-auto text-5xl font-semibold text-stone-800 uppercase select-none text-shadow-md sm:text-7xl sm:text-shadow-lg">
 					playlists
 				</h1>
 			</div>
@@ -30,15 +30,13 @@
 		<div class="mx-5 my-5 flex max-h-[41rem] flex-col sm:mx-auto sm:w-7/12">
 			{#if data?.playlists && data?.playlists.length > 0}
 				<span class="text-stone-600">{data?.playlists?.length} playlists found</span>
-				<div
-					class="mt-1 flex flex-col space-y-4 overflow-y-auto border border-stone-400 p-2 scrollbar scrollbar-track-stone-400 scrollbar-thumb-stone-900"
-				>
+				<div class="mt-1 flex flex-col space-y-4 overflow-y-auto border border-stone-400 p-2">
 					{#each data.playlists as playlist}
-						<section class="group flex select-none flex-col space-y-3 border border-stone-300 px-2 py-2 sm:px-4 sm:py-3">
+						<section class="group flex flex-col space-y-3 border border-stone-300 px-2 py-2 select-none sm:px-4 sm:py-3">
 							<div class="flex flex-row items-start justify-start">
 								<span
 									id="title"
-									class="line-clamp-2 pb-1 text-xl font-bold leading-tight text-stone-800 transition-colors duration-300 group-hover:text-black sm:line-clamp-1 sm:text-3xl"
+									class="line-clamp-2 pb-1 text-xl leading-tight font-bold text-stone-800 transition-colors duration-300 group-hover:text-black sm:line-clamp-1 sm:text-3xl"
 								>
 									{playlist.title}
 								</span>

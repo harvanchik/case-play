@@ -84,7 +84,7 @@
 	<meta name="author" content="Jake Harvanchik" />
 </svelte:head>
 
-<main class="scrollbar scrollbar-track-stone-800 scrollbar-thumb-black flex min-h-screen flex-col overflow-hidden bg-stone-100/[97%]">
+<main class="flex min-h-screen flex-col overflow-hidden bg-stone-100/[97%]">
 	<!-- Background -->
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 	<div class="mt-10 flex w-full flex-col items-center justify-center">
@@ -168,6 +168,14 @@
 						autocomplete="off"
 					/>
 				</div>
+				<a
+					href="/play-builder"
+					class="flex cursor-pointer items-center justify-center border border-stone-300 bg-stone-50 px-4 text-stone-900 transition-colors duration-200 hover:bg-stone-100 hover:text-black focus:ring-2 focus:ring-stone-500"
+					title="Open Play Builder"
+					aria-label="Open Play Builder"
+				>
+					<Icon icon="material-symbols:construction" class="text-2xl" />
+				</a>
 				<button
 					class="flex cursor-pointer items-center justify-center border border-stone-300 bg-stone-50 px-4 text-stone-900 transition-colors duration-200 hover:bg-stone-100 hover:text-black focus:ring-2 focus:ring-stone-500"
 					on:click={() => (showCreateModal = true)}
@@ -223,9 +231,7 @@
 				</div>
 				<!-- END: Results Header -->
 
-				<div
-					class="scrollbar scrollbar-track-stone-400 scrollbar-thumb-stone-900 mt-1 grid max-h-[calc(100vh-16rem)] grid-cols-1 gap-4 overflow-y-auto border border-stone-400 p-2 sm:grid-cols-2 lg:grid-cols-3"
-				>
+				<div class="mt-1 grid max-h-[calc(100vh-16rem)] grid-cols-1 gap-4 overflow-y-auto border border-stone-400 p-2 sm:grid-cols-2 lg:grid-cols-3">
 					{#each filteredCasePlays as casePlay}
 						<CasePlayCard {casePlay} href={`/c/${casePlay.id}${activeFilterQuery ? `?${activeFilterQuery}` : ''}`} />
 					{/each}
@@ -238,14 +244,12 @@
 	<!-- END: Search Results -->
 
 	<!-- START: Footer -->
-	<footer class="mt-auto w-full py-6 text-center text-stone-600">
-		<div class="mb-2">
-			<p class="text-sm">This database was created in 2023 for the purpose of training intramural officials.</p>
-		</div>
-		<div class="flex flex-row justify-center space-x-4 text-sm font-semibold">
+	<footer class="mt-auto w-full py-3 text-center text-stone-600">
+		<div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
+			<p>This database was created in 2023 by Jake Harvanchik for the purpose of training intramural officials.</p>
 			<span>&copy; {new Date().getFullYear()} caseplay.org</span>
-			<button on:click={() => (showCreateModal = true)} class="cursor-pointer hover:underline">Contribute</button>
-			<a href="mailto:contact@caseplay.org" target="_blank" class="cursor-pointer hover:underline">Contact</a>
+			<button on:click={() => (showCreateModal = true)} class="cursor-pointer font-semibold hover:underline">Contribute</button>
+			<a href="mailto:contact@caseplay.org" target="_blank" class="cursor-pointer font-semibold hover:underline">Contact</a>
 		</div>
 	</footer>
 	<!-- END: Footer -->

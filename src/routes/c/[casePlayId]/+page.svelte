@@ -1,15 +1,21 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import type { PageData } from './$types';
 	import Mark from 'mark.js';
+	import Icon from '@iconify/svelte';
 	import { HIGHLIGHT_PATTERNS } from '$lib/highlight-patterns';
 	import CasePlayCard from '$lib/components/CasePlayCard.svelte';
+	import FlagFootballPlayBuilder from '$lib/components/FlagFootballPlayBuilder.svelte';
 	import youtubeIcon from '$lib/svg/youtube.svg';
 
 	export let data: PageData;
 
 	let isClicked = false;
 	let isRevealed = false;
+	let isPlayBuilderOpen = false;
+	let playBuilderButton: HTMLButtonElement;
+	let playBuilderCloseButton: HTMLButtonElement;
+	let previousBodyOverflow = '';
 
 	$: authorName = data.casePlay?.author?.id ? `${data.casePlay.author.first_name} ${data.casePlay.author.last_name}`.trim() : null;
 	$: rulebookName = data.casePlay?.rulebook?.id ? data.casePlay.rulebook.nickname || data.casePlay.rulebook.title : null;
@@ -20,10 +26,9 @@
 		data.casePlay?.ruleReference ? `Rule ${data.casePlay.ruleReference}` : null,
 		data.casePlay?.pageNumber ? `Page ${data.casePlay.pageNumber}` : null
 	].filter((item): item is string => Boolean(item));
-
 	onMount(() => {
 		const instance = new Mark('main');
-		const highlightExcludes = ['h1', 'h2', '.similar-case-plays', '.similar-case-plays *'];
+		const highlightExcludes = ['h1', 'h2', '.play-builder', '.play-builder *', '.similar-case-plays', '.similar-case-plays *'];
 		const TEAM_REGEX = /Team ([ABKR])('s)*|[ABKR]-[0-9]{1,2}('s)*/g;
 		instance.markRegExp(TEAM_REGEX, { element: 'u', exclude: highlightExcludes });
 		const LETTER_REGEX = /\([a-z]\)/gi;
@@ -50,7 +55,32 @@
 		instance.markRegExp(HIGHLIGHT_PATTERNS.closed, { element: 'span', className: 'closed', exclude: highlightExcludes });
 		const NEWLINE_REGEX = /\n/g;
 		instance.markRegExp(NEWLINE_REGEX, { element: 'br', exclude: highlightExcludes });
+		return () => {
+			if (isPlayBuilderOpen) document.body.style.overflow = previousBodyOverflow;
+		};
 	});
+
+	const openPlayBuilder = async () => {
+		if (isPlayBuilderOpen) return;
+		previousBodyOverflow = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
+		isPlayBuilderOpen = true;
+		await tick();
+		playBuilderCloseButton?.focus();
+	};
+	const closePlayBuilder = async () => {
+		if (!isPlayBuilderOpen) return;
+		isPlayBuilderOpen = false;
+		document.body.style.overflow = previousBodyOverflow;
+		await tick();
+		playBuilderButton?.focus();
+	};
+	const handleWindowKeydown = (event: KeyboardEvent) => {
+		if (!isPlayBuilderOpen || event.key !== 'Escape') return;
+		setTimeout(() => {
+			if (!event.defaultPrevented) void closePlayBuilder();
+		}, 0);
+	};
 
 	const copyLink = () => {
 		isClicked = true;
@@ -60,6 +90,8 @@
 		}, 2000);
 	};
 </script>
+
+<svelte:window on:keydown={handleWindowKeydown} />
 
 <svelte:head>
 	<title>{data.casePlay?.title}</title>
@@ -71,7 +103,7 @@
 	<meta name="author" content="Jake Harvanchik" />
 </svelte:head>
 
-<main class="scrollbar scrollbar-track-stone-800 scrollbar-thumb-black min-h-screen overflow-hidden bg-stone-100/[97%]">
+<main class="min-h-screen overflow-hidden bg-stone-100/[97%]">
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 
 	<a
@@ -112,17 +144,33 @@
 
 		<div class="mx-auto grid w-full max-w-[90rem] gap-8 px-3 pb-12 xl:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] xl:gap-10">
 			<section class="min-w-0 text-lg leading-[1.425]">
-				<p
-					id="prompt"
-					class="scrollbar-w-3 scrollbar scrollbar-track-stone-300 scrollbar-thumb-stone-700 mb-5 max-h-48 overflow-y-auto border-2 border-stone-900 bg-white p-4 shadow-lg selection:bg-black/20"
-					contenteditable="false"
-				>
-					{data.casePlay?.prompt}
-				</p>
+				<div class="relative mb-5">
+					<p
+						id="prompt"
+						class="case-play-prompt max-h-48 overflow-y-auto border-2 border-stone-900 bg-white p-4 shadow-lg selection:bg-black/20"
+						contenteditable="false"
+					>
+						{data.casePlay?.prompt}
+					</p>
+					<button
+						bind:this={playBuilderButton}
+						type="button"
+						title="Open play builder"
+						aria-label="Open play builder"
+						aria-expanded={isPlayBuilderOpen}
+						aria-controls="case-play-builder-modal"
+						on:click={openPlayBuilder}
+						class="absolute right-2 bottom-2 flex h-8 w-8 cursor-pointer items-center justify-center border-0 bg-white/90 text-stone-600 shadow-sm transition-colors hover:bg-stone-900 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-500"
+						class:!bg-stone-900={isPlayBuilderOpen}
+						class:!text-white={isPlayBuilderOpen}
+					>
+						<Icon icon="material-symbols:construction" class="text-xl" />
+					</button>
+				</div>
 
 				<spoiler
 					id="answer"
-					class="scrollbar-w-3 group scrollbar scrollbar-track-black/70 scrollbar-thumb-stone-200 max-h-80 overflow-y-auto border-2 border-stone-900"
+					class="group max-h-80 overflow-y-auto border-2 border-stone-900"
 					class:revealed={isRevealed}
 					on:click={() => (isRevealed = !isRevealed)}
 					on:keydown={(e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (isRevealed = !isRevealed)}
@@ -159,6 +207,47 @@
 					</div>
 				</aside>
 			{/if}
+		</div>
+	</div>
+
+	<div
+		id="case-play-builder-modal"
+		class="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/80 p-2 backdrop-blur-[1px] sm:p-4"
+		class:hidden={!isPlayBuilderOpen}
+		aria-hidden={!isPlayBuilderOpen}
+		on:click|self={closePlayBuilder}
+	>
+		<div
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="case-play-builder-modal-title"
+			class="relative z-10 flex max-h-[96vh] w-full flex-col"
+			style="max-width: min(96vw, calc((96vh - 8rem) * 2.1));"
+		>
+			<h2 id="case-play-builder-modal-title" class="sr-only">Play Builder for {data.casePlay?.title}</h2>
+			<div class="relative mb-2 shrink-0">
+				<p
+					class="case-play-prompt max-h-[18vh] overflow-y-auto border-2 border-stone-900 bg-white p-4 pr-14 text-base leading-[1.425] shadow-lg selection:bg-black/20 sm:text-lg"
+					contenteditable="false"
+				>
+					{data.casePlay?.prompt}
+				</p>
+				<button
+					bind:this={playBuilderCloseButton}
+					type="button"
+					aria-label="Close play builder"
+					tabindex={isPlayBuilderOpen ? 0 : -1}
+					on:click={closePlayBuilder}
+					class="absolute top-2 right-2 flex h-8 w-8 cursor-pointer items-center justify-center border-0 bg-stone-900 text-xl font-black text-white shadow-sm hover:bg-stone-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-500"
+				>
+					&times;
+				</button>
+			</div>
+			<div class="play-builder min-h-0 overflow-y-auto">
+				{#key data.casePlay.id}
+					<FlagFootballPlayBuilder />
+				{/key}
+			</div>
 		</div>
 	</div>
 </main>
