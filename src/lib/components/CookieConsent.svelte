@@ -6,7 +6,6 @@
 		hasGlobalPrivacyControl,
 		initializeConsentMode,
 		loadAdSense,
-		openConsentChoices,
 		readConsent,
 		saveConsent,
 		type ConsentChoice
@@ -17,15 +16,15 @@
 	let globalPrivacyControl = false;
 
 	const choose = async (choice: ConsentChoice) => {
-		const advertisingWasLoaded = currentChoice === 'all';
+		const previousChoice = currentChoice;
 		saveConsent(choice);
 		currentChoice = readConsent() ?? (globalPrivacyControl ? 'essential' : choice);
 		visible = false;
-		if (advertisingWasLoaded && currentChoice === 'essential') {
+		if (previousChoice !== null && previousChoice !== currentChoice) {
 			window.location.reload();
 			return;
 		}
-		if (currentChoice === 'all') await loadAdSense().catch(() => undefined);
+		await loadAdSense().catch(() => undefined);
 	};
 
 	onMount(() => {
@@ -37,7 +36,7 @@
 			currentChoice = 'essential';
 		}
 		visible = currentChoice === null;
-		if (currentChoice === 'all' && !globalPrivacyControl) loadAdSense().catch(() => undefined);
+		if (currentChoice !== null) loadAdSense().catch(() => undefined);
 
 		const open = () => (visible = true);
 		const changed = (event: Event) => {
@@ -59,43 +58,29 @@
 		aria-modal="false"
 		aria-labelledby="cookie-consent-title"
 	>
-		<div class="flex items-start justify-between gap-4">
-			<div>
-				<h2 id="cookie-consent-title" class="text-base font-bold text-stone-900">Your Privacy Choices</h2>
-				<p class="mt-1 text-sm leading-5 text-stone-700">
-					Essential storage keeps requested features and your privacy choice working. Advertising and measurement stay off unless you choose Allow All.
-				</p>
-				<p class="mt-2 text-sm font-semibold leading-5 text-stone-800">
-					Allowing ads helps keep Caseplay free—the revenue pays for the domain, hosting, and database.
-				</p>
-				{#if globalPrivacyControl}
-					<p class="mt-2 text-xs font-semibold text-stone-700">Your browser's Global Privacy Control is on, so optional advertising remains disabled.</p>
-				{/if}
-				<p class="mt-2 text-xs text-stone-600">
-					Read the <a class="font-semibold underline" href="/cookie-policy">Cookie Policy</a> and
-					<a class="font-semibold underline" href="/privacy">Privacy Policy</a>. You can change this choice at any time.
-				</p>
-			</div>
-		</div>
+		<h2 id="cookie-consent-title" class="text-base font-bold text-stone-900">Your Privacy Choices</h2>
+		<p class="mt-1 text-sm leading-5 text-stone-700">
+			Ads always help fund Caseplay. Choose Generic Ads to keep optional tracking and personalization off, or allow personalized ads and measurement.
+		</p>
+		<p class="mt-2 text-sm font-semibold leading-5 text-stone-800">Ad revenue pays for the domain, hosting, and database.</p>
+		{#if globalPrivacyControl}
+			<p class="mt-2 text-xs font-semibold text-stone-700">Your browser's Global Privacy Control is on, so only generic ads are available.</p>
+		{/if}
+		<p class="mt-2 text-xs text-stone-600">
+			Read the <a class="font-semibold underline" href="/cookie-policy">Cookie Policy</a> and
+			<a class="font-semibold underline" href="/privacy">Privacy Policy</a>. You can change this choice at any time.
+		</p>
 		<div class="mt-4 flex flex-wrap justify-end gap-2">
 			<button class="cursor-pointer border-2 border-stone-900 bg-white px-4 py-2 text-sm font-bold text-stone-900" on:click={() => choose('essential')}>
-				Essential Only
+				Generic Ads
 			</button>
 			<button
 				class="cursor-pointer border-2 border-stone-900 bg-stone-900 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
 				disabled={globalPrivacyControl}
 				on:click={() => choose('all')}
 			>
-				Allow All
+				Allow Personalized Ads
 			</button>
 		</div>
 	</div>
-{:else if currentChoice !== null}
-	<button
-		class="fixed bottom-0 left-0 z-[9999] cursor-pointer border border-stone-700 bg-white/95 px-2 py-1 text-[10px] font-semibold text-stone-700"
-		on:click={openConsentChoices}
-		aria-label="Open privacy choices"
-	>
-		Privacy Choices
-	</button>
 {/if}

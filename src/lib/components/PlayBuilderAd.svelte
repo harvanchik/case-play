@@ -4,9 +4,7 @@
 		ADSENSE_PUBLISHER_ID,
 		CONSENT_EVENT,
 		canLoadAdvertising,
-		loadAdSense,
-		openConsentChoices,
-		type ConsentChoice
+		loadAdSense
 	} from '$lib/privacy/consent';
 
 	const adSlot = '5024456887';
@@ -33,8 +31,8 @@
 
 	onMount(() => {
 		initializeAd();
-		const consentChanged = (event: Event) => {
-			advertisingAllowed = (event as CustomEvent<ConsentChoice>).detail === 'all' && canLoadAdvertising();
+		const consentChanged = () => {
+			advertisingAllowed = canLoadAdvertising();
 			if (advertisingAllowed) initializeAd();
 		};
 		window.addEventListener(CONSENT_EVENT, consentChanged);
@@ -58,10 +56,7 @@
 		></ins>
 	{:else}
 		<div class="flex flex-1 items-center justify-center p-4 text-center text-xs text-stone-500">
-			<div>
-				<p>Optional advertising is off.</p>
-				<button class="mt-2 cursor-pointer font-semibold underline" on:click={openConsentChoices}>Privacy Choices</button>
-			</div>
+			<p>Choose your advertising privacy preference to continue.</p>
 		</div>
 	{/if}
 </aside>

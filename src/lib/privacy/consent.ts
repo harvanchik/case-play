@@ -8,7 +8,9 @@ export const ADSENSE_PUBLISHER_ID = 'ca-pub-3425711717023232';
 
 type ConsentWindow = Window & {
 	dataLayer?: unknown[];
-	adsbygoogle?: Record<string, unknown>[];
+	adsbygoogle?: Record<string, unknown>[] & {
+		requestNonPersonalizedAds?: 0 | 1;
+	};
 };
 
 let adsenseLoadPromise: Promise<void> | null = null;
@@ -75,10 +77,17 @@ export const openConsentChoices = () => {
 	if (typeof window !== 'undefined') window.dispatchEvent(new Event(OPEN_CONSENT_EVENT));
 };
 
-export const canLoadAdvertising = () => readConsent() === 'all' && !hasGlobalPrivacyControl();
+export const canLoadAdvertising = () => readConsent() !== null;
+
+const configureAdPersonalization = () => {
+	const consentWindow = window as ConsentWindow;
+	const adsByGoogle = (consentWindow.adsbygoogle ??= []);
+	adsByGoogle.requestNonPersonalizedAds = readConsent() === 'all' && !hasGlobalPrivacyControl() ? 0 : 1;
+};
 
 export const loadAdSense = () => {
 	if (typeof window === 'undefined' || !canLoadAdvertising()) return Promise.resolve();
+	configureAdPersonalization();
 	if (adsenseLoadPromise) return adsenseLoadPromise;
 
 	adsenseLoadPromise = new Promise<void>((resolve, reject) => {
