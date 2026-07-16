@@ -35,7 +35,16 @@
 	type DragTarget =
 		| { type: 'marker'; id: number; pointerStart: Point; elementStart: Point; moved: boolean }
 		| { type: 'guide'; id: number; pointerStart: Point; xStart: number; moved: boolean }
-		| { type: 'path'; id: number; pointerStart: Point; start: Point; end: Point; startMarkerId?: number; moved: boolean };
+		| {
+				type: 'path';
+				id: number;
+				pointerStart: Point;
+				start: Point;
+				end: Point;
+				startMarkerId?: number;
+				mode: 'whole' | 'start' | 'end';
+				moved: boolean;
+			};
 	type Scene = PlayBuilderScene;
 
 	export let initialDocument: SerializedPlayBuilderDocument | null = null;
@@ -1750,7 +1759,7 @@
 		setDeleteTargetAtPointer({ type: 'marker', id: marker.id }, event);
 		dragTarget = { type: 'marker', id: marker.id, pointerStart: pointFromEvent(event), elementStart: { x: marker.x, y: marker.y }, moved: false };
 	};
-	const beginOnPath = (event: PointerEvent, path: FieldPath) => {
+	const beginOnPath = (event: PointerEvent, path: FieldPath, mode: 'whole' | 'start' | 'end' = 'whole') => {
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
 		clearPlacementSnap();
@@ -1760,15 +1769,16 @@
 		}
 		setDeleteTargetAtPointer({ type: 'path', id: path.id }, event);
 		const start = pathStart(path);
-		dragTarget = {
-			type: 'path',
-			id: path.id,
+			dragTarget = {
+				type: 'path',
+				id: path.id,
 			pointerStart: pointFromEvent(event),
 			start: { ...start },
-			end: { ...path.end },
-			startMarkerId: path.startMarkerId,
-			moved: false
-		};
+				end: { ...path.end },
+				startMarkerId: path.startMarkerId,
+				mode,
+				moved: false
+			};
 	};
 	const beginOnGuide = (event: PointerEvent, guide: FieldGuide) => {
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
@@ -1861,10 +1871,14 @@
 		}
 		if (dragTarget.type === 'path') {
 			const target = dragTarget;
-			if (target.startMarkerId !== undefined) {
-				const dx = Math.max(fieldLeft - target.end.x, Math.min(fieldRight - target.end.x, rawDx));
-				const dy = Math.max(fieldTop - target.end.y, Math.min(fieldBottom - target.end.y, rawDy));
-				paths = paths.map((path) => (path.id === target.id ? { ...path, end: { x: target.end.x + dx, y: target.end.y + dy } } : path));
+			if (target.mode === 'end') {
+				const end = clampPoint({ x: target.end.x + rawDx, y: target.end.y + rawDy });
+				paths = paths.map((path) => (path.id === target.id ? { ...path, end } : path));
+				return;
+			}
+			if (target.mode === 'start') {
+				const start = clampPoint({ x: target.start.x + rawDx, y: target.start.y + rawDy });
+				paths = paths.map((path) => (path.id === target.id ? { ...path, start, startMarkerId: undefined } : path));
 				return;
 			}
 			const minX = Math.min(target.start.x, target.end.x);
@@ -1878,7 +1892,8 @@
 					? {
 							...path,
 							start: { x: target.start.x + dx, y: target.start.y + dy },
-							end: { x: target.end.x + dx, y: target.end.y + dy }
+							end: { x: target.end.x + dx, y: target.end.y + dy },
+							startMarkerId: undefined
 						}
 					: path
 			);
@@ -3131,6 +3146,48 @@
 								stroke-dasharray={guideDash(path.style)}
 								marker-end={pathMarker(path.kind)}
 								pointer-events="none"
+							/>
+						{/if}
+						{#if isArrowPath(path.kind)}
+							<circle
+								data-field-element
+								data-field-type="path"
+								data-path-endpoint="start"
+								cx={start.x}
+								cy={start.y}
+								r="14"
+								fill="transparent"
+								pointer-events="all"
+								role="button"
+								tabindex="-1"
+								aria-label={`Move ${path.kind} origin`}
+								class:cursor-pointer={tool !== 'free-draw' && !isDragging('path', path.id)}
+								class:cursor-grabbing={tool !== 'free-draw' && isDragging('path', path.id)}
+								on:pointerenter={() => (hoveringElement = true)}
+								on:pointerleave={() => (hoveringElement = false)}
+								on:pointerdown|stopPropagation={(event) => beginOnPath(event, path, 'start')}
+								on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
+								on:keydown={(event) => handlePathKeydown(event, path)}
+							/>
+							<circle
+								data-field-element
+								data-field-type="path"
+								data-path-endpoint="end"
+								cx={path.end.x}
+								cy={path.end.y}
+								r="26"
+								fill="transparent"
+								pointer-events="all"
+								role="button"
+								tabindex="-1"
+								aria-label={`Move ${path.kind} destination`}
+								class:cursor-pointer={tool !== 'free-draw' && !isDragging('path', path.id)}
+								class:cursor-grabbing={tool !== 'free-draw' && isDragging('path', path.id)}
+								on:pointerenter={() => (hoveringElement = true)}
+								on:pointerleave={() => (hoveringElement = false)}
+								on:pointerdown|stopPropagation={(event) => beginOnPath(event, path, 'end')}
+								on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
+								on:keydown={(event) => handlePathKeydown(event, path)}
 							/>
 						{/if}
 					</g>
