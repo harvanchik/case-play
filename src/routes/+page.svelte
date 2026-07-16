@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import Icon from '@iconify/svelte';
 	import { replaceState } from '$app/navigation';
 	import { updateFilterSearchParams } from '$lib/case-play-filter-state';
 	import CasePlayCard from '$lib/components/CasePlayCard.svelte';
+	import LandingPageAd from '$lib/components/LandingPageAd.svelte';
 
 	export let data: PageData;
 
@@ -12,6 +14,16 @@
 	let showCreateModal = false;
 	let showDifficultyDropdown = false;
 	let selectedDifficulties = data.initialFilters.difficulties;
+	let resultColumns = 1;
+
+	onMount(() => {
+		const updateResultColumns = () => {
+			resultColumns = window.matchMedia('(min-width: 1024px)').matches ? 3 : window.matchMedia('(min-width: 640px)').matches ? 2 : 1;
+		};
+		updateResultColumns();
+		window.addEventListener('resize', updateResultColumns);
+		return () => window.removeEventListener('resize', updateResultColumns);
+	});
 
 	const difficultyOptions = [
 		{ value: 1, label: 'Easy', color: 'bg-green-600' },
@@ -54,6 +66,11 @@
 
 		return matchesSearch && matchesDifficulty;
 	});
+
+	$: casePlayGroups = Array.from(
+		{ length: Math.ceil((filteredCasePlays?.length ?? 0) / (resultColumns * 2)) },
+		(_, index) => (filteredCasePlays ?? []).slice(index * resultColumns * 2, (index + 1) * resultColumns * 2)
+	);
 
 	/**
 	 * Returns the difficulty of the case play (i.e., Easy, Moderate, Hard)
@@ -232,8 +249,13 @@
 				<!-- END: Results Header -->
 
 				<div class="mt-1 grid max-h-[calc(100vh-16rem)] grid-cols-1 gap-4 overflow-y-auto border border-stone-400 p-2 sm:grid-cols-2 lg:grid-cols-3">
-					{#each filteredCasePlays as casePlay}
-						<CasePlayCard {casePlay} href={`/c/${casePlay.id}${activeFilterQuery ? `?${activeFilterQuery}` : ''}`} />
+					{#each casePlayGroups as group, groupIndex}
+						{#each group as casePlay}
+							<CasePlayCard {casePlay} href={`/c/${casePlay.id}${activeFilterQuery ? `?${activeFilterQuery}` : ''}`} />
+						{/each}
+						{#if groupIndex < casePlayGroups.length - 1}
+							<LandingPageAd />
+						{/if}
 					{/each}
 				</div>
 			{:else if data?.casePlays}
@@ -245,8 +267,8 @@
 
 	<!-- START: Footer -->
 	<footer class="mt-auto w-full py-3 text-center text-stone-600">
-		<div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
-			<p>This database was created in 2023 by Jake Harvanchik for the purpose of training intramural officials.</p>
+		<p class="text-sm">This database was created in 2023 by Jake Harvanchik for the purpose of training intramural officials.</p>
+		<div class="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
 			<span>&copy; {new Date().getFullYear()} caseplay.org</span>
 			<button on:click={() => (showCreateModal = true)} class="cursor-pointer font-semibold hover:underline">Contribute</button>
 			<a href="mailto:contact@caseplay.org" target="_blank" class="cursor-pointer font-semibold hover:underline">Contact</a>
