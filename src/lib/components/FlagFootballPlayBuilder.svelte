@@ -947,7 +947,8 @@
 	const isPathTool = (value: Tool): value is Exclude<PathKind, 'line'> => ['run', 'pass', 'kick'].includes(value);
 	const isArrowPath = (value: Tool | PathKind): value is Exclude<PathKind, 'line'> => ['run', 'pass', 'kick'].includes(value);
 	const isGuideTool = (value: Tool): value is 'line-of-scrimmage' | 'line-to-gain' => ['line-of-scrimmage', 'line-to-gain'].includes(value);
-	const minimumArrowLength = () => (fieldWidth / fieldLayout.totalYards) * 2;
+	// Keep only a sub-pixel-scale safeguard so SVG arrow markers retain a direction.
+	const minimumArrowLength = () => 1;
 	const pointWithMinimumDistance = (anchor: Point, candidate: Point, fallback: Point): Point => {
 		let dx = candidate.x - anchor.x;
 		let dy = candidate.y - anchor.y;
