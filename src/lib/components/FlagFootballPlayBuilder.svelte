@@ -33,7 +33,7 @@
 	type Tool = PlayerKind | 'ball' | 'flag' | 'deflag' | 'event' | 'free-draw' | 'run' | 'pass' | 'kick' | 'line-of-scrimmage' | 'line-to-gain';
 	type SelectedTarget = { type: 'marker' | 'path' | 'guide'; id: number };
 	type DragTarget =
-		| { type: 'marker'; id: number; pointerStart: Point; elementStart: Point; moved: boolean }
+		| { type: 'marker'; id: number; pointerStart: Point; elementStart: Point; moved: boolean; snapToMarkers?: boolean }
 		| { type: 'guide'; id: number; pointerStart: Point; xStart: number; moved: boolean }
 		| {
 				type: 'path';
@@ -1058,8 +1058,17 @@
 		const fieldXLayer = svg.querySelector<SVGGElement>('[data-field-x-layer]');
 		if (fieldXLayer) svg.appendChild(fieldXLayer);
 		const footballMarkerIds = new Set(markers.filter((marker) => marker.kind === 'ball').map((marker) => marker.id));
-		for (const layer of layerOrder.filter((item) => item.type !== 'guide' && !(item.type === 'marker' && footballMarkerIds.has(item.id)))) {
+		const attachedMarkerIds = new Set(paths.flatMap((path) => (path.startMarkerId === undefined ? [] : [path.startMarkerId])));
+		for (const layer of layerOrder.filter(
+			(item) => item.type !== 'guide' && !(item.type === 'marker' && (footballMarkerIds.has(item.id) || attachedMarkerIds.has(item.id)))
+		)) {
 			const element = svg.querySelector<SVGGElement>(`[data-layer-type="${layer.type}"][data-layer-id="${layer.id}"]`);
+			if (element) svg.appendChild(element);
+		}
+		for (const layer of layerOrder.filter(
+			(item) => item.type === 'marker' && attachedMarkerIds.has(item.id) && !footballMarkerIds.has(item.id)
+		)) {
+			const element = svg.querySelector<SVGGElement>(`[data-layer-type="marker"][data-layer-id="${layer.id}"]`);
 			if (element) svg.appendChild(element);
 		}
 		const fixtureLayer = svg.querySelector<SVGGElement>('[data-field-fixtures-layer]');
@@ -1087,6 +1096,14 @@
 		if (candidates.length === 0) return null;
 		const nearest = candidates.reduce((closest, candidate) => (Math.abs(candidate - pointerX) < Math.abs(closest - pointerX) ? candidate : closest));
 		return Math.abs(nearest - pointerX) <= placementSnapThreshold ? nearest : null;
+	};
+	const nearestMarkerToPoint = (point: Point, excludedMarkerId?: number) => {
+		const candidates = markers.filter((marker) => marker.id !== excludedMarkerId);
+		if (candidates.length === 0) return null;
+		const nearest = candidates.reduce((closest, marker) =>
+			Math.hypot(marker.x - point.x, marker.y - point.y) < Math.hypot(closest.x - point.x, closest.y - point.y) ? marker : closest
+		);
+		return Math.hypot(nearest.x - point.x, nearest.y - point.y) <= playerRadius * 1.75 ? nearest : null;
 	};
 	const schedulePlacementSnap = (point: Point, instant = false) => {
 		clearPlacementSnap();
@@ -1799,7 +1816,14 @@
 			return;
 		}
 		setDeleteTargetAtPointer({ type: 'marker', id: marker.id }, event);
-		dragTarget = { type: 'marker', id: marker.id, pointerStart: pointFromEvent(event), elementStart: { x: marker.x, y: marker.y }, moved: false };
+		dragTarget = {
+			type: 'marker',
+			id: marker.id,
+			pointerStart: pointFromEvent(event),
+			elementStart: { x: marker.x, y: marker.y },
+			moved: false,
+			snapToMarkers: paths.some((path) => path.startMarkerId === marker.id)
+		};
 	};
 	const beginOnPath = async (event: PointerEvent, path: FieldPath, mode: 'whole' | 'start' | 'end' = 'whole') => {
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
@@ -1815,9 +1839,24 @@
 		}
 		setDeleteTargetAtPointer({ type: 'path', id: path.id }, event);
 		const start = pathStart(path);
-			dragTarget = {
-				type: 'path',
-				id: path.id,
+		if (mode === 'start' && path.startMarkerId !== undefined) {
+			const attachedMarker = markers.find((marker) => marker.id === path.startMarkerId);
+			if (attachedMarker) {
+				setDeleteTargetAtPointer({ type: 'marker', id: attachedMarker.id }, event);
+				dragTarget = {
+					type: 'marker',
+					id: attachedMarker.id,
+					pointerStart: pointFromEvent(event),
+					elementStart: { x: attachedMarker.x, y: attachedMarker.y },
+					moved: false,
+					snapToMarkers: true
+				};
+				return;
+			}
+		}
+		dragTarget = {
+			type: 'path',
+			id: path.id,
 			pointerStart: pointFromEvent(event),
 			start: { ...start },
 				end: { ...path.end },
@@ -1918,10 +1957,12 @@
 			if (!svg.hasPointerCapture(event.pointerId)) svg.setPointerCapture(event.pointerId);
 		}
 		if (dragTarget.type === 'marker') {
-			const next = clampPoint({ x: dragTarget.elementStart.x + rawDx, y: dragTarget.elementStart.y + rawDy });
+			const candidate = clampPoint({ x: dragTarget.elementStart.x + rawDx, y: dragTarget.elementStart.y + rawDy });
+			const snappedMarker = event.shiftKey && dragTarget.snapToMarkers ? nearestMarkerToPoint(candidate, dragTarget.id) : null;
+			const next = snappedMarker ? { x: snappedMarker.x, y: snappedMarker.y } : candidate;
 			markers = markers.map((marker) => (marker.id === dragTarget?.id ? { ...marker, ...next } : marker));
 			paths = paths.map((path) => (path.startMarkerId === dragTarget?.id ? { ...path, start: { ...next } } : path));
-			if (placementPointerMoved) scheduleDragSnap(dragTarget, next.x, event.shiftKey);
+			if (!snappedMarker && placementPointerMoved) scheduleDragSnap(dragTarget, next.x, event.shiftKey);
 		}
 		if (dragTarget.type === 'guide') {
 			const x = Math.max(fieldLeft, Math.min(fieldRight, dragTarget.xStart + rawDx));
@@ -1938,8 +1979,11 @@
 			}
 			if (target.mode === 'start') {
 				const candidate = clampPoint({ x: target.start.x + rawDx, y: target.start.y + rawDy });
-				const start = pointWithMinimumDistance(target.end, candidate, target.start);
-				paths = paths.map((path) => (path.id === target.id ? { ...path, start, startMarkerId: undefined } : path));
+				const snappedMarker = event.shiftKey ? nearestMarkerToPoint(candidate) : null;
+				const start = snappedMarker ? { x: snappedMarker.x, y: snappedMarker.y } : pointWithMinimumDistance(target.end, candidate, target.start);
+				paths = paths.map((path) =>
+					path.id === target.id ? { ...path, start, startMarkerId: snappedMarker?.id } : path
+				);
 				return;
 			}
 			const minX = Math.min(target.start.x, target.end.x);
@@ -3899,7 +3943,8 @@
 						</p>
 						<p>
 							<strong>Move:</strong> Drag any placed element. When an arrow tool is selected, dragging from a player starts the arrow from—and keeps it
-							attached to—that player.
+							attached to—that player. Moving an attached origin moves its player or football, and every attached arrow follows. Hold <kbd>Shift</kbd>
+							while moving a free origin to snap and attach it to a nearby element.
 						</p>
 						<p>
 							<strong>Edit:</strong> Double-click players, footballs, event tags, penalty flags, flag belts, routes, arrows, and cross-field lines to open
