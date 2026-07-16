@@ -1630,6 +1630,8 @@
 		}
 	};
 	const isStylusEraserEvent = (event: PointerEvent) => event.pointerType === 'pen' && (event.button === 5 || (event.buttons & 32) === 32);
+	const isStylusBarrelButtonActive = (event: PointerEvent) => event.pointerType === 'pen' && (event.button === 2 || (event.buttons & 2) === 2);
+	const shouldSnapStraightDrawing = (event: PointerEvent) => event.shiftKey || isStylusBarrelButtonActive(event);
 	const selectedTargetAtClientPoint = (clientX: number, clientY: number): SelectedTarget | null => {
 		const hit = document.elementFromPoint(clientX, clientY);
 		const layer = hit?.closest<SVGElement>('[data-layer-type][data-layer-id]');
@@ -1660,7 +1662,7 @@
 		const point = canvasPointFromEvent(event);
 		lastErasePoint = point;
 		eraseFreeStrokeAt(point);
-		eraseElementAtClientPoint(event.clientX, event.clientY);
+		if (tool !== 'free-draw') eraseElementAtClientPoint(event.clientX, event.clientY);
 		try {
 			svg.setPointerCapture(event.pointerId);
 		} catch {
@@ -1851,7 +1853,7 @@
 			event.preventDefault();
 			const point = canvasPointFromEvent(event);
 			eraseFreeStrokesAlong(lastErasePoint ?? point, point);
-			eraseElementAtClientPoint(event.clientX, event.clientY);
+			if (tool !== 'free-draw') eraseElementAtClientPoint(event.clientX, event.clientY);
 			lastErasePoint = point;
 			return;
 		}
@@ -1888,7 +1890,9 @@
 		lastPlacementHoverPoint = point;
 		if (activeFreeStroke) {
 			const strokePoint =
-				activeFreeDrawShape === 'straight' && event.shiftKey ? snapStraightDrawPoint(activeFreeStroke.points[0], canvasPoint) : canvasPoint;
+				activeFreeDrawShape === 'straight' && shouldSnapStraightDrawing(event)
+					? snapStraightDrawPoint(activeFreeStroke.points[0], canvasPoint)
+					: canvasPoint;
 			const last = activeFreeStroke.points.at(-1)!;
 			if (Math.hypot(strokePoint.x - last.x, strokePoint.y - last.y) >= 1.5) {
 				activeFreeStroke = {
@@ -1960,7 +1964,7 @@
 		if (stylusEraserActive) {
 			const point = canvasPointFromEvent(event);
 			eraseFreeStrokesAlong(lastErasePoint ?? point, point);
-			eraseElementAtClientPoint(event.clientX, event.clientY);
+			if (tool !== 'free-draw') eraseElementAtClientPoint(event.clientX, event.clientY);
 			stylusEraserActive = false;
 			eraseHistorySaved = false;
 			lastErasePoint = null;
@@ -1976,10 +1980,12 @@
 			if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
 			return;
 		}
+		if (event.pointerType === 'pen' && event.button === 2) return;
 		if (activeFreeStroke) {
 			const first = activeFreeStroke.points[0];
 			const rawFinalPoint = canvasPointFromEvent(event);
-			const finalPoint = activeFreeDrawShape === 'straight' && event.shiftKey ? snapStraightDrawPoint(first, rawFinalPoint) : rawFinalPoint;
+			const finalPoint =
+				activeFreeDrawShape === 'straight' && shouldSnapStraightDrawing(event) ? snapStraightDrawPoint(first, rawFinalPoint) : rawFinalPoint;
 			const last = activeFreeStroke.points.at(-1)!;
 			const points =
 				activeFreeDrawShape === 'straight'
@@ -2602,6 +2608,7 @@
 				on:pointerdown|capture={beginStylusEraser}
 				on:pointerdown={beginOnField}
 				on:pointermove={continuePointer}
+				on:contextmenu|preventDefault
 				on:pointerenter={(event) => {
 					hoveringElement = false;
 					pointerOnField = isPointOnField(canvasPointFromEvent(event));
@@ -3966,7 +3973,12 @@
 							</li>
 							<li>
 								<strong>Surface/stylus eraser:</strong> Flip a supported pen over and press its eraser end against the builder. Dragging removes drawing
-								strokes, while touching a player, field element, route, or cross-field line deletes it. One continuous eraser gesture is one Undo action.
+								strokes only while Draw is selected. Outside Draw mode, it also deletes touched players, field elements, routes, and cross-field lines. One
+								continuous eraser gesture is one Undo action.
+							</li>
+							<li>
+								<strong>Surface Pen barrel button:</strong> Hold the side/right-click button while using Straight to lock the stroke to the nearest 45-degree
+								angle, just like holding <kbd>Shift</kbd>.
 							</li>
 						</ul>
 					</div>
