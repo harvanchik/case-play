@@ -283,7 +283,7 @@
 	const fieldLineWidth = 3;
 	const playerRadius = 14.025;
 	const playerStrokeWidth = 2.55;
-	const footballSize = 24.15;
+	const footballSize = 25.36;
 	const deflagSize = 33.75;
 	const foulFlagSize = 31.5;
 	const eventTagWidth = 46.5;
@@ -1796,7 +1796,7 @@
 		const snappedX = placementSnapX;
 		clearPlacementSnap();
 		lastPlacementHoverPoint = null;
-		if (tool === 'event' && marker.kind !== 'ball') {
+		if (tool === 'event' && marker.kind !== 'ball' && marker.kind !== 'event') {
 			await placeEventTag(pointFromEvent(event));
 			return;
 		}
@@ -1928,7 +1928,10 @@
 		const canPlaceEventThroughHoveredElement =
 			tool === 'event' &&
 			Boolean(hoveredFieldElement) &&
-			!(hoveredFieldElement?.getAttribute('data-field-type') === 'marker' && hoveredFieldElement?.getAttribute('data-field-kind') === 'ball');
+			!(
+				hoveredFieldElement?.getAttribute('data-field-type') === 'marker' &&
+				['ball', 'event'].includes(hoveredFieldElement?.getAttribute('data-field-kind') ?? '')
+			);
 		hoveringElement = Boolean(hoveredFieldElement) && !canSnapThroughHoveredElement && !canPlaceEventThroughHoveredElement;
 		const placementPointerMoved =
 			!lastPlacementHoverPoint || Math.hypot(point.x - lastPlacementHoverPoint.x, point.y - lastPlacementHoverPoint.y) > 0.1;
@@ -3375,7 +3378,8 @@
 						data-field-kind={marker.kind}
 						on:pointerdown|stopPropagation={(event) => beginOnMarker(event, marker)}
 						on:pointerenter={() =>
-							(hoveringElement = tool === 'event' ? marker.kind === 'ball' : !(isGuideTool(tool) && marker.kind === 'ball'))}
+							(hoveringElement =
+								tool === 'event' ? marker.kind === 'ball' || marker.kind === 'event' : !(isGuideTool(tool) && marker.kind === 'ball'))}
 						on:pointerleave={() => (hoveringElement = false)}
 						on:dblclick|stopPropagation={(event) => startEditingMarker(event, marker)}
 						on:keydown|stopPropagation={(event) => handleMarkerKeydown(event, marker)}
@@ -3392,8 +3396,12 @@
 										: marker.kind === 'ball'
 											? `${marker.label ? `${marker.label}, ` : ''}football, double-click to add text`
 											: marker.kind}
-						class:cursor-pointer={tool !== 'free-draw' && (tool !== 'event' || marker.kind === 'ball') && !isDragging('marker', marker.id)}
-						class:cursor-grabbing={tool !== 'free-draw' && (tool !== 'event' || marker.kind === 'ball') && isDragging('marker', marker.id)}
+						class:cursor-pointer={tool !== 'free-draw' &&
+							(tool !== 'event' || marker.kind === 'ball' || marker.kind === 'event') &&
+							!isDragging('marker', marker.id)}
+						class:cursor-grabbing={tool !== 'free-draw' &&
+							(tool !== 'event' || marker.kind === 'ball' || marker.kind === 'event') &&
+							isDragging('marker', marker.id)}
 						class:focus:outline-none={isEditableMarker(marker)}
 					>
 						{#if isTeamMarker(marker)}
