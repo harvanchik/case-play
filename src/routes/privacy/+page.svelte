@@ -17,12 +17,12 @@
 
 		<h2 class="mt-7 text-xl font-bold">Information</h2>
 		<p class="mt-2 leading-7">
-			Caseplay processes play diagrams you save, messages you send, and standard technical records needed to deliver, secure, and troubleshoot the site. Saved plays have shareable URLs. Service providers may process IP address, browser, request, error, and security information. Records are kept only as reasonably needed for these purposes or legal obligations.
+			Caseplay processes play diagrams you save and standard technical records needed to deliver, secure, and troubleshoot the site. Saved plays have shareable URLs. Service providers may process IP address, browser, request, error, and security information. Records are kept only as reasonably needed for these purposes or legal obligations.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Advertising</h2>
 		<p class="mt-2 leading-7">
-			Google AdSense ads fund the domain, hosting, and database. If you allow personalized ads, Google and approved partners may use advertising cookies and activity data for personalization and measurement. If you choose Generic Ads or enable Global Privacy Control, Caseplay denies personalization signals and requests generic ads instead. Generic and limited ad delivery may still process technical data such as IP address and use narrowly scoped storage for delivery, aggregate reporting, security, and fraud prevention. See the
+			Google AdSense ads fund the domain, hosting, and database. If you choose Accept All, Google and approved partners may use advertising cookies and activity data for personalization and measurement. If you choose Essential Only or enable Global Privacy Control, Caseplay denies personalization signals and requests generic ads instead. Generic and limited ad delivery may still process technical data such as IP address and use narrowly scoped storage for delivery, aggregate reporting, security, and fraud prevention. See the
 			<a class="font-semibold underline" href="/cookie-policy">Cookie Policy</a> and
 			<a class="font-semibold underline" href="https://policies.google.com/privacy" rel="noreferrer" target="_blank">Google Privacy Policy</a>.
 		</p>

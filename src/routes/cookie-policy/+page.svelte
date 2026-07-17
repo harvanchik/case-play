@@ -16,7 +16,7 @@
 
 		<h2 class="mt-7 text-xl font-bold">Advertising choices</h2>
 		<p class="mt-2 leading-7">
-			Ads appear under either choice. <strong>Generic Ads</strong> disables behavioral personalization; Google may still process technical delivery data and use limited storage for aggregate reporting and fraud prevention where permitted. <strong>Allow Personalized Ads</strong> permits Google and approved partners to use advertising cookies and activity data for personalized ads and measurement. Global Privacy Control forces Generic Ads. Learn more from
+			Ads appear under either choice. <strong>Essential Only</strong> disables behavioral personalization; Google may still process technical delivery data and use limited storage for aggregate reporting and fraud prevention where permitted. <strong>Accept All</strong> permits Google and approved partners to use advertising cookies and activity data for personalized ads and measurement. Global Privacy Control applies Essential Only. Learn more from
 			<a class="font-semibold underline" href="https://policies.google.com/technologies/ads" rel="noreferrer" target="_blank">Google advertising technologies</a>.
 		</p>
 
