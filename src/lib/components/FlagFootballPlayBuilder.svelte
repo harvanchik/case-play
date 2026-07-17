@@ -785,13 +785,20 @@
 		activeFreeStroke = null;
 		layerOrder = [];
 	};
-	const clearFreeDrawings = () => {
-		if (freeStrokes.length === 0 && !activeFreeStroke) return;
-		if (freeStrokes.length > 0) saveHistory();
+	const discardFreeDrawings = () => {
 		clearEditorState();
 		clearDeleteState();
 		freeStrokes = [];
 		activeFreeStroke = null;
+		erasingFreeStrokes = false;
+		eraseHistorySaved = false;
+		stylusEraserActive = false;
+		lastErasePoint = null;
+	};
+	const clearFreeDrawings = () => {
+		if (freeStrokes.length === 0 && !activeFreeStroke) return;
+		if (freeStrokes.length > 0) saveHistory();
+		discardFreeDrawings();
 	};
 	const handleBeforeUnload = (event: BeforeUnloadEvent) => {
 		if (!hasUnsavedChanges) return;
@@ -1471,6 +1478,7 @@
 	const updateFieldSetting = <Key extends keyof PlayBuilderFieldSettings>(key: Key, value: PlayBuilderFieldSettings[Key]) => {
 		if (fieldSettings[key] === value) return;
 		saveHistory();
+		if (key === 'fieldType') discardFreeDrawings();
 		fieldSettings = { ...fieldSettings, [key]: value };
 		clearPlacementSnap();
 	};
