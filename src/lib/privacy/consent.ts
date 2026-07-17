@@ -5,6 +5,8 @@ export const CONSENT_EVENT = 'caseplay:consent-changed';
 export const OPEN_CONSENT_EVENT = 'caseplay:open-consent';
 export const ADSENSE_SCRIPT_ID = 'caseplay-adsense-script';
 export const ADSENSE_PUBLISHER_ID = 'ca-pub-3425711717023232';
+export const ANALYTICS_SCRIPT_ID = 'caseplay-google-analytics-script';
+export const ANALYTICS_MEASUREMENT_ID = 'G-XSBHT3M6GY';
 
 type ConsentWindow = Window & {
 	dataLayer?: unknown[];
@@ -14,6 +16,8 @@ type ConsentWindow = Window & {
 };
 
 let adsenseLoadPromise: Promise<void> | null = null;
+let analyticsLoadPromise: Promise<void> | null = null;
+let lastTrackedPage = '';
 
 const gtag = (...args: unknown[]) => {
 	const consentWindow = window as ConsentWindow;
@@ -21,8 +25,7 @@ const gtag = (...args: unknown[]) => {
 };
 
 export const hasGlobalPrivacyControl = () =>
-	typeof navigator !== 'undefined' &&
-	(navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true;
+	typeof navigator !== 'undefined' && (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true;
 
 export const readConsent = (): ConsentChoice | null => {
 	if (typeof window === 'undefined') return null;
@@ -51,6 +54,27 @@ export const initializeConsentMode = () => {
 			ad_personalization: 'granted',
 			analytics_storage: 'granted'
 		});
+	} else {
+		clearGoogleAnalyticsCookies();
+	}
+};
+
+const expireCookie = (name: string, domain?: string) => {
+	const domainAttribute = domain ? `; Domain=${domain}` : '';
+	document.cookie = `${encodeURIComponent(name)}=; Max-Age=0; Path=/${domainAttribute}; SameSite=Lax`;
+};
+
+export const clearGoogleAnalyticsCookies = () => {
+	if (typeof document === 'undefined') return;
+	const cookieNames = document.cookie
+		.split(';')
+		.map((cookie) => cookie.trim().split('=')[0])
+		.filter((name) => name === '_ga' || name.startsWith('_ga_'));
+
+	for (const name of cookieNames) {
+		expireCookie(name);
+		expireCookie(name, window.location.hostname);
+		if (window.location.hostname.endsWith('caseplay.org')) expireCookie(name, '.caseplay.org');
 	}
 };
 
@@ -70,6 +94,7 @@ export const saveConsent = (choice: ConsentChoice) => {
 		ad_personalization: granted,
 		analytics_storage: granted
 	});
+	if (effectiveChoice === 'essential') clearGoogleAnalyticsCookies();
 	window.dispatchEvent(new CustomEvent<ConsentChoice>(CONSENT_EVENT, { detail: effectiveChoice }));
 };
 
@@ -78,6 +103,63 @@ export const openConsentChoices = () => {
 };
 
 export const canLoadAdvertising = () => readConsent() !== null;
+export const canLoadAnalytics = () => readConsent() === 'all' && !hasGlobalPrivacyControl();
+
+export const loadGoogleAnalytics = () => {
+	if (typeof window === 'undefined' || !canLoadAnalytics()) return Promise.resolve();
+	if (analyticsLoadPromise) return analyticsLoadPromise;
+
+	gtag('js', new Date());
+	gtag('config', ANALYTICS_MEASUREMENT_ID, {
+		allow_google_signals: false,
+		allow_ad_personalization_signals: false,
+		cookie_expires: 31_536_000,
+		send_page_view: false
+	});
+
+	analyticsLoadPromise = new Promise<void>((resolve, reject) => {
+		const existing = document.getElementById(ANALYTICS_SCRIPT_ID) as HTMLScriptElement | null;
+		if (existing) {
+			if (existing.dataset.loaded === 'true') resolve();
+			else {
+				existing.addEventListener('load', () => resolve(), { once: true });
+				existing.addEventListener('error', () => reject(new Error('Google Analytics failed to load.')), { once: true });
+			}
+			return;
+		}
+
+		const script = document.createElement('script');
+		script.id = ANALYTICS_SCRIPT_ID;
+		script.async = true;
+		script.src = `https://www.googletagmanager.com/gtag/js?id=${ANALYTICS_MEASUREMENT_ID}`;
+		script.addEventListener(
+			'load',
+			() => {
+				script.dataset.loaded = 'true';
+				resolve();
+			},
+			{ once: true }
+		);
+		script.addEventListener('error', () => reject(new Error('Google Analytics failed to load.')), { once: true });
+		document.head.appendChild(script);
+	});
+
+	return analyticsLoadPromise;
+};
+
+export const trackGoogleAnalyticsPageView = async (url: URL) => {
+	if (!canLoadAnalytics()) return;
+	const pageKey = `${url.pathname}${url.search}${url.hash}`;
+	if (pageKey === lastTrackedPage) return;
+	await loadGoogleAnalytics();
+	if (!canLoadAnalytics() || pageKey === lastTrackedPage) return;
+	lastTrackedPage = pageKey;
+	gtag('event', 'page_view', {
+		page_title: document.title,
+		page_location: url.href,
+		page_path: `${url.pathname}${url.search}`
+	});
+};
 
 const configureAdPersonalization = () => {
 	const consentWindow = window as ConsentWindow;

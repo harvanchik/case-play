@@ -17,19 +17,34 @@
 
 		<h2 class="mt-7 text-xl font-bold">Information</h2>
 		<p class="mt-2 leading-7">
-			Caseplay processes play diagrams you save and standard technical records needed to deliver, secure, and troubleshoot the site. Saved plays have shareable URLs. Service providers may process IP address, browser, request, error, and security information. Records are kept only as reasonably needed for these purposes or legal obligations.
+			Caseplay processes play diagrams you save and standard technical records needed to deliver, secure, and troubleshoot the site. Saved plays have
+			shareable URLs. Service providers may process IP address, browser, request, error, and security information. Records are kept only as reasonably
+			needed for these purposes or legal obligations.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Advertising</h2>
 		<p class="mt-2 leading-7">
-			Google AdSense ads fund the domain, hosting, and database. If you choose Accept All, Google and approved partners may use advertising cookies and activity data for personalization and measurement. If you choose Essential Only or enable Global Privacy Control, Caseplay denies personalization signals and requests generic ads instead. Generic and limited ad delivery may still process technical data such as IP address and use narrowly scoped storage for delivery, aggregate reporting, security, and fraud prevention. See the
+			Google AdSense ads fund the domain, hosting, and database. If you choose Accept All, Google and approved partners may use advertising cookies
+			and activity data for personalization and measurement. If you choose Essential Only or enable Global Privacy Control, Caseplay denies
+			personalization signals and requests generic ads instead. Generic and limited ad delivery may still process technical data such as IP address
+			and use narrowly scoped storage for delivery, aggregate reporting, security, and fraud prevention. See the
 			<a class="font-semibold underline" href="/cookie-policy">Cookie Policy</a> and
 			<a class="font-semibold underline" href="https://policies.google.com/privacy" rel="noreferrer" target="_blank">Google Privacy Policy</a>.
 		</p>
 
+		<h2 class="mt-7 text-xl font-bold">Analytics</h2>
+		<p class="mt-2 leading-7">
+			Google Analytics loads only after you choose <strong>Accept All</strong>. It records aggregate usage such as pages visited, visit duration,
+			approximate region, referring source, and device or browser type. It does not load after <strong>Essential Only</strong> or when Global Privacy Control
+			is enabled. Caseplay disables Google signals and advertising personalization signals for Analytics and does not send saved play content or player
+			labels to Analytics.
+		</p>
+
 		<h2 class="mt-7 text-xl font-bold">Sharing and your rights</h2>
 		<p class="mt-2 leading-7">
-			Information is shared with providers needed to operate the service, with advertising providers according to your choice, when legally required, or when you share a play URL. Depending on your location, you may request access, correction, deletion, or restriction and may opt out of personalized advertising, sale, or sharing. Contact
+			Information is shared with providers needed to operate the service, with advertising providers according to your choice, when legally required,
+			or when you share a play URL. Depending on your location, you may request access, correction, deletion, or restriction and may opt out of
+			personalized advertising, sale, or sharing. Contact
 			<a class="font-semibold underline" href="mailto:contact@caseplay.org">contact@caseplay.org</a>.
 		</p>
 		<button class="mt-4 cursor-pointer border-2 border-stone-900 bg-stone-900 px-4 py-2 font-bold text-white" on:click={openConsentChoices}>
