@@ -24,7 +24,7 @@
 				</div>
 			</div>
 		</div>
-		<div class="flex min-w-0 items-center justify-center lg:pr-2">
+		<div class="flex min-w-0 items-center justify-center">
 			<PlayBuilderAd />
 		</div>
 	</div>
