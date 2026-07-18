@@ -62,15 +62,19 @@
 		<p class="mt-1 text-sm leading-5 text-stone-700">
 			Caseplay uses cookies to keep the site working and, with your permission, personalize advertising and measure performance.
 		</p>
-		<p class="mt-2 text-sm font-semibold leading-5 text-stone-800">
-			Accepting all cookies helps advertising contribute more toward the domain, hosting, and database. Essential Only keeps optional cookies off and shows generic ads.
+		<p class="mt-2 text-sm leading-5 font-semibold text-stone-800">
+			Accepting all cookies helps advertising contribute toward the cost of the domain, hosting site, and database. Essential Only keeps optional
+			cookies off and shows generic ads.
 		</p>
 		<p class="mt-2 text-xs text-stone-600">
 			Read the <a class="font-semibold underline" href="/cookie-policy">Cookie Policy</a> and
 			<a class="font-semibold underline" href="/privacy">Privacy Policy</a>. You can change this choice at any time.
 		</p>
 		<div class="mt-4 flex flex-wrap justify-end gap-2">
-			<button class="cursor-pointer border-2 border-stone-900 bg-white px-4 py-2 text-sm font-bold text-stone-900" on:click={() => choose('essential')}>
+			<button
+				class="cursor-pointer border-2 border-stone-900 bg-white px-4 py-2 text-sm font-bold text-stone-900"
+				on:click={() => choose('essential')}
+			>
 				Essential Only
 			</button>
 			<button

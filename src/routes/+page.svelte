@@ -67,9 +67,8 @@
 		return matchesSearch && matchesDifficulty;
 	});
 
-	$: casePlayGroups = Array.from(
-		{ length: Math.ceil((filteredCasePlays?.length ?? 0) / (resultColumns * 2)) },
-		(_, index) => (filteredCasePlays ?? []).slice(index * resultColumns * 2, (index + 1) * resultColumns * 2)
+	$: casePlayGroups = Array.from({ length: Math.ceil((filteredCasePlays?.length ?? 0) / (resultColumns * 2)) }, (_, index) =>
+		(filteredCasePlays ?? []).slice(index * resultColumns * 2, (index + 1) * resultColumns * 2)
 	);
 
 	/**
@@ -108,7 +107,7 @@
 		<h1 class="font-dokdo mx-auto text-5xl font-semibold text-stone-800 uppercase select-none text-shadow-md sm:text-7xl sm:text-shadow-lg">
 			caseplay.org
 		</h1>
-		<p class="font-neucha text-xl text-stone-600 sm:text-2xl">a case play database created by Jake Harvanchik</p>
+		<p class="font-neucha text-xl text-stone-600 sm:text-2xl">a case play database and play builder created by Jake Harvanchik</p>
 	</div>
 
 	<!-- START: Create Modal -->
