@@ -2,10 +2,12 @@
 	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import Icon from '@iconify/svelte';
-	import { replaceState } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { updateFilterSearchParams } from '$lib/case-play-filter-state';
 	import CasePlayCard from '$lib/components/CasePlayCard.svelte';
 	import LandingPageAd from '$lib/components/LandingPageAd.svelte';
+	import PublicSiteFooter from '$lib/components/PublicSiteFooter.svelte';
+	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
 
 	export let data: PageData;
 
@@ -15,6 +17,15 @@
 	let showDifficultyDropdown = false;
 	let selectedDifficulties = data.initialFilters.difficulties;
 	let resultColumns = 1;
+	let navigationTimer: ReturnType<typeof setTimeout> | undefined;
+	const websiteStructuredData = JSON.stringify({
+		'@context': 'https://schema.org',
+		'@type': 'WebSite',
+		name: 'caseplay.org',
+		url: 'https://caseplay.org/',
+		description: 'A searchable case-play database and flag football play builder for referee education.',
+		author: { '@type': 'Person', name: 'Jake Harvanchik' }
+	}).replace(/</g, '\\u003c');
 
 	onMount(() => {
 		const updateResultColumns = () => {
@@ -40,10 +51,14 @@
 		syncFilterUrl();
 	};
 
-	const syncFilterUrl = () => {
+	const syncFilterUrl = (resetPage = true) => {
 		const url = new URL(window.location.href);
 		url.search = updateFilterSearchParams(url.searchParams, searchTerm, selectedDifficulties).toString();
-		replaceState(url, {});
+		if (resetPage) url.searchParams.delete('page');
+		clearTimeout(navigationTimer);
+		navigationTimer = setTimeout(() => {
+			void goto(url, { replaceState: true, keepFocus: true, noScroll: true });
+		}, 250);
 	};
 
 	const handleSearchInput = (event: Event) => {
@@ -51,21 +66,16 @@
 		syncFilterUrl();
 	};
 
-	$: activeFilterQuery = updateFilterSearchParams(new URLSearchParams(), searchTerm, selectedDifficulties).toString();
+	$: activeFilterParams = updateFilterSearchParams(new URLSearchParams(), searchTerm, selectedDifficulties);
+	$: if (data.pagination.currentPage > 1) activeFilterParams.set('page', String(data.pagination.currentPage));
+	$: activeFilterQuery = activeFilterParams.toString();
+	const pageHref = (pageNumber: number) => {
+		const params = updateFilterSearchParams(new URLSearchParams(), searchTerm, selectedDifficulties);
+		if (pageNumber > 1) params.set('page', String(pageNumber));
+		return `/${params.size ? `?${params}` : ''}`;
+	};
 
-	$: filteredCasePlays = data?.casePlays?.filter((play) => {
-		const matchesSearch =
-			!searchTerm ||
-			play.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-			play.prompt.toLowerCase().includes(searchTerm.toLowerCase()) ||
-			play.ruleReference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-			play.edition?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-			getDifficulty(play.difficulty).toLowerCase().includes(searchTerm.toLowerCase());
-
-		const matchesDifficulty = selectedDifficulties.length === 0 || selectedDifficulties.includes(play.difficulty);
-
-		return matchesSearch && matchesDifficulty;
-	});
+	$: filteredCasePlays = data?.casePlays ?? [];
 
 	$: casePlayGroups = Array.from({ length: Math.ceil((filteredCasePlays?.length ?? 0) / (resultColumns * 2)) }, (_, index) =>
 		(filteredCasePlays ?? []).slice(index * resultColumns * 2, (index + 1) * resultColumns * 2)
@@ -91,16 +101,17 @@
 </script>
 
 <svelte:head>
-	<title>Case Plays</title>
-	<meta name="description" content="Sports case play database for referee education" />
-	<meta
-		name="keywords"
-		content="case,play,plays,db,database,sports,intramural,extramural,official,referee,education,learning,training,flag,tackle,football,basketball,baseball,soccer,volleyball,ice,roller,hockey,flash,cards,coach,player,umpire,ref,ump,zebra,stripes,whistle,rule,rules,interpretation,rule book,edition,spoiler,tool"
-	/>
+	<title>Flag Football Case Plays and Play Builder | caseplay.org</title>
+	<meta name="description" content="Study searchable flag football officiating case plays and create shareable diagrams with a field play builder made for referee education." />
 	<meta name="author" content="Jake Harvanchik" />
+	<meta property="og:title" content="Flag Football Case Plays and Play Builder" />
+	<meta property="og:description" content="Study officiating scenarios and build shareable flag football play diagrams." />
+	<meta property="og:type" content="website" />
+	{@html `<script type="application/ld+json">${websiteStructuredData}<\/script>`}
 </svelte:head>
 
 <main class="flex min-h-screen flex-col overflow-hidden bg-stone-100/[97%]">
+	<PublicSiteNav />
 	<!-- Background -->
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 	<div class="mt-10 flex w-full flex-col items-center justify-center">
@@ -109,6 +120,10 @@
 		</h1>
 		<p class="font-neucha text-xl text-stone-600 sm:text-2xl">a case play database and play builder created by Jake Harvanchik</p>
 	</div>
+	<p class="mx-auto mt-3 max-w-3xl px-5 text-center text-sm leading-6 text-stone-600 sm:text-base">
+		Study difficult officiating situations, compare related rulings, and use the original play builder to create clear flag football diagrams for
+		training, clinics, and crew discussion.
+	</p>
 
 	<!-- START: Create Modal -->
 	{#if showCreateModal}
@@ -205,7 +220,7 @@
 			{#if filteredCasePlays && filteredCasePlays.length > 0}
 				<!-- START: Results Header -->
 				<div class="mb-2 flex flex-row items-center justify-between">
-					<span class="text-stone-600">{filteredCasePlays.length} case plays found</span>
+					<span class="text-stone-600">{data.pagination.total} case plays found</span>
 
 					<!-- START: Filter Bar -->
 					<div class="relative">
@@ -252,11 +267,28 @@
 						{#each group as casePlay}
 							<CasePlayCard {casePlay} href={`/c/${casePlay.id}${activeFilterQuery ? `?${activeFilterQuery}` : ''}`} />
 						{/each}
-						{#if groupIndex < casePlayGroups.length - 1}
+						{#if groupIndex < casePlayGroups.length - 1 && groupIndex < 2}
 							<LandingPageAd />
 						{/if}
 					{/each}
 				</div>
+				{#if data.pagination.pageCount > 1}
+					<nav class="mt-3 flex items-center justify-center gap-2 text-sm font-semibold" aria-label="Case-play pages">
+						<a
+							href={pageHref(data.pagination.currentPage - 1)}
+							aria-disabled={data.pagination.currentPage === 1}
+							class="border border-stone-400 bg-white px-3 py-1.5 hover:bg-stone-100 aria-disabled:pointer-events-none aria-disabled:opacity-40"
+							>Previous</a
+						>
+						<span>Page {data.pagination.currentPage} of {data.pagination.pageCount}</span>
+						<a
+							href={pageHref(data.pagination.currentPage + 1)}
+							aria-disabled={data.pagination.currentPage === data.pagination.pageCount}
+							class="border border-stone-400 bg-white px-3 py-1.5 hover:bg-stone-100 aria-disabled:pointer-events-none aria-disabled:opacity-40"
+							>Next</a
+						>
+					</nav>
+				{/if}
 			{:else if data?.casePlays}
 				<div>No results found for "{searchTerm}"</div>
 			{/if}
@@ -264,16 +296,5 @@
 	</section>
 	<!-- END: Search Results -->
 
-	<!-- START: Footer -->
-	<footer class="mt-auto w-full py-3 text-center text-stone-600">
-		<p class="text-sm">This database was created in 2023 by Jake Harvanchik for the purpose of training intramural officials.</p>
-		<div class="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
-			<span>&copy; {new Date().getFullYear()} caseplay.org</span>
-			<button on:click={() => (showCreateModal = true)} class="cursor-pointer font-semibold hover:underline">Contribute</button>
-			<a href="mailto:contact@caseplay.org" target="_blank" class="cursor-pointer font-semibold hover:underline">Contact</a>
-			<a href="/privacy" class="cursor-pointer font-semibold hover:underline">Privacy</a>
-			<a href="/cookie-policy" class="cursor-pointer font-semibold hover:underline">Cookies</a>
-		</div>
-	</footer>
-	<!-- END: Footer -->
+	<PublicSiteFooter context="database" />
 </main>

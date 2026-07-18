@@ -105,7 +105,7 @@
 				symbol: 'R',
 				shortcut: 'alt+r',
 				shortcutKeys: ['Alt', 'R'],
-				image: '/images/official-referee.png'
+				image: '/images/official-referee.webp'
 			},
 			{
 				id: 'official-l',
@@ -113,7 +113,7 @@
 				symbol: 'L',
 				shortcut: 'alt+l',
 				shortcutKeys: ['Alt', 'L'],
-				image: '/images/official-line-judge.png'
+				image: '/images/official-line-judge.webp'
 			},
 			{
 				id: 'official-b',
@@ -121,7 +121,7 @@
 				symbol: 'B',
 				shortcut: 'alt+b',
 				shortcutKeys: ['Alt', 'B'],
-				image: '/images/official-back-judge.png'
+				image: '/images/official-back-judge.webp'
 			},
 			{
 				id: 'official-f',
@@ -129,13 +129,13 @@
 				symbol: 'F',
 				shortcut: 'alt+f',
 				shortcutKeys: ['Alt', 'F'],
-				image: '/images/official-field-judge.png'
+				image: '/images/official-field-judge.webp'
 			}
 		],
-		[{ id: 'ball', label: 'Football', symbol: '', shortcut: 'o', shortcutKeys: ['O'], caption: 'Football', image: '/images/football.png' }],
-		[{ id: 'flag', label: 'Penalty Flag', symbol: '', shortcut: 'f', shortcutKeys: ['F'], caption: 'Penalty', image: '/images/penalty-flag.png' }],
-		[{ id: 'bean-bag', label: 'Bean Bag', symbol: '', shortcut: '', shortcutKeys: [], caption: 'Bean Bag', image: '/images/bean-bag-blue.png' }],
-		[{ id: 'deflag', label: 'Flag Belt', symbol: '', shortcut: 'l', shortcutKeys: ['L'], caption: 'Flag Belt', image: '/images/flag-belt.png' }],
+		[{ id: 'ball', label: 'Football', symbol: '', shortcut: 'o', shortcutKeys: ['O'], caption: 'Football', image: '/images/football.webp' }],
+		[{ id: 'flag', label: 'Penalty Flag', symbol: '', shortcut: 'f', shortcutKeys: ['F'], caption: 'Penalty', image: '/images/penalty-flag.webp' }],
+		[{ id: 'bean-bag', label: 'Bean Bag', symbol: '', shortcut: '', shortcutKeys: [], caption: 'Bean Bag', image: '/images/bean-bag-blue.webp' }],
+		[{ id: 'deflag', label: 'Flag Belt', symbol: '', shortcut: 'l', shortcutKeys: ['L'], caption: 'Flag Belt', image: '/images/flag-belt.webp' }],
 		[{ id: 'event', label: 'Event Tag', symbol: '', shortcut: 'e', shortcutKeys: ['E'], caption: 'Event Tag', icon: 'event' }],
 		[
 			{ id: 'run', label: 'Run Arrow', symbol: '', shortcut: 'shift+r', shortcutKeys: ['Shift', 'R'], caption: 'Run', image: '/images/run-arrow.png' }
@@ -162,7 +162,7 @@
 				icon: 'line-to-gain'
 			}
 		],
-		[{ id: 'free-draw', label: 'Free Draw', symbol: '', shortcut: 'd', shortcutKeys: ['D'], caption: 'Draw', image: '/images/draw-pen.png' }]
+		[{ id: 'free-draw', label: 'Free Draw', symbol: '', shortcut: 'd', shortcutKeys: ['D'], caption: 'Draw', image: '/images/draw-pen.webp' }]
 	];
 	const tools = toolRows.flat();
 	const helpPlayerTools = tools.filter((item) => ['team-a', 'team-k', 'team-b', 'team-r'].includes(item.id));
@@ -1356,10 +1356,10 @@
 		'official-f': 'Field Judge'
 	};
 	const officialImages: Record<OfficialKind, string> = {
-		'official-r': '/images/official-referee.png',
-		'official-l': '/images/official-line-judge.png',
-		'official-b': '/images/official-back-judge.png',
-		'official-f': '/images/official-field-judge.png'
+		'official-r': '/images/official-referee.webp',
+		'official-l': '/images/official-line-judge.webp',
+		'official-b': '/images/official-back-judge.webp',
+		'official-f': '/images/official-field-judge.webp'
 	};
 	const isMarkerTool = (value: Tool): value is MarkerKind =>
 		[...playerKinds, ...officialKinds, 'ball', 'flag', 'bean-bag', 'deflag', 'event'].includes(value as MarkerKind);
@@ -1455,7 +1455,7 @@
 	const toolbarArrowDash = (style: GuideStyle) => (style === 'dashed' ? '4 2.5' : style === 'dotted' ? '1 3' : undefined);
 	const deflagColors = freeDrawColors.filter((option) => !['white', 'gray', 'black'].includes(option.id));
 	const deflagImage = (color: GuideColor | undefined) =>
-		color && color !== 'red' && deflagColors.some((option) => option.id === color) ? `/images/flag-belt-${color}.png` : '/images/flag-belt.png';
+		color && color !== 'red' && deflagColors.some((option) => option.id === color) ? `/images/flag-belt-${color}.webp` : '/images/flag-belt.webp';
 	const beanBagColors: { id: GuideColor; label: string; value: string }[] = [
 		{ id: 'blue', label: 'Blue', value: '#1257d6' },
 		{ id: 'white', label: 'White', value: '#ffffff' },
@@ -1463,7 +1463,7 @@
 		{ id: 'pink', label: 'Breast Cancer Pink', value: '#f06292' }
 	];
 	const beanBagImage = (color: GuideColor | undefined) =>
-		`/images/bean-bag-${color === 'white' || color === 'black' || color === 'pink' ? color : 'blue'}.png`;
+		`/images/bean-bag-${color === 'white' || color === 'black' || color === 'pink' ? color : 'blue'}.webp`;
 	const eventWidth = (label = 'EVENT') => Math.max(eventTagWidth, Math.min(154, label.length * 6.6 + 16));
 	const penaltyLabelLines = (label = '') => {
 		const maxCharacters = 12;
@@ -3758,6 +3758,7 @@
 											class:!w-7={item.id === 'free-draw'}
 											class:invert={item.id === 'free-draw' && tool === item.id}
 											draggable="false"
+											decoding="async"
 										/>
 									{:else if item.icon === 'event'}
 										<svg viewBox="0 0 24 24" class="h-7 w-7" aria-hidden="true">
@@ -4076,7 +4077,7 @@
 							on:click={() => runGuardedAction(clear)}
 							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-35"
 						>
-							<img src="/images/trash-can.png" alt="" class="h-4 w-4 object-contain" draggable="false" />
+							<img src="/images/trash-can.webp" alt="" class="h-4 w-4 object-contain" draggable="false" loading="lazy" />
 							<span class="text-[8px] leading-none font-semibold">Clear All</span>
 						</button>
 					</HoverTooltip>
@@ -4849,7 +4850,7 @@
 							/>
 						{:else if tool === 'ball'}
 							<image
-								href="/images/football.png"
+								href="/images/football.webp"
 								x={(placementSnapX ?? hoverPoint.x) - footballSize / 2}
 								y={hoverPoint.y - footballSize / 2}
 								width={footballSize}
@@ -4869,7 +4870,7 @@
 							/>
 						{:else if tool === 'flag'}
 							<image
-								href="/images/penalty-flag.png"
+								href="/images/penalty-flag.webp"
 								x={hoverPoint.x - foulFlagSize / 2}
 								y={hoverPoint.y - foulFlagSize / 2}
 								width={foulFlagSize}
@@ -5295,7 +5296,7 @@
 								/>
 							{:else if marker.kind === 'ball'}
 								<image
-									href="/images/football.png"
+									href="/images/football.webp"
 									x={marker.x - footballSize / 2}
 									y={marker.y - footballSize / 2}
 									width={footballSize}
@@ -5336,7 +5337,7 @@
 								>
 							{:else}
 								<image
-									href="/images/penalty-flag.png"
+									href="/images/penalty-flag.webp"
 									x={marker.x - foulFlagSize / 2}
 									y={marker.y - foulFlagSize / 2}
 									width={foulFlagSize}
@@ -5732,7 +5733,7 @@
 						style:left={`${deletePosition.x / 10}%`}
 						style:top={`${(deletePosition.y / 484) * 100}%`}
 					>
-						<img src="/images/trash-can.png" alt="" class="h-4 w-4 object-contain invert" draggable="false" />
+						<img src="/images/trash-can.webp" alt="" class="h-4 w-4 object-contain invert" draggable="false" loading="lazy" />
 					</button>
 				{/if}
 			</div>
@@ -5804,6 +5805,8 @@
 						alt=""
 						class="h-9 w-9 object-contain"
 						draggable="false"
+						loading="lazy"
+						decoding="async"
 					/>
 				</div>
 			{:else if item.icon === 'event'}

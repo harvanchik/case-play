@@ -1,20 +1,22 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import PublicSiteFooter from '$lib/components/PublicSiteFooter.svelte';
+	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
 
 	export let data: PageData;
 </script>
 
 <svelte:head>
-	<title>Playlists</title>
-	<meta name="description" content="Sports case play database for referee education" />
-	<meta
-		name="keywords"
-		content="case,play,plays,db,database,sports,intramural,extramural,official,referee,education,learning,training,flag,tackle,football,basketball,baseball,soccer,volleyball,ice,roller,hockey,flash,cards,coach,player,umpire,ref,ump,zebra,stripes,whistle,rule,rules,interpretation,rule book,edition,spoiler,tool"
-	/>
+	<title>Officiating Case-Play Playlists | caseplay.org</title>
+	<meta name="description" content="Browse curated playlists of related officiating case plays for training sessions, clinics, and rules study." />
 	<meta name="author" content="Jake Harvanchik" />
+	<meta property="og:title" content="Officiating Case-Play Playlists" />
+	<meta property="og:description" content="Browse curated groups of related case plays for officiating education." />
+	<meta property="og:type" content="website" />
 </svelte:head>
 
 <main class="min-h-screen overflow-hidden bg-stone-100/[97%]">
+	<PublicSiteNav />
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 	<section id="search">
 		<div class="mt-10 flex flex-col space-y-3 sm:mt-16">
@@ -66,4 +68,5 @@
 			{/if}
 		</div>
 	</section>
+	<PublicSiteFooter />
 </main>

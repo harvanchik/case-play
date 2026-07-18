@@ -2,8 +2,6 @@
 	import { onMount } from 'svelte';
 	import {
 		ADSENSE_PUBLISHER_ID,
-		CONSENT_EVENT,
-		canLoadAdvertising,
 		loadAdSense
 	} from '$lib/privacy/consent';
 
@@ -14,13 +12,11 @@
 		adsbygoogle?: Record<string, never>[];
 	};
 
-	let advertisingAllowed = false;
 	let initialized = false;
 	let layoutMatches = false;
 
 	const initializeAd = async () => {
-		advertisingAllowed = canLoadAdvertising();
-		if (!advertisingAllowed || !layoutMatches || initialized) return;
+		if (!layoutMatches || initialized) return;
 		initialized = true;
 		try {
 			await loadAdSense();
@@ -39,15 +35,9 @@
 			if (layoutMatches) initializeAd();
 		};
 		updateLayoutMatch();
-		const consentChanged = () => {
-			advertisingAllowed = canLoadAdvertising();
-			if (advertisingAllowed) initializeAd();
-		};
 		desktopLayout.addEventListener('change', updateLayoutMatch);
-		window.addEventListener(CONSENT_EVENT, consentChanged);
 		return () => {
 			desktopLayout.removeEventListener('change', updateLayoutMatch);
-			window.removeEventListener(CONSENT_EVENT, consentChanged);
 		};
 	});
 </script>
@@ -59,18 +49,12 @@
 	aria-label="Advertisement"
 >
 	<span class="h-4 shrink-0 px-1 text-[9px] font-semibold uppercase leading-4 tracking-wide text-stone-500">Advertisement</span>
-	{#if advertisingAllowed}
-		<ins
-			class="adsbygoogle block min-h-0 w-full flex-1"
-			style="display: block;"
-			data-ad-client={ADSENSE_PUBLISHER_ID}
-			data-ad-slot={adSlot}
-			data-ad-format={orientation}
-			data-full-width-responsive="true"
-		></ins>
-	{:else}
-		<div class="flex flex-1 items-center justify-center p-4 text-center text-xs text-stone-500">
-			<p>Choose your advertising privacy preference to continue.</p>
-		</div>
-	{/if}
+	<ins
+		class="adsbygoogle block min-h-0 w-full flex-1"
+		style="display: block;"
+		data-ad-client={ADSENSE_PUBLISHER_ID}
+		data-ad-slot={adSlot}
+		data-ad-format={orientation}
+		data-full-width-responsive="true"
+	></ins>
 </aside>

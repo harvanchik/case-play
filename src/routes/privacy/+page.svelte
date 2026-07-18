@@ -1,13 +1,19 @@
 <script lang="ts">
-	import { openConsentChoices } from '$lib/privacy/consent';
+	import { openAdPrivacyChoices, openConsentChoices } from '$lib/privacy/consent';
+	import PublicSiteFooter from '$lib/components/PublicSiteFooter.svelte';
+	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
 </script>
 
 <svelte:head>
 	<title>Privacy Policy | caseplay.org</title>
 	<meta name="description" content="The caseplay.org privacy policy." />
+	<meta property="og:title" content="Privacy Policy | caseplay.org" />
+	<meta property="og:description" content="How caseplay.org handles saved play data, advertising choices, analytics, and privacy requests." />
+	<meta property="og:type" content="website" />
 </svelte:head>
 
 <main class="min-h-screen bg-stone-100 px-4 py-10 text-stone-800">
+	<div class="-mx-4 -mt-10 mb-8"><PublicSiteNav /></div>
 	<article class="mx-auto max-w-3xl border-2 border-stone-900 bg-white p-6 sm:p-10">
 		<a href="/" class="font-semibold underline">&larr; caseplay.org</a>
 		<h1 class="mt-5 text-3xl font-bold">Privacy Policy</h1>
@@ -24,20 +30,20 @@
 
 		<h2 class="mt-7 text-xl font-bold">Advertising</h2>
 		<p class="mt-2 leading-7">
-			Google AdSense ads fund the domain, hosting, and database. If you choose Accept All, Google and approved partners may use advertising cookies
-			and activity data for personalization and measurement. If you choose Essential Only or enable Global Privacy Control, Caseplay denies
-			personalization signals and requests generic ads instead. Generic and limited ad delivery may still process technical data such as IP address
-			and use narrowly scoped storage for delivery, aggregate reporting, security, and fraud prevention. See the
+			Google AdSense ads help fund the domain, hosting, and database. Google Privacy &amp; Messaging, a Google-certified consent management platform,
+			presents advertising choices where required. Depending on your location and choices, Google and approved partners may use cookies and activity
+			data for personalized advertising and measurement, or may serve non-personalized or limited ads. Technical data may still be processed for ad
+			delivery, aggregate reporting, security, and fraud prevention. See the
 			<a class="font-semibold underline" href="/cookie-policy">Cookie Policy</a> and
 			<a class="font-semibold underline" href="https://policies.google.com/privacy" rel="noreferrer" target="_blank">Google Privacy Policy</a>.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Analytics</h2>
 		<p class="mt-2 leading-7">
-			Google Analytics loads only after you choose <strong>Accept All</strong>. It records aggregate usage such as pages visited, visit duration,
-			approximate region, referring source, and device or browser type. It does not load after <strong>Essential Only</strong> or when Global Privacy Control
-			is enabled. Caseplay disables Google signals and advertising personalization signals for Analytics and does not send saved play content or player
-			labels to Analytics.
+			Google Analytics loads only after you choose <strong>Allow Analytics</strong>. It records aggregate usage such as pages visited, visit duration,
+			approximate region, referring source, and device or browser type. It does not load after <strong>No Analytics</strong> or when Global Privacy Control
+			is enabled. Caseplay disables Google signals and advertising-personalization signals for Analytics and does not send saved play content or player
+			labels to Analytics. The Analytics choice is separate from advertising consent.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Sharing and your rights</h2>
@@ -47,8 +53,14 @@
 			personalized advertising, sale, or sharing. Contact
 			<a class="font-semibold underline" href="mailto:contact@caseplay.org">contact@caseplay.org</a>.
 		</p>
-		<button class="mt-4 cursor-pointer border-2 border-stone-900 bg-stone-900 px-4 py-2 font-bold text-white" on:click={openConsentChoices}>
-			Review Privacy Choices
-		</button>
+		<div class="mt-4 flex flex-wrap gap-2">
+			<button class="cursor-pointer border-2 border-stone-900 bg-stone-900 px-4 py-2 font-bold text-white" on:click={openAdPrivacyChoices}>
+				Advertising Choices
+			</button>
+			<button class="cursor-pointer border-2 border-stone-900 bg-white px-4 py-2 font-bold text-stone-900" on:click={openConsentChoices}>
+				Analytics Choices
+			</button>
+		</div>
 	</article>
+	<PublicSiteFooter />
 </main>

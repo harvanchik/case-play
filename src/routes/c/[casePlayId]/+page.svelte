@@ -7,6 +7,8 @@
 	import CasePlayCard from '$lib/components/CasePlayCard.svelte';
 	import FlagFootballPlayBuilder from '$lib/components/FlagFootballPlayBuilder.svelte';
 	import youtubeIcon from '$lib/svg/youtube.svg';
+	import PublicSiteFooter from '$lib/components/PublicSiteFooter.svelte';
+	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
 
 	export let data: PageData;
 
@@ -26,6 +28,15 @@
 		data.casePlay?.ruleReference ? `Rule ${data.casePlay.ruleReference}` : null,
 		data.casePlay?.pageNumber ? `Page ${data.casePlay.pageNumber}` : null
 	].filter((item): item is string => Boolean(item));
+	$: caseDescription = (data.casePlay?.prompt ?? 'Study this flag football officiating case play on caseplay.org').replace(/\s+/g, ' ').trim().slice(0, 158);
+	$: breadcrumbData = JSON.stringify({
+		'@context': 'https://schema.org',
+		'@type': 'BreadcrumbList',
+		itemListElement: [
+			{ '@type': 'ListItem', position: 1, name: 'Case Plays', item: 'https://caseplay.org/' },
+			{ '@type': 'ListItem', position: 2, name: data.casePlay?.title ?? 'Case Play', item: `https://caseplay.org/c/${data.casePlay?.id ?? ''}` }
+		]
+	}).replace(/</g, '\\u003c');
 	onMount(() => {
 		const instance = new Mark('main');
 		const highlightExcludes = ['h1', 'h2', '.play-builder', '.play-builder *', '.similar-case-plays', '.similar-case-plays *'];
@@ -95,20 +106,21 @@
 
 <svelte:head>
 	<title>{data.casePlay?.title}</title>
-	<meta name="description" content="Sports case play database for referee education" />
-	<meta
-		name="keywords"
-		content="case,play,plays,db,database,sports,intramural,extramural,official,referee,education,learning,training,flag,tackle,football,basketball,baseball,soccer,volleyball,ice,roller,hockey,flash,cards,coach,player,umpire,ref,ump,zebra,stripes,whistle,rule,rules,interpretation,rule book,edition,spoiler,tool"
-	/>
+	<meta name="description" content={caseDescription} />
 	<meta name="author" content="Jake Harvanchik" />
+	<meta property="og:title" content={data.casePlay?.title ?? 'Flag Football Case Play'} />
+	<meta property="og:description" content={caseDescription} />
+	<meta property="og:type" content="article" />
+	{@html `<script type="application/ld+json">${breadcrumbData}<\/script>`}
 </svelte:head>
 
 <main class="min-h-screen overflow-hidden bg-stone-100/[97%]">
+	<PublicSiteNav compact />
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 
 	<a
 		href={data.backHref}
-		class="absolute top-5 left-10 flex cursor-pointer flex-row items-center space-x-1 text-stone-600 transition-colors duration-200 hover:text-stone-900"
+		class="absolute top-12 left-10 flex cursor-pointer flex-row items-center space-x-1 text-stone-600 transition-colors duration-200 hover:text-stone-900"
 	>
 		<span class="text-xl font-bold">&larr;</span>
 		<span class="text-lg font-semibold">Back</span>
@@ -141,6 +153,9 @@
 				{/each}
 			</h2>
 		{/if}
+		<p class="mx-auto -mt-1 mb-3 max-w-[90%] text-center text-xs text-stone-500">
+			Source references support rules study and verification. Caseplay.org is independently operated and is not affiliated with or endorsed by NIRSA.
+		</p>
 
 		<div class="mx-auto grid w-full max-w-[90rem] gap-8 px-3 pb-12 xl:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] xl:gap-10">
 			<section class="min-w-0 text-lg leading-[1.425]">
@@ -250,4 +265,5 @@
 			</div>
 		</div>
 	</div>
+	<PublicSiteFooter />
 </main>

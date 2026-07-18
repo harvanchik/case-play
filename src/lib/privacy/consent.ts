@@ -10,8 +10,10 @@ export const ANALYTICS_MEASUREMENT_ID = 'G-XSBHT3M6GY';
 
 type ConsentWindow = Window & {
 	dataLayer?: unknown[];
-	adsbygoogle?: Record<string, unknown>[] & {
-		requestNonPersonalizedAds?: 0 | 1;
+	adsbygoogle?: Record<string, unknown>[];
+	googlefc?: {
+		callbackQueue?: Array<() => void>;
+		showRevocationMessage?: () => void;
 	};
 };
 
@@ -40,18 +42,12 @@ export const readConsent = (): ConsentChoice | null => {
 export const initializeConsentMode = () => {
 	if (typeof window === 'undefined') return;
 	gtag('consent', 'default', {
-		ad_storage: 'denied',
-		ad_user_data: 'denied',
-		ad_personalization: 'denied',
 		analytics_storage: 'denied',
 		wait_for_update: 500
 	});
 
 	if (readConsent() === 'all' && !hasGlobalPrivacyControl()) {
 		gtag('consent', 'update', {
-			ad_storage: 'granted',
-			ad_user_data: 'granted',
-			ad_personalization: 'granted',
 			analytics_storage: 'granted'
 		});
 	} else {
@@ -89,9 +85,6 @@ export const saveConsent = (choice: ConsentChoice) => {
 
 	const granted = effectiveChoice === 'all' ? 'granted' : 'denied';
 	gtag('consent', 'update', {
-		ad_storage: granted,
-		ad_user_data: granted,
-		ad_personalization: granted,
 		analytics_storage: granted
 	});
 	if (effectiveChoice === 'essential') clearGoogleAnalyticsCookies();
@@ -102,7 +95,15 @@ export const openConsentChoices = () => {
 	if (typeof window !== 'undefined') window.dispatchEvent(new Event(OPEN_CONSENT_EVENT));
 };
 
-export const canLoadAdvertising = () => readConsent() !== null;
+export const openAdPrivacyChoices = () => {
+	if (typeof window === 'undefined') return;
+	const consentWindow = window as ConsentWindow;
+	const googlefc = (consentWindow.googlefc ??= {});
+	const callbackQueue = (googlefc.callbackQueue ??= []);
+	if (googlefc.showRevocationMessage) callbackQueue.push(googlefc.showRevocationMessage);
+};
+
+export const canLoadAdvertising = () => typeof window !== 'undefined';
 export const canLoadAnalytics = () => readConsent() === 'all' && !hasGlobalPrivacyControl();
 
 export const loadGoogleAnalytics = () => {
@@ -161,15 +162,8 @@ export const trackGoogleAnalyticsPageView = async (url: URL) => {
 	});
 };
 
-const configureAdPersonalization = () => {
-	const consentWindow = window as ConsentWindow;
-	const adsByGoogle = (consentWindow.adsbygoogle ??= []);
-	adsByGoogle.requestNonPersonalizedAds = readConsent() === 'all' && !hasGlobalPrivacyControl() ? 0 : 1;
-};
-
 export const loadAdSense = () => {
 	if (typeof window === 'undefined' || !canLoadAdvertising()) return Promise.resolve();
-	configureAdPersonalization();
 	if (adsenseLoadPromise) return adsenseLoadPromise;
 
 	adsenseLoadPromise = new Promise<void>((resolve, reject) => {
