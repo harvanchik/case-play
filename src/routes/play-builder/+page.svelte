@@ -17,9 +17,10 @@
 		style="min-height: calc(100vh - 2rem);"
 	>
 		<div class="flex min-w-0 items-center justify-start">
-			<div class="min-w-0 lg:relative" style="width: min(100%, calc((100vh - 4rem) * 2.1));">
+			<div class="min-w-0 lg:relative" style="width: min(100%, calc((100vh - 4rem) * 2.1)); container-type: inline-size;">
 				<h1
-					class="font-dokdo pb-1 text-center text-[4rem] font-semibold tracking-[0.04em] text-stone-800 uppercase select-none text-shadow-md sm:text-[4.25rem] lg:absolute lg:inset-x-0 lg:bottom-full"
+					class="font-dokdo pb-1 text-center leading-none font-semibold tracking-[0.04em] whitespace-nowrap text-stone-800 uppercase select-none text-shadow-md lg:absolute lg:inset-x-0 lg:bottom-full"
+					style="font-size: clamp(1.25rem, 6cqw, 4.25rem);"
 				>
 					Flag Football Play Builder
 				</h1>
@@ -31,6 +32,9 @@
 		</div>
 		<div class="flex min-w-0 items-center justify-center">
 			<PlayBuilderAd />
+		</div>
+		<div class="w-full lg:hidden">
+			<PlayBuilderAd orientation="horizontal" />
 		</div>
 	</div>
 </main>
