@@ -1,9 +1,11 @@
 export type PlayerKind = 'team-a' | 'team-k' | 'team-b' | 'team-r';
-export type MarkerKind = PlayerKind | 'ball' | 'flag' | 'deflag' | 'event';
+export type OfficialKind = 'official-r' | 'official-l' | 'official-b' | 'official-f';
+export type MarkerKind = PlayerKind | OfficialKind | 'ball' | 'flag' | 'bean-bag' | 'deflag' | 'event';
 export type PathKind = 'line' | 'run' | 'pass' | 'kick';
 export type GuideKind = 'line-of-scrimmage' | 'line-to-gain' | 'custom';
-export type GuideColor = 'orange' | 'gold' | 'yellow' | 'red' | 'cyan' | 'blue' | 'green' | 'purple' | 'black' | 'white' | 'gray';
+export type GuideColor = 'orange' | 'gold' | 'yellow' | 'red' | 'cyan' | 'blue' | 'green' | 'purple' | 'black' | 'white' | 'gray' | 'pink';
 export type GuideStyle = 'solid' | 'dashed' | 'dotted';
+export type DownMarkerValue = '1st' | '2nd' | '3rd' | '4th' | 'pat';
 export type PlayBuilderFieldType = 'traditional' | 'four-v-four' | 'unified';
 export type PlayBuilderFieldColor = 'green' | 'red' | 'navy' | 'light-blue' | 'orange' | 'purple';
 export type PlayBuilderFieldSettings = {
@@ -18,13 +20,16 @@ export type PlayBuilderFieldSettings = {
 	showThirtyYardMarker: boolean;
 	showNoRunZoneText: boolean;
 	showTeamBoxes: boolean;
+	showDownMarker: boolean;
+	teamBoxTopLabel: string;
+	teamBoxBottomLabel: string;
 	fieldType: PlayBuilderFieldType;
 	fieldColor: PlayBuilderFieldColor;
 };
 export type Point = { x: number; y: number };
 export type FieldMarker = Point & { id: number; kind: MarkerKind; label?: string; sequence?: number; color?: GuideColor };
 export type FieldPath = { id: number; kind: PathKind; start: Point; end: Point; color: GuideColor; style: GuideStyle; startMarkerId?: number };
-export type FieldGuide = { id: number; kind: GuideKind; x: number; color: GuideColor; style: GuideStyle };
+export type FieldGuide = { id: number; kind: GuideKind; x: number; color: GuideColor; style: GuideStyle; down?: DownMarkerValue };
 export type FreeStroke = { id: number; color: GuideColor; points: Point[]; width?: number };
 export type LayerType = 'guide' | 'path' | 'marker';
 export type LayerRef = { type: LayerType; id: number };
@@ -36,11 +41,28 @@ export type PlayBuilderScene = {
 	layerOrder: LayerRef[];
 };
 
-const markerKinds: MarkerKind[] = ['team-a', 'team-k', 'team-b', 'team-r', 'ball', 'flag', 'deflag', 'event'];
+// New marker kinds must be appended so existing compact marker indexes remain backward compatible.
+const markerKinds: MarkerKind[] = [
+	'team-a',
+	'team-k',
+	'team-b',
+	'team-r',
+	'ball',
+	'flag',
+	'deflag',
+	'event',
+	'official-r',
+	'official-l',
+	'official-b',
+	'official-f',
+	'bean-bag'
+];
 const pathKinds: PathKind[] = ['line', 'run', 'pass', 'kick'];
 const guideKinds: GuideKind[] = ['line-of-scrimmage', 'line-to-gain', 'custom'];
-const colors: GuideColor[] = ['orange', 'gold', 'yellow', 'red', 'cyan', 'blue', 'green', 'purple', 'black', 'white', 'gray'];
+// New colors must be appended so existing compact color indexes remain backward compatible.
+const colors: GuideColor[] = ['orange', 'gold', 'yellow', 'red', 'cyan', 'blue', 'green', 'purple', 'black', 'white', 'gray', 'pink'];
 const styles: GuideStyle[] = ['solid', 'dashed', 'dotted'];
+const downMarkerValues: DownMarkerValue[] = ['1st', '2nd', '3rd', '4th', 'pat'];
 const layerTypes: LayerType[] = ['guide', 'path', 'marker'];
 const fieldTypes: PlayBuilderFieldType[] = ['traditional', 'four-v-four', 'unified'];
 const fieldColors: PlayBuilderFieldColor[] = ['green', 'red', 'navy', 'light-blue', 'orange', 'purple'];
@@ -55,22 +77,24 @@ const fieldSettingKeys = [
 	'showFourteenYardX',
 	'showThirtyYardMarker',
 	'showTeamBoxes',
-	'showNoRunZoneText'
+	'showNoRunZoneText',
+	'showDownMarker'
 ] as const;
 
 type LegacyMarkerTuple = [number, number, number, number, string | null, number | null];
 type MarkerTuple = [number, number, number, number, string | null, number | null, number | null];
 type PathTuple = [number, number, number, number, number, number, number, number, number | null];
-type GuideTuple = [number, number, number, number, number];
+type LegacyGuideTuple = [number, number, number, number, number];
+type GuideTuple = [number, number, number, number, number, number | null];
 type LegacyStrokeTuple = [number, number, number[]];
 type StrokeTuple = [number, number, number, number[]];
-type FieldSettingsTuple = [number, number, number];
+type FieldSettingsTuple = [number, number, number, string?, string?];
 
 export type SerializedPlayBuilderScene = {
 	v: 1;
 	m: (LegacyMarkerTuple | MarkerTuple)[];
 	p: PathTuple[];
-	g: GuideTuple[];
+	g: (LegacyGuideTuple | GuideTuple)[];
 	f: (LegacyStrokeTuple | StrokeTuple)[];
 	o?: [number, number][];
 };
@@ -81,7 +105,8 @@ export type PlayBuilderDocument = {
 };
 
 export const PLAY_BUILDER_PLAY_NAME_MAX_LENGTH = 64;
-export const PLAY_BUILDER_MAX_PLAYS = 4;
+export const PLAY_BUILDER_TEAM_BOX_LABEL_MAX_LENGTH = 32;
+export const PLAY_BUILDER_MAX_PLAYS = 10;
 
 export const DEFAULT_PLAY_BUILDER_FIELD_SETTINGS: Readonly<PlayBuilderFieldSettings> = {
 	showYardNumbers: true,
@@ -95,6 +120,9 @@ export const DEFAULT_PLAY_BUILDER_FIELD_SETTINGS: Readonly<PlayBuilderFieldSetti
 	showThirtyYardMarker: true,
 	showNoRunZoneText: false,
 	showTeamBoxes: true,
+	showDownMarker: true,
+	teamBoxTopLabel: 'TEAM BOX',
+	teamBoxBottomLabel: 'TEAM BOX',
 	fieldType: 'traditional',
 	fieldColor: 'green'
 };
@@ -113,7 +141,13 @@ type SerializedPlayBuilderDocumentV3 = {
 	p: [string, SerializedPlayBuilderScene, FieldSettingsTuple][];
 };
 
-export type SerializedPlayBuilderDocument = SerializedPlayBuilderDocumentV2 | SerializedPlayBuilderDocumentV3;
+type SerializedPlayBuilderDocumentV4 = {
+	v: 4;
+	a: number;
+	p: [string, SerializedPlayBuilderScene, FieldSettingsTuple][];
+};
+
+export type SerializedPlayBuilderDocument = SerializedPlayBuilderDocumentV2 | SerializedPlayBuilderDocumentV3 | SerializedPlayBuilderDocumentV4;
 
 const quantize = (value: number) => Math.round(value * 10);
 const dequantize = (value: number) => value / 10;
@@ -146,7 +180,8 @@ export const encodePlayBuilderScene = (scene: PlayBuilderScene): SerializedPlayB
 		indexOf(guideKinds, guide.kind),
 		quantize(guide.x),
 		indexOf(colors, guide.color),
-		indexOf(styles, guide.style)
+		indexOf(styles, guide.style),
+		guide.kind === 'line-to-gain' ? indexOf(downMarkerValues, guide.down ?? '1st') : null
 	]),
 	f: scene.freeStrokes.map((stroke) => {
 		const points: number[] = [];
@@ -226,20 +261,32 @@ export const decodePlayBuilderScene = (value: unknown): PlayBuilderScene => {
 			...(item[8] === null ? {} : { startMarkerId: item[8] })
 		};
 	});
-	const guides = scene.g.map((item) => {
+	let guides = scene.g.map((item) => {
 		if (
 			!Array.isArray(item) ||
-			item.length !== 5 ||
+			(item.length !== 5 && item.length !== 6) ||
 			!validInteger(item[0]) ||
 			!validIndex(item[1], guideKinds.length) ||
 			!validCoordinate(item[2]) ||
 			!validIndex(item[3], colors.length) ||
-			!validIndex(item[4], styles.length)
+			!validIndex(item[4], styles.length) ||
+			(item.length === 6 && item[5] !== null && !validIndex(item[5], downMarkerValues.length))
 		) {
 			throw new Error('Invalid guide data.');
 		}
-		return { id: item[0], kind: guideKinds[item[1]], x: dequantize(item[2]), color: colors[item[3]], style: styles[item[4]] };
+		const kind = guideKinds[item[1]];
+		return {
+			id: item[0],
+			kind,
+			x: dequantize(item[2]),
+			color: colors[item[3]],
+			style: styles[item[4]],
+			down: kind === 'line-to-gain' && item.length === 6 && item[5] !== null ? downMarkerValues[item[5]] : kind === 'line-to-gain' ? '1st' : undefined
+		};
 	});
+	const latestLineToGainId = guides.filter((guide) => guide.kind === 'line-to-gain').at(-1)?.id;
+	if (latestLineToGainId !== undefined)
+		guides = guides.filter((guide) => guide.kind !== 'line-to-gain' || guide.id === latestLineToGainId);
 	let pointCount = 0;
 	const freeStrokes = scene.f.map((item) => {
 		const pointDataIndex = item.length === 4 ? 3 : 2;
@@ -300,32 +347,41 @@ export const decodePlayBuilderScene = (value: unknown): PlayBuilderScene => {
 const encodeFieldSettings = (settings: PlayBuilderFieldSettings): FieldSettingsTuple => [
 	fieldSettingKeys.reduce((mask, key, index) => mask | (settings[key] ? 1 << index : 0), 0),
 	indexOf(fieldTypes, settings.fieldType),
-	indexOf(fieldColors, settings.fieldColor)
+	indexOf(fieldColors, settings.fieldColor),
+	settings.teamBoxTopLabel,
+	settings.teamBoxBottomLabel
 ];
 
-const decodeFieldSettings = (value: unknown): PlayBuilderFieldSettings => {
+const decodeFieldSettings = (value: unknown, includesDownMarkerSetting: boolean): PlayBuilderFieldSettings => {
 	if (
 		!Array.isArray(value) ||
-		value.length !== 3 ||
+		(value.length !== 3 && value.length !== 4 && value.length !== 5) ||
 		!validInteger(value[0]) ||
 		Number(value[0]) < 0 ||
 		Number(value[0]) >= 1 << fieldSettingKeys.length ||
 		!validIndex(value[1], fieldTypes.length) ||
-		!validIndex(value[2], fieldColors.length)
+		!validIndex(value[2], fieldColors.length) ||
+		(value.length >= 4 && (typeof value[3] !== 'string' || value[3].trim().length < 1 || value[3].trim().length > PLAY_BUILDER_TEAM_BOX_LABEL_MAX_LENGTH)) ||
+		(value.length === 5 && (typeof value[4] !== 'string' || value[4].trim().length < 1 || value[4].trim().length > PLAY_BUILDER_TEAM_BOX_LABEL_MAX_LENGTH))
 	) {
 		throw new Error('Invalid field settings.');
 	}
 	const settings = defaultPlayBuilderFieldSettings();
 	fieldSettingKeys.forEach((key, index) => {
+		if (key === 'showDownMarker' && !includesDownMarkerSetting) return;
 		settings[key] = (Number(value[0]) & (1 << index)) !== 0;
 	});
 	settings.fieldType = fieldTypes[Number(value[1])];
 	settings.fieldColor = fieldColors[Number(value[2])];
+	if (value.length >= 4) {
+		settings.teamBoxTopLabel = String(value[3]).trim();
+		settings.teamBoxBottomLabel = value.length === 5 ? String(value[4]).trim() : settings.teamBoxTopLabel;
+	}
 	return settings;
 };
 
 export const encodePlayBuilderDocument = (document: PlayBuilderDocument): SerializedPlayBuilderDocument => ({
-	v: 3,
+	v: 4,
 	a: document.activePlayIndex,
 	p: document.plays.map((play) => [play.name, encodePlayBuilderScene(play.scene), encodeFieldSettings(play.settings)])
 });
@@ -337,7 +393,7 @@ export const decodePlayBuilderDocument = (value: unknown): PlayBuilderDocument =
 	if (!value || typeof value !== 'object') throw new Error('Invalid play builder document.');
 	const document = value as Partial<SerializedPlayBuilderDocument>;
 	if (
-		(document.v !== 2 && document.v !== 3) ||
+		(document.v !== 2 && document.v !== 3 && document.v !== 4) ||
 		!Number.isInteger(document.a) ||
 		!Array.isArray(document.p) ||
 		document.p.length < 1 ||
@@ -347,7 +403,7 @@ export const decodePlayBuilderDocument = (value: unknown): PlayBuilderDocument =
 	}
 	if (Number(document.a) < 0 || Number(document.a) >= document.p.length) throw new Error('Invalid active play.');
 	const plays = document.p.map((item) => {
-		const expectedLength = document.v === 3 ? 3 : 2;
+		const expectedLength = document.v === 2 ? 2 : 3;
 		if (!Array.isArray(item) || item.length !== expectedLength || typeof item[0] !== 'string') throw new Error('Invalid play data.');
 		const name = item[0].trim();
 		if (name.length < 1 || name.length > PLAY_BUILDER_PLAY_NAME_MAX_LENGTH)
@@ -355,7 +411,7 @@ export const decodePlayBuilderDocument = (value: unknown): PlayBuilderDocument =
 		return {
 			name,
 			scene: decodePlayBuilderScene(item[1]),
-			settings: document.v === 3 ? decodeFieldSettings(item[2]) : defaultPlayBuilderFieldSettings()
+			settings: document.v === 2 ? defaultPlayBuilderFieldSettings() : decodeFieldSettings(item[2], document.v === 4)
 		};
 	});
 	return { activePlayIndex: Number(document.a), plays };

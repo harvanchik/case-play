@@ -46,7 +46,8 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@sveltejs/vite-plugin-svelte": "6.2.1"
+		"@sveltejs/vite-plugin-svelte": "6.2.1",
+		"driver.js": "^1.7.0"
 	},
 	"pnpm": {
 		"onlyBuiltDependencies": [

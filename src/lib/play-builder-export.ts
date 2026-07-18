@@ -32,18 +32,18 @@ const unionBounds = (bounds: ExportBounds, next: DOMRect): ExportBounds => {
 	return { x, y, width: right - x, height: bottom - y };
 };
 
-const exportBounds = (source: SVGSVGElement, pdfOutlines: boolean): ExportBounds => {
+const exportBounds = (source: SVGSVGElement, pdfOutlines: boolean, paddingOverride?: number): ExportBounds => {
 	const field = source.querySelector<SVGGraphicsElement>('[data-export-field-boundary]');
 	const viewBox = source.viewBox.baseVal;
 	let bounds: ExportBounds = field
 		? field.getBBox()
 		: { x: viewBox.x, y: viewBox.y, width: viewBox.width, height: viewBox.height };
-	const optionalBounds = source.querySelectorAll<SVGGraphicsElement>('[data-export-team-box], [data-field-fixtures-layer]');
+	const optionalBounds = source.querySelectorAll<SVGGraphicsElement>('[data-export-team-box], [data-field-fixtures-layer], [data-export-down-marker]');
 	for (const element of optionalBounds) {
 		const next = element.getBBox();
 		if (next.width > 0 && next.height > 0) bounds = unionBounds(bounds, next);
 	}
-	const padding = pdfOutlines ? 11 : 5;
+	const padding = paddingOverride ?? (pdfOutlines ? 11 : 5);
 	return {
 		x: bounds.x - padding,
 		y: bounds.y - padding,
@@ -52,8 +52,23 @@ const exportBounds = (source: SVGSVGElement, pdfOutlines: boolean): ExportBounds
 	};
 };
 
-export const renderPlayBuilderCanvas = async (source: SVGSVGElement, { pdfOutlines = false }: { pdfOutlines?: boolean } = {}) => {
-	const bounds = exportBounds(source, pdfOutlines);
+export const renderPlayBuilderCanvas = async (
+	source: SVGSVGElement,
+	{
+		pdfOutlines = false,
+		padding,
+		backgroundColor,
+		stripedBackground = false,
+		fieldBorderColor
+	}: {
+		pdfOutlines?: boolean;
+		padding?: number;
+		backgroundColor?: string;
+		stripedBackground?: boolean;
+		fieldBorderColor?: string;
+	} = {}
+) => {
+	const bounds = exportBounds(source, pdfOutlines, padding);
 	const outputScale = 2;
 	const outputWidth = Math.ceil(bounds.width * outputScale);
 	const outputHeight = Math.ceil(bounds.height * outputScale);
@@ -63,8 +78,33 @@ export const renderPlayBuilderCanvas = async (source: SVGSVGElement, { pdfOutlin
 	clone.setAttribute('width', String(outputWidth));
 	clone.setAttribute('height', String(outputHeight));
 	clone.setAttribute('font-family', getComputedStyle(source).fontFamily);
+	if (backgroundColor) {
+		const namespace = 'http://www.w3.org/2000/svg';
+		const background = document.createElementNS(namespace, 'g');
+		background.setAttribute('data-export-background', '');
+		const base = document.createElementNS(namespace, 'rect');
+		base.setAttribute('x', String(bounds.x));
+		base.setAttribute('y', String(bounds.y));
+		base.setAttribute('width', String(bounds.width));
+		base.setAttribute('height', String(bounds.height));
+		base.setAttribute('fill', backgroundColor);
+		background.append(base);
+		if (stripedBackground) {
+			const stripes = base.cloneNode() as SVGRectElement;
+			stripes.setAttribute('fill', 'url(#builder-grass-stripe)');
+			background.append(stripes);
+		}
+		const definitions = clone.querySelector('defs');
+		if (definitions) definitions.after(background);
+		else clone.prepend(background);
+	}
 	if (pdfOutlines) {
 		for (const outline of clone.querySelectorAll<SVGElement>('[data-pdf-outline]')) outline.removeAttribute('display');
+	}
+	if (fieldBorderColor) {
+		const outline = clone.querySelector<SVGElement>('[data-export-field-outline]');
+		outline?.removeAttribute('display');
+		outline?.setAttribute('stroke', fieldBorderColor);
 	}
 	const images = Array.from(clone.querySelectorAll('image'));
 	await Promise.all(
@@ -90,6 +130,10 @@ export const renderPlayBuilderCanvas = async (source: SVGSVGElement, { pdfOutlin
 		canvas.height = outputHeight;
 		const context = canvas.getContext('2d');
 		if (!context) throw new Error('Canvas export is not supported by this browser.');
+		if (backgroundColor) {
+			context.fillStyle = backgroundColor;
+			context.fillRect(0, 0, canvas.width, canvas.height);
+		}
 		context.drawImage(image, 0, 0, canvas.width, canvas.height);
 		return canvas;
 	} finally {
@@ -174,6 +218,26 @@ const createPdf = async (canvases: HTMLCanvasElement[]) => {
 	return new Blob([concatBytes(parts)], { type: 'application/pdf' });
 };
 
-export const exportPlayBuilderPng = async (svg: SVGSVGElement) =>
-	downloadBlob(await canvasBlob(await renderPlayBuilderCanvas(svg), 'image/png'), 'flag-football-play.png');
+export const exportPlayBuilderRaster = async (
+	svg: SVGSVGElement,
+	format: 'png' | 'jpg' | 'webp',
+	options: { backgroundColor?: string; padding?: number; stripedBackground?: boolean; fieldBorderColor?: string } = {}
+) => {
+	const mimeType = format === 'jpg' ? 'image/jpeg' : `image/${format}`;
+	const quality = format === 'png' ? undefined : 0.94;
+	const canvas = await renderPlayBuilderCanvas(svg, options);
+	if (format === 'jpg') {
+		const opaqueCanvas = document.createElement('canvas');
+		opaqueCanvas.width = canvas.width;
+		opaqueCanvas.height = canvas.height;
+		const context = opaqueCanvas.getContext('2d');
+		if (!context) throw new Error('Canvas export is not supported by this browser.');
+		context.fillStyle = '#ffffff';
+		context.fillRect(0, 0, opaqueCanvas.width, opaqueCanvas.height);
+		context.drawImage(canvas, 0, 0);
+		downloadBlob(await canvasBlob(opaqueCanvas, mimeType, quality), `flag-football-play.${format}`);
+		return;
+	}
+	downloadBlob(await canvasBlob(canvas, mimeType, quality), `flag-football-play.${format}`);
+};
 export const exportPlayBuilderPdf = async (canvases: HTMLCanvasElement[]) => downloadBlob(await createPdf(canvases), 'flag-football-plays.pdf');
