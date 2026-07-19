@@ -43,7 +43,10 @@
 					class="grid grid-cols-[2fr,1fr,1fr,1fr] gap-4 border-b border-stone-200 px-4 py-3 hover:bg-stone-50"
 				>
 					<div>
-						<p class="font-semibold text-stone-900">{casePlay.title}</p>
+						<p class="flex flex-wrap items-center gap-2 font-semibold text-stone-900">
+							{casePlay.title}
+							{#if casePlay.isHidden}<span class="border border-amber-700 bg-amber-50 px-1.5 py-0.5 text-xs text-amber-900">Hidden</span>{/if}
+						</p>
 						{#if casePlay.sourceKey}
 							<p class="text-xs text-stone-500">source_key: {casePlay.sourceKey}</p>
 						{/if}

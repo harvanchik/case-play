@@ -7,19 +7,23 @@ export const ADSENSE_SCRIPT_ID = 'caseplay-adsense-script';
 export const ADSENSE_PUBLISHER_ID = 'ca-pub-3425711717023232';
 export const ANALYTICS_SCRIPT_ID = 'caseplay-google-analytics-script';
 export const ANALYTICS_MEASUREMENT_ID = 'G-XSBHT3M6GY';
+export const CONSENT_DURATION_MS = 365 * 24 * 60 * 60 * 1000;
+
+type ConsentRecord = {
+	choice: ConsentChoice;
+	expiresAt: number;
+};
 
 type ConsentWindow = Window & {
 	dataLayer?: unknown[];
+	__caseplayConsentModeDefaulted?: boolean;
 	adsbygoogle?: Record<string, unknown>[];
-	googlefc?: {
-		callbackQueue?: Array<() => void>;
-		showRevocationMessage?: () => void;
-	};
 };
 
 let adsenseLoadPromise: Promise<void> | null = null;
 let analyticsLoadPromise: Promise<void> | null = null;
 let lastTrackedPage = '';
+let sessionConsent: ConsentChoice | null = null;
 
 const gtag = (...args: unknown[]) => {
 	const consentWindow = window as ConsentWindow;
@@ -33,26 +37,52 @@ export const readConsent = (): ConsentChoice | null => {
 	if (typeof window === 'undefined') return null;
 	try {
 		const stored = window.localStorage.getItem(CONSENT_STORAGE_KEY);
-		return stored === 'all' || stored === 'essential' ? stored : null;
+		if (stored === 'all' || stored === 'essential') {
+			writeConsentRecord(stored);
+			return stored;
+		}
+		if (!stored) return sessionConsent;
+		const record = JSON.parse(stored) as Partial<ConsentRecord>;
+		if ((record.choice !== 'all' && record.choice !== 'essential') || typeof record.expiresAt !== 'number' || record.expiresAt <= Date.now()) {
+			window.localStorage.removeItem(CONSENT_STORAGE_KEY);
+			sessionConsent = null;
+			return null;
+		}
+		return record.choice;
 	} catch {
-		return null;
+		return sessionConsent;
 	}
+};
+
+const writeConsentRecord = (choice: ConsentChoice) => {
+	const record: ConsentRecord = { choice, expiresAt: Date.now() + CONSENT_DURATION_MS };
+	window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(record));
+};
+
+const consentState = (choice: ConsentChoice) => {
+	const state = choice === 'all' ? 'granted' : 'denied';
+	return {
+		analytics_storage: state,
+		ad_storage: state,
+		ad_user_data: state,
+		ad_personalization: state
+	};
 };
 
 export const initializeConsentMode = () => {
 	if (typeof window === 'undefined') return;
-	gtag('consent', 'default', {
-		analytics_storage: 'denied',
-		wait_for_update: 500
-	});
-
-	if (readConsent() === 'all' && !hasGlobalPrivacyControl()) {
-		gtag('consent', 'update', {
-			analytics_storage: 'granted'
-		});
-	} else {
-		clearGoogleAnalyticsCookies();
+	const consentWindow = window as ConsentWindow;
+	if (!consentWindow.__caseplayConsentModeDefaulted) {
+		gtag('consent', 'default', { ...consentState('essential'), wait_for_update: 500 });
+		gtag('set', 'ads_data_redaction', true);
+		gtag('set', 'url_passthrough', false);
+		consentWindow.__caseplayConsentModeDefaulted = true;
 	}
+
+	const effectiveChoice: ConsentChoice = readConsent() === 'all' && !hasGlobalPrivacyControl() ? 'all' : 'essential';
+	gtag('consent', 'update', consentState(effectiveChoice));
+	gtag('set', 'ads_data_redaction', effectiveChoice !== 'all');
+	if (effectiveChoice === 'essential') clearGoogleTrackingCookies();
 };
 
 const expireCookie = (name: string, domain?: string) => {
@@ -74,20 +104,48 @@ export const clearGoogleAnalyticsCookies = () => {
 	}
 };
 
+export const clearGoogleTrackingCookies = () => {
+	if (typeof document === 'undefined') return;
+	const cookieNames = document.cookie
+		.split(';')
+		.map((cookie) => cookie.trim().split('=')[0])
+		.filter(
+			(name) =>
+				name === '_ga' ||
+				name.startsWith('_ga_') ||
+				name.startsWith('_gcl_') ||
+				name === '__gads' ||
+				name === '__gpi' ||
+				name === '__eoi' ||
+				name === 'IDE' ||
+				name === 'DSID' ||
+				name === 'FLC'
+		);
+
+	for (const name of cookieNames) {
+		expireCookie(name);
+		expireCookie(name, window.location.hostname);
+		if (window.location.hostname.endsWith('caseplay.org')) expireCookie(name, '.caseplay.org');
+	}
+};
+
 export const saveConsent = (choice: ConsentChoice) => {
 	if (typeof window === 'undefined') return;
 	const effectiveChoice: ConsentChoice = hasGlobalPrivacyControl() ? 'essential' : choice;
+	sessionConsent = effectiveChoice;
 	try {
-		window.localStorage.setItem(CONSENT_STORAGE_KEY, effectiveChoice);
+		writeConsentRecord(effectiveChoice);
 	} catch {
 		// The preference remains active for this page even if browser storage is unavailable.
 	}
 
-	const granted = effectiveChoice === 'all' ? 'granted' : 'denied';
-	gtag('consent', 'update', {
-		analytics_storage: granted
-	});
-	if (effectiveChoice === 'essential') clearGoogleAnalyticsCookies();
+	gtag('consent', 'update', consentState(effectiveChoice));
+	gtag('set', 'ads_data_redaction', effectiveChoice !== 'all');
+	gtag('set', 'url_passthrough', false);
+	if (effectiveChoice === 'essential') {
+		lastTrackedPage = '';
+		clearGoogleTrackingCookies();
+	}
 	window.dispatchEvent(new CustomEvent<ConsentChoice>(CONSENT_EVENT, { detail: effectiveChoice }));
 };
 
@@ -95,15 +153,7 @@ export const openConsentChoices = () => {
 	if (typeof window !== 'undefined') window.dispatchEvent(new Event(OPEN_CONSENT_EVENT));
 };
 
-export const openAdPrivacyChoices = () => {
-	if (typeof window === 'undefined') return;
-	const consentWindow = window as ConsentWindow;
-	const googlefc = (consentWindow.googlefc ??= {});
-	const callbackQueue = (googlefc.callbackQueue ??= []);
-	if (googlefc.showRevocationMessage) callbackQueue.push(googlefc.showRevocationMessage);
-};
-
-export const canLoadAdvertising = () => typeof window !== 'undefined';
+export const canLoadAdvertising = () => readConsent() === 'all' && !hasGlobalPrivacyControl();
 export const canLoadAnalytics = () => readConsent() === 'all' && !hasGlobalPrivacyControl();
 
 export const loadGoogleAnalytics = () => {

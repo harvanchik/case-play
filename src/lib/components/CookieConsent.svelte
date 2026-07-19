@@ -6,6 +6,7 @@
 		hasGlobalPrivacyControl,
 		initializeConsentMode,
 		loadAdSense,
+		loadGoogleAnalytics,
 		readConsent,
 		saveConsent,
 		type ConsentChoice
@@ -16,15 +17,12 @@
 	let globalPrivacyControl = false;
 
 	const choose = async (choice: ConsentChoice) => {
-		const previousChoice = currentChoice;
 		saveConsent(choice);
 		currentChoice = readConsent() ?? (globalPrivacyControl ? 'essential' : choice);
 		visible = false;
-		if (previousChoice !== null && previousChoice !== currentChoice) {
-			window.location.reload();
-			return;
+		if (currentChoice === 'all') {
+			await Promise.all([loadGoogleAnalytics(), loadAdSense()]).catch(() => undefined);
 		}
-		await loadAdSense().catch(() => undefined);
 	};
 
 	onMount(() => {
@@ -35,8 +33,8 @@
 			saveConsent('essential');
 			currentChoice = 'essential';
 		}
-		visible = false;
-		loadAdSense().catch(() => undefined);
+		visible = !globalPrivacyControl && currentChoice === null;
+		if (currentChoice === 'all') loadAdSense().catch(() => undefined);
 
 		const open = () => (visible = true);
 		const changed = (event: Event) => {
@@ -58,28 +56,29 @@
 		aria-modal="false"
 		aria-labelledby="cookie-consent-title"
 	>
-		<h2 id="cookie-consent-title" class="text-base font-bold text-stone-900">Analytics Choices</h2>
+		<h2 id="cookie-consent-title" class="text-base font-bold text-stone-900">We Value Your Privacy</h2>
 		<p class="mt-1 text-sm leading-5 text-stone-700">
-			Allow optional Google Analytics cookies to help Caseplay understand site traffic and improve performance.
+			This website uses cookies and similar technologies to enhance your browsing experience. Select <strong>Accept All Cookies</strong> to allow optional
+			cookies used for behavior analysis, advertising, and personalized services. Select <strong>Reject All Cookies</strong> to enable only essential
+			cookies, which may limit some features. Use <strong>Use of Cookies</strong> in the footer to reopen these preferences at any time.
 		</p>
 		<p class="mt-2 text-xs text-stone-600">
-			Read the <a class="font-semibold underline" href="/cookie-policy">Cookie Policy</a> and
-			<a class="font-semibold underline" href="/privacy">Privacy Policy</a>. Advertising privacy choices are managed separately by Google's certified
-			consent system where required.
+			For more information, read the <a class="font-semibold underline" href="/cookie-policy">Cookie Policy</a> and
+			<a class="font-semibold underline" href="/privacy">Privacy Policy</a>.
 		</p>
 		<div class="mt-4 flex flex-wrap justify-end gap-2">
 			<button
 				class="cursor-pointer border-2 border-stone-900 bg-white px-4 py-2 text-sm font-bold text-stone-900"
 				on:click={() => choose('essential')}
 			>
-				No Analytics
+				Reject All Cookies
 			</button>
 			<button
 				class="cursor-pointer border-2 border-stone-900 bg-stone-900 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
 				disabled={globalPrivacyControl}
 				on:click={() => choose('all')}
 			>
-				Allow Analytics
+				Accept All Cookies
 			</button>
 		</div>
 	</div>

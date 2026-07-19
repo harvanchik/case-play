@@ -4,14 +4,14 @@ import { listCasePlayOptions } from '$lib/server/db/repositories/case-plays';
 import {
 	createPlaylist,
 	deletePlaylist,
-	listPlaylists,
+	listPlaylistsForAdmin,
 	savePlaylist
 } from '$lib/server/db/repositories/playlists';
 import { readOptionalText, readRequiredText } from '$lib/server/forms';
 
 export const load = (async () => {
 	return {
-		playlists: await listPlaylists(),
+		playlists: await listPlaylistsForAdmin(),
 		casePlayOptions: await listCasePlayOptions()
 	};
 }) satisfies PageServerLoad;

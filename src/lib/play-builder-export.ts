@@ -24,6 +24,37 @@ const downloadBlob = (blob: Blob, filename: string) => {
 
 type ExportBounds = { x: number; y: number; width: number; height: number };
 
+export type ExportPrompt = {
+	text: string;
+	runs?: ExportPromptRun[];
+	fontFamily: string;
+	fontSize: number;
+	fontWeight: string;
+	fontStyle: string;
+	lineHeight: number;
+	color: string;
+	backgroundColor: string;
+	borderColor: string;
+	borderWidth: number;
+	paddingTop: number;
+	paddingRight: number;
+	paddingBottom: number;
+	paddingLeft: number;
+};
+
+export type ExportPromptRun = {
+	text: string;
+	fontFamily: string;
+	fontSize: number;
+	fontWeight: string;
+	fontStyle: string;
+	color: string;
+	backgroundColor?: string;
+	textDecorationLine?: string;
+	paddingLeft?: number;
+	paddingRight?: number;
+};
+
 const unionBounds = (bounds: ExportBounds, next: DOMRect): ExportBounds => {
 	const right = Math.max(bounds.x + bounds.width, next.x + next.width);
 	const bottom = Math.max(bounds.y + bounds.height, next.y + next.height);
@@ -38,7 +69,9 @@ const exportBounds = (source: SVGSVGElement, pdfOutlines: boolean, paddingOverri
 	let bounds: ExportBounds = field
 		? field.getBBox()
 		: { x: viewBox.x, y: viewBox.y, width: viewBox.width, height: viewBox.height };
-	const optionalBounds = source.querySelectorAll<SVGGraphicsElement>('[data-export-team-box], [data-field-fixtures-layer], [data-export-down-marker]');
+	const optionalBounds = source.querySelectorAll<SVGGraphicsElement>(
+		'[data-export-team-box], [data-field-fixtures-layer], [data-export-down-marker], [data-export-los-marker]'
+	);
 	for (const element of optionalBounds) {
 		const next = element.getBBox();
 		if (next.width > 0 && next.height > 0) bounds = unionBounds(bounds, next);
@@ -52,6 +85,114 @@ const exportBounds = (source: SVGSVGElement, pdfOutlines: boolean, paddingOverri
 	};
 };
 
+const addPromptHeader = (diagram: HTMLCanvasElement, prompt: ExportPrompt) => {
+	const scale = 2;
+	const paddingTop = prompt.paddingTop * scale;
+	const paddingRight = prompt.paddingRight * scale;
+	const paddingBottom = prompt.paddingBottom * scale;
+	const paddingLeft = prompt.paddingLeft * scale;
+	const borderWidth = prompt.borderWidth * scale;
+	const gap = 8 * scale;
+	const fontSize = prompt.fontSize * scale;
+	const lineHeight = prompt.lineHeight * scale;
+	const measurementCanvas = document.createElement('canvas');
+	const measurementContext = measurementCanvas.getContext('2d');
+	if (!measurementContext) throw new Error('Canvas export is not supported by this browser.');
+	measurementContext.font = `${prompt.fontStyle} ${prompt.fontWeight} ${fontSize}px ${prompt.fontFamily}`;
+	type PromptToken = { text: string; run: ExportPromptRun; whitespace: boolean; newline: boolean };
+	type PositionedPromptToken = PromptToken & { x: number; y: number; width: number };
+	const defaultRun: ExportPromptRun = {
+		text: '',
+		fontFamily: prompt.fontFamily,
+		fontSize: prompt.fontSize,
+		fontWeight: prompt.fontWeight,
+		fontStyle: prompt.fontStyle,
+		color: prompt.color
+	};
+	const tokens: PromptToken[] = [];
+	for (const run of prompt.runs?.length ? prompt.runs : [{ ...defaultRun, text: prompt.text }]) {
+		for (const part of run.text.replace(/\r\n/g, '\n').split(/(\n|\s+)/).filter(Boolean)) {
+			tokens.push({ text: part, run, whitespace: /^\s+$/.test(part) && part !== '\n', newline: part === '\n' });
+		}
+	}
+	const setTokenFont = (run: ExportPromptRun) => {
+		measurementContext.font = `${run.fontStyle} ${run.fontWeight} ${run.fontSize * scale}px ${run.fontFamily}`;
+	};
+	const maxX = diagram.width - paddingRight;
+	const positioned: PositionedPromptToken[] = [];
+	let x = paddingLeft;
+	let line = 0;
+	let pendingWhitespace: PromptToken | null = null;
+	for (const token of tokens) {
+		if (token.newline) {
+			line += 1;
+			x = paddingLeft;
+			pendingWhitespace = null;
+			continue;
+		}
+		if (token.whitespace) {
+			pendingWhitespace = token;
+			continue;
+		}
+		setTokenFont(token.run);
+		const tokenPadding = ((token.run.paddingLeft ?? 0) + (token.run.paddingRight ?? 0)) * scale;
+		const tokenWidth = measurementContext.measureText(token.text).width + tokenPadding;
+		let spaceWidth = 0;
+		if (pendingWhitespace && x > paddingLeft) {
+			setTokenFont(pendingWhitespace.run);
+			spaceWidth = measurementContext.measureText(' ').width;
+		}
+		if (x > paddingLeft && x + spaceWidth + tokenWidth > maxX) {
+			line += 1;
+			x = paddingLeft;
+			spaceWidth = 0;
+		}
+		if (pendingWhitespace && spaceWidth > 0) {
+			positioned.push({ ...pendingWhitespace, text: ' ', x, y: paddingTop + line * lineHeight, width: spaceWidth });
+			x += spaceWidth;
+		}
+		positioned.push({ ...token, x, y: paddingTop + line * lineHeight, width: tokenWidth });
+		x += tokenWidth;
+		pendingWhitespace = null;
+	}
+	const lineCount = Math.max(1, line + 1);
+	const headerHeight = paddingTop + paddingBottom + lineCount * lineHeight;
+	const output = document.createElement('canvas');
+	output.width = diagram.width;
+	output.height = headerHeight + gap + diagram.height;
+	const context = output.getContext('2d');
+	if (!context) throw new Error('Canvas export is not supported by this browser.');
+	context.fillStyle = prompt.backgroundColor;
+	context.fillRect(0, 0, output.width, headerHeight);
+	context.strokeStyle = prompt.borderColor;
+	context.lineWidth = borderWidth;
+	context.strokeRect(borderWidth / 2, borderWidth / 2, output.width - borderWidth, headerHeight - borderWidth);
+	context.textBaseline = 'top';
+	for (const token of positioned) {
+		const runFontSize = token.run.fontSize * scale;
+		const textY = token.y + (lineHeight - runFontSize) / 2;
+		const tokenPaddingLeft = (token.run.paddingLeft ?? 0) * scale;
+		if (token.run.backgroundColor && token.run.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+			context.fillStyle = token.run.backgroundColor;
+			context.fillRect(token.x, textY, token.width, runFontSize * 1.12);
+		}
+		context.fillStyle = token.run.color;
+		context.font = `${token.run.fontStyle} ${token.run.fontWeight} ${runFontSize}px ${token.run.fontFamily}`;
+		if (!token.whitespace) context.fillText(token.text, token.x + tokenPaddingLeft, textY);
+		if (token.run.textDecorationLine?.includes('underline')) {
+			context.strokeStyle = token.run.color;
+			context.lineWidth = Math.max(1, scale);
+			const underlineY = textY + runFontSize * 1.04;
+			context.beginPath();
+			context.moveTo(token.x, underlineY);
+			context.lineTo(token.x + token.width, underlineY);
+			context.stroke();
+		}
+	}
+	context.drawImage(diagram, 0, headerHeight + gap);
+	return output;
+};
+
 export const renderPlayBuilderCanvas = async (
 	source: SVGSVGElement,
 	{
@@ -59,13 +200,15 @@ export const renderPlayBuilderCanvas = async (
 		padding,
 		backgroundColor,
 		stripedBackground = false,
-		fieldBorderColor
+		fieldBorderColor,
+		prompt
 	}: {
 		pdfOutlines?: boolean;
 		padding?: number;
 		backgroundColor?: string;
 		stripedBackground?: boolean;
 		fieldBorderColor?: string;
+		prompt?: ExportPrompt;
 	} = {}
 ) => {
 	const bounds = exportBounds(source, pdfOutlines, padding);
@@ -77,7 +220,8 @@ export const renderPlayBuilderCanvas = async (
 	clone.setAttribute('viewBox', `${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`);
 	clone.setAttribute('width', String(outputWidth));
 	clone.setAttribute('height', String(outputHeight));
-	clone.setAttribute('font-family', getComputedStyle(source).fontFamily);
+	const fontFamily = getComputedStyle(source).fontFamily || 'Arial, sans-serif';
+	clone.setAttribute('font-family', fontFamily);
 	if (backgroundColor) {
 		const namespace = 'http://www.w3.org/2000/svg';
 		const background = document.createElementNS(namespace, 'g');
@@ -135,7 +279,7 @@ export const renderPlayBuilderCanvas = async (
 			context.fillRect(0, 0, canvas.width, canvas.height);
 		}
 		context.drawImage(image, 0, 0, canvas.width, canvas.height);
-		return canvas;
+		return prompt?.text.trim() ? addPromptHeader(canvas, prompt) : canvas;
 	} finally {
 		URL.revokeObjectURL(url);
 	}
@@ -221,7 +365,7 @@ const createPdf = async (canvases: HTMLCanvasElement[]) => {
 export const exportPlayBuilderRaster = async (
 	svg: SVGSVGElement,
 	format: 'png' | 'jpg' | 'webp',
-	options: { backgroundColor?: string; padding?: number; stripedBackground?: boolean; fieldBorderColor?: string } = {}
+	options: { backgroundColor?: string; padding?: number; stripedBackground?: boolean; fieldBorderColor?: string; prompt?: ExportPrompt } = {}
 ) => {
 	const mimeType = format === 'jpg' ? 'image/jpeg' : `image/${format}`;
 	const quality = format === 'png' ? undefined : 0.94;

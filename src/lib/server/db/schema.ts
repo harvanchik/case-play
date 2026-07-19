@@ -85,6 +85,7 @@ export const casePlays = sqliteTable(
 		authorId: text('author_id').references(() => authors.id, { onDelete: 'set null' }),
 		rulebookId: text('rulebook_id').references(() => rulebooks.id, { onDelete: 'set null' }),
 		sportId: text('sport_id').references(() => sports.id, { onDelete: 'set null' }),
+		isHidden: integer('is_hidden', { mode: 'boolean' }).notNull().default(false),
 		createdAt: text('created_at').notNull(),
 		updatedAt: text('updated_at').notNull()
 	},
@@ -94,6 +95,7 @@ export const casePlays = sqliteTable(
 		index('case_plays_author_id_idx').on(table.authorId),
 		index('case_plays_rulebook_id_idx').on(table.rulebookId),
 		index('case_plays_sport_id_idx').on(table.sportId),
+		index('case_plays_is_hidden_idx').on(table.isHidden),
 		check('case_plays_difficulty_check', sql`${table.difficulty} in (1, 2, 3)`)
 	]
 );

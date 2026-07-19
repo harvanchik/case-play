@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../index';
 import { casePlays, playlistCasePlays, playlists } from '../schema';
@@ -6,7 +6,7 @@ import type { Database } from '../connection';
 
 const resolveDb = (database?: Database) => database ?? getDb();
 
-export const listPlaylists = async (database?: Database) => {
+const listPlaylistsInternal = async (includeHidden: boolean, database?: Database) => {
 	const db = resolveDb(database);
 	const rows = await db
 		.select({
@@ -21,7 +21,12 @@ export const listPlaylists = async (database?: Database) => {
 		})
 		.from(playlists)
 		.leftJoin(playlistCasePlays, eq(playlists.id, playlistCasePlays.playlistId))
-		.leftJoin(casePlays, eq(playlistCasePlays.casePlayId, casePlays.id))
+		.leftJoin(
+			casePlays,
+			includeHidden
+				? eq(playlistCasePlays.casePlayId, casePlays.id)
+				: and(eq(playlistCasePlays.casePlayId, casePlays.id), eq(casePlays.isHidden, false))
+		)
 		.orderBy(asc(playlists.title), asc(playlistCasePlays.position), asc(casePlays.title));
 
 	const grouped = new Map<
@@ -58,6 +63,10 @@ export const listPlaylists = async (database?: Database) => {
 
 	return [...grouped.values()];
 };
+
+export const listPlaylists = (database?: Database) => listPlaylistsInternal(false, database);
+
+export const listPlaylistsForAdmin = (database?: Database) => listPlaylistsInternal(true, database);
 
 export const createPlaylist = async (title: string, database?: Database) => {
 	const db = resolveDb(database);

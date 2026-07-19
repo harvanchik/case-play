@@ -53,25 +53,25 @@
 	}
 
 	mark {
-		@apply bg-current px-[1px] pb-0.5 font-extrabold text-stone-900 transition-colors duration-[1.25s] ease-in group-hover:bg-yellow-300 group-[.revealed]:bg-yellow-300 selection:bg-yellow-200;
+		@apply bg-current px-[1px] pb-0.5 font-extrabold text-stone-900 group-[.revealed]:bg-yellow-300 selection:bg-yellow-200;
 	}
 	mark[green] {
-		@apply group-hover:bg-lime-300 group-[.revealed]:bg-lime-300 selection:bg-lime-200;
+		@apply group-[.revealed]:bg-lime-300 selection:bg-lime-200;
 	}
 	mark[blue] {
-		@apply group-hover:bg-sky-300 group-[.revealed]:bg-sky-300 selection:bg-sky-200;
+		@apply group-[.revealed]:bg-sky-300 selection:bg-sky-200;
 	}
 	mark[orange] {
-		@apply group-hover:bg-orange-300 group-[.revealed]:bg-orange-300 selection:bg-orange-200;
+		@apply group-[.revealed]:bg-orange-300 selection:bg-orange-200;
 	}
 	mark[indigo] {
-		@apply group-hover:bg-indigo-300 group-[.revealed]:bg-indigo-300 selection:bg-indigo-200;
+		@apply group-[.revealed]:bg-indigo-300 selection:bg-indigo-200;
 	}
 	mark[red] {
-		@apply group-hover:bg-red-400 group-[.revealed]:bg-red-400 selection:bg-red-300;
+		@apply group-[.revealed]:bg-red-400 selection:bg-red-300;
 	}
 	mark[violet] {
-		@apply group-hover:bg-violet-400 group-[.revealed]:bg-violet-400 selection:bg-violet-300;
+		@apply group-[.revealed]:bg-violet-400 selection:bg-violet-300;
 	}
 	p > mark {
 		@apply bg-yellow-400 font-extrabold;
@@ -101,7 +101,7 @@
 		@apply mb-3 block content-['_'];
 	}
 	spoiler span {
-		@apply font-medium text-stone-900 transition-colors duration-[1.25s] ease-in;
+		@apply font-medium text-stone-900;
 	}
 	p:is(#prompt, .case-play-prompt) span {
 		@apply font-medium;
@@ -118,40 +118,89 @@
 
 @layer components {
 	spoiler {
-		@apply block w-full cursor-default space-y-3 bg-stone-900 p-4 text-stone-900 shadow-lg transition-colors duration-[1.25s] ease-in select-none hover:text-white;
+		@apply block w-full cursor-default space-y-3 bg-stone-900 p-4 text-stone-900 shadow-lg select-none;
 	}
-	spoiler.revealed {
-		@apply text-white;
+	spoiler .spoiler-content {
+		color: white;
+		opacity: 0;
+		transition-property: opacity;
+		transition-duration: 1.25s;
+		transition-timing-function: ease-in-out;
+	}
+	spoiler.revealed .spoiler-content {
+		opacity: 1;
+	}
+	spoiler .spoiler-content span,
+	spoiler .spoiler-content u,
+	spoiler .spoiler-content b {
+		color: white !important;
+	}
+	spoiler .spoiler-content mark {
+		background-color: #fde047 !important;
+		color: #1c1917 !important;
+	}
+	spoiler .spoiler-content mark[green] {
+		background-color: #bef264 !important;
+	}
+	spoiler .spoiler-content mark[blue] {
+		background-color: #7dd3fc !important;
+	}
+	spoiler .spoiler-content mark[orange] {
+		background-color: #fdba74 !important;
+	}
+	spoiler .spoiler-content mark[indigo] {
+		background-color: #a5b4fc !important;
+	}
+	spoiler .spoiler-content mark[red] {
+		background-color: #f87171 !important;
+	}
+	spoiler .spoiler-content mark[violet] {
+		background-color: #a78bfa !important;
+	}
+	spoiler .spoiler-content .accept {
+		color: rgb(34 197 94 / 0.5) !important;
+	}
+	spoiler .spoiler-content .decline {
+		color: rgb(239 68 68 / 0.5) !important;
+	}
+	spoiler .spoiler-content .offset {
+		color: rgb(234 179 8 / 0.8) !important;
+	}
+	spoiler .spoiler-content .open {
+		color: rgb(14 165 233 / 0.7) !important;
+	}
+	spoiler .spoiler-content .closed {
+		color: rgb(236 72 153 / 0.7) !important;
 	}
 }
 
 @layer utilities {
 	.accept {
-		@apply group-hover:text-green-500/50 group-[.revealed]:text-green-500/50;
+		@apply group-[.revealed]:text-green-500/50;
 	}
 	p:is(#prompt, .case-play-prompt) .accept {
 		@apply text-green-600;
 	}
 	.decline {
-		@apply group-hover:text-red-500/50 group-[.revealed]:text-red-500/50;
+		@apply group-[.revealed]:text-red-500/50;
 	}
 	p:is(#prompt, .case-play-prompt) .decline {
 		@apply text-red-500;
 	}
 	.offset {
-		@apply group-hover:text-yellow-500/80 group-[.revealed]:text-yellow-500/80;
+		@apply group-[.revealed]:text-yellow-500/80;
 	}
 	p:is(#prompt, .case-play-prompt) .offset {
 		@apply text-yellow-500;
 	}
 	.open {
-		@apply group-hover:text-sky-500/70 group-[.revealed]:text-sky-500/70;
+		@apply group-[.revealed]:text-sky-500/70;
 	}
 	p:is(#prompt, .case-play-prompt) .open {
 		@apply text-sky-600;
 	}
 	.closed {
-		@apply group-hover:text-pink-500/70 group-[.revealed]:text-pink-500/70;
+		@apply group-[.revealed]:text-pink-500/70;
 	}
 	p:is(#prompt, .case-play-prompt) .closed {
 		@apply text-pink-600;

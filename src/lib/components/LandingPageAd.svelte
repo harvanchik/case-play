@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import {
 		ADSENSE_PUBLISHER_ID,
+		CONSENT_EVENT,
+		canLoadAdvertising,
 		loadAdSense
 	} from '$lib/privacy/consent';
 
@@ -12,18 +14,23 @@
 	};
 
 	let initialized = false;
+	let initializing = false;
 	let inViewport = false;
 	let adContainer: HTMLElement;
 
 	const initializeAd = async () => {
-		if (!inViewport || initialized) return;
+		if (!inViewport || initialized || initializing || !canLoadAdvertising()) return;
+		initializing = true;
 		try {
 			await loadAdSense();
+			if (!canLoadAdvertising()) return;
 			const adsenseWindow = window as AdSenseWindow;
 			(adsenseWindow.adsbygoogle ??= []).push({});
 			initialized = true;
 		} catch {
 			// Ad blockers and network restrictions may prevent an ad from loading.
+		} finally {
+			initializing = false;
 		}
 	};
 
@@ -38,8 +45,11 @@
 			{ rootMargin: '200px 0px' }
 		);
 		observer.observe(adContainer);
+		const consentChanged = () => initializeAd();
+		window.addEventListener(CONSENT_EVENT, consentChanged);
 		return () => {
 			observer.disconnect();
+			window.removeEventListener(CONSENT_EVENT, consentChanged);
 		};
 	});
 </script>

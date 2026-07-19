@@ -2,6 +2,24 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			window.gtag =
+				window.gtag ||
+				function () {
+					window.dataLayer.push(arguments);
+				};
+			window.gtag('consent', 'default', {
+				analytics_storage: 'denied',
+				ad_storage: 'denied',
+				ad_user_data: 'denied',
+				ad_personalization: 'denied',
+				wait_for_update: 500
+			});
+			window.gtag('set', 'ads_data_redaction', true);
+			window.gtag('set', 'url_passthrough', false);
+			window.__caseplayConsentModeDefaulted = true;
+		</script>
 		<link rel="manifest" href="%sveltekit.assets%/manifest.json" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.ico" />
 		<link rel="icon" type="image/png" sizes="32x32" href="%sveltekit.assets%/icon/favicon-32x32.png" />
@@ -10,8 +28,8 @@
 		<meta name="theme-color" content="#f5f5f4" />
 		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-		<meta name="apple-mobile-web-app-title" content="CasePlay" />
-		<meta name="application-name" content="CasePlay" />
+		<meta name="apple-mobile-web-app-title" content="CasePlay.org" />
+		<meta name="application-name" content="CasePlay.org" />
 		<meta name="google-adsense-account" content="ca-pub-3425711717023232" />
 		<meta name="google-site-verification" content="inHctX9qXhggvLRhadlpiqiIHq3PzMod2pzw9Uwwvm4" />
 		<link rel="apple-touch-icon" href="%sveltekit.assets%/icon/apple-touch-icon.png" />

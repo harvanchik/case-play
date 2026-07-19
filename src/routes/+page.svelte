@@ -21,9 +21,9 @@
 	const websiteStructuredData = JSON.stringify({
 		'@context': 'https://schema.org',
 		'@type': 'WebSite',
-		name: 'caseplay.org',
+		name: 'CasePlay.org',
 		url: 'https://caseplay.org/',
-		description: 'A searchable case-play database and flag football play builder for referee education.',
+		description: 'A searchable case play database and flag football play builder for referee education.',
 		author: { '@type': 'Person', name: 'Jake Harvanchik' }
 	}).replace(/</g, '\\u003c');
 
@@ -101,8 +101,11 @@
 </script>
 
 <svelte:head>
-	<title>Flag Football Case Plays and Play Builder | caseplay.org</title>
-	<meta name="description" content="Study searchable flag football officiating case plays and create shareable diagrams with a field play builder made for referee education." />
+	<title>Flag Football Case Plays and Play Builder | CasePlay.org</title>
+	<meta
+		name="description"
+		content="Study searchable flag football officiating case plays and create shareable diagrams with a field play builder made for referee education."
+	/>
 	<meta name="author" content="Jake Harvanchik" />
 	<meta property="og:title" content="Flag Football Case Plays and Play Builder" />
 	<meta property="og:description" content="Study officiating scenarios and build shareable flag football play diagrams." />
@@ -115,15 +118,9 @@
 	<!-- Background -->
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 	<div class="mt-10 flex w-full flex-col items-center justify-center">
-		<h1 class="font-dokdo mx-auto text-5xl font-semibold text-stone-800 uppercase select-none text-shadow-md sm:text-7xl sm:text-shadow-lg">
-			caseplay.org
-		</h1>
+		<h1 class="font-dokdo mx-auto text-5xl font-semibold text-stone-800 select-none text-shadow-md sm:text-7xl sm:text-shadow-lg">CASEPLAY.ORG</h1>
 		<p class="font-neucha text-xl text-stone-600 sm:text-2xl">a case play database and play builder created by Jake Harvanchik</p>
 	</div>
-	<p class="mx-auto mt-3 max-w-3xl px-5 text-center text-sm leading-6 text-stone-600 sm:text-base">
-		Study difficult officiating situations, compare related rulings, and use the original play builder to create clear flag football diagrams for
-		training, clinics, and crew discussion.
-	</p>
 
 	<!-- START: Create Modal -->
 	{#if showCreateModal}
@@ -199,14 +196,20 @@
 						autocomplete="off"
 					/>
 				</div>
-				<a
-					href="/play-builder"
-					class="flex cursor-pointer items-center justify-center border border-stone-300 bg-stone-50 px-4 text-stone-900 transition-colors duration-200 hover:bg-stone-100 hover:text-black focus:ring-2 focus:ring-stone-500"
-					title="Open Play Builder"
-					aria-label="Open Play Builder"
-				>
-					<Icon icon="material-symbols:construction" class="text-2xl" />
-				</a>
+				<div class="play-builder-launch relative flex shrink-0">
+					<span
+						class="pointer-events-none absolute -top-2 -right-2 z-10 border border-stone-900 bg-red-600 px-1.5 py-0.5 text-[0.6rem] leading-none font-black tracking-wide text-white"
+						aria-hidden="true">NEW</span
+					>
+					<a
+						href="/play-builder"
+						class="flex cursor-pointer items-center justify-center border border-stone-300 bg-stone-50 px-4 text-stone-900 transition-colors duration-200 hover:bg-stone-100 hover:text-black focus:ring-2 focus:ring-stone-500"
+						title="Open Play Builder"
+						aria-label="Open Play Builder — New"
+					>
+						<Icon icon="material-symbols:construction" class="text-2xl" />
+					</a>
+				</div>
 				<button
 					class="flex cursor-pointer items-center justify-center border border-stone-300 bg-stone-50 px-4 text-stone-900 transition-colors duration-200 hover:bg-stone-100 hover:text-black focus:ring-2 focus:ring-stone-500"
 					on:click={() => (showCreateModal = true)}
@@ -273,7 +276,7 @@
 					{/each}
 				</div>
 				{#if data.pagination.pageCount > 1}
-					<nav class="mt-3 flex items-center justify-center gap-2 text-sm font-semibold" aria-label="Case-play pages">
+					<nav class="mt-3 flex items-center justify-center gap-2 text-sm font-semibold" aria-label="Case play pages">
 						<a
 							href={pageHref(data.pagination.currentPage - 1)}
 							aria-disabled={data.pagination.currentPage === 1}
@@ -298,3 +301,36 @@
 
 	<PublicSiteFooter context="database" />
 </main>
+
+<style>
+	.play-builder-launch {
+		transform-origin: bottom center;
+		animation: dock-bounce 2.6s ease-in-out infinite;
+	}
+
+	@keyframes dock-bounce {
+		0%,
+		46%,
+		100% {
+			transform: translateY(0);
+		}
+		10% {
+			transform: translateY(-0.75rem);
+		}
+		19% {
+			transform: translateY(0);
+		}
+		27% {
+			transform: translateY(-0.4rem);
+		}
+		34% {
+			transform: translateY(0);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.play-builder-launch {
+			animation: none;
+		}
+	}
+</style>

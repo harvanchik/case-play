@@ -11,7 +11,9 @@
 			<h1 class="text-3xl font-bold">{data.casePlay.title}</h1>
 			<p class="text-stone-600">Update the case play record, then review it on the public site.</p>
 		</div>
-		<a href="/c/{data.casePlay.id}" class="border border-stone-300 px-4 py-2 font-semibold hover:bg-stone-100">View Public Page</a>
+		{#if !data.casePlay.isHidden}
+			<a href="/c/{data.casePlay.id}" class="border border-stone-300 px-4 py-2 font-semibold hover:bg-stone-100">View Public Page</a>
+		{/if}
 	</div>
 
 	{#if form?.error}
@@ -100,6 +102,13 @@
 					<option value="3" selected={data.casePlay.difficulty === 3}>Hard</option>
 				</select>
 			</div>
+			<label class="flex items-center gap-3 border border-stone-300 px-3 py-2 md:col-span-2">
+				<input name="isHidden" type="checkbox" checked={data.casePlay.isHidden} class="size-4" />
+				<span>
+					<strong class="block text-sm">Hidden from public pages</strong>
+					<span class="text-xs text-stone-600">Hidden case plays remain available to administrators but are excluded from search, playlists, direct URLs, and the sitemap.</span>
+				</span>
+			</label>
 			<div class="space-y-1 md:col-span-2">
 				<label for="prompt" class="text-sm font-semibold">Prompt</label>
 				<textarea id="prompt" name="prompt" required rows="8" class="w-full border border-stone-300 px-3 py-2">{data.casePlay.prompt}</textarea>

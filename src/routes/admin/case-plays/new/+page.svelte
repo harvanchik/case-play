@@ -76,6 +76,13 @@
 					<option value="3">Hard</option>
 				</select>
 			</div>
+			<label class="flex items-center gap-3 border border-stone-300 px-3 py-2 md:col-span-2">
+				<input name="isHidden" type="checkbox" class="size-4" />
+				<span>
+					<strong class="block text-sm">Hidden from public pages</strong>
+					<span class="text-xs text-stone-600">NIRSA-authored case plays are always hidden automatically.</span>
+				</span>
+			</label>
 			<div class="space-y-1 md:col-span-2">
 				<label for="prompt" class="text-sm font-semibold">Prompt</label>
 				<textarea id="prompt" name="prompt" required rows="8" class="w-full border border-stone-300 px-3 py-2"></textarea>

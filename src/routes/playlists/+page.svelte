@@ -7,10 +7,10 @@
 </script>
 
 <svelte:head>
-	<title>Officiating Case-Play Playlists | caseplay.org</title>
+	<title>Officiating Case Play Playlists | CasePlay.org</title>
 	<meta name="description" content="Browse curated playlists of related officiating case plays for training sessions, clinics, and rules study." />
 	<meta name="author" content="Jake Harvanchik" />
-	<meta property="og:title" content="Officiating Case-Play Playlists" />
+	<meta property="og:title" content="Officiating Case Play Playlists" />
 	<meta property="og:description" content="Browse curated groups of related case plays for officiating education." />
 	<meta property="og:type" content="website" />
 </svelte:head>

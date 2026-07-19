@@ -1,6 +1,6 @@
 {
-	"short_name": "caseplay.org",
-	"name": "Case Play Database",
+	"short_name": "CasePlay.org",
+	"name": "CasePlay.org",
 	"description": "Sports case play database for referee education",
 	"icons": [
 		{ "src": "/icon/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },

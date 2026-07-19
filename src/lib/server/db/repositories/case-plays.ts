@@ -1,4 +1,4 @@
-import { asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../index';
 import { authors, casePlays, rulebooks, sports } from '../schema';
@@ -17,6 +17,7 @@ export type CasePlayMutationInput = {
 	rulebookId?: string | null;
 	sportId?: string | null;
 	sourceKey?: string | null;
+	isHidden?: boolean;
 };
 
 const resolveDb = (database?: Database) => database ?? getDb();
@@ -38,6 +39,7 @@ export const listCasePlays = async (database?: Database) => {
 			film: casePlays.filmUrl
 		})
 		.from(casePlays)
+		.where(eq(casePlays.isHidden, false))
 		.orderBy(asc(casePlays.title));
 };
 
@@ -53,6 +55,7 @@ export const listCasePlaysForAdmin = async (database?: Database) => {
 			pageNumber: casePlays.pageNumber,
 			updatedAt: casePlays.updatedAt,
 			sourceKey: casePlays.sourceKey,
+			isHidden: casePlays.isHidden,
 			authorFirstName: authors.firstName,
 			authorLastName: authors.lastName,
 			rulebookTitle: rulebooks.title,
@@ -95,6 +98,7 @@ export const getCasePlayById = async (id: string, database?: Database) => {
 			authorId: casePlays.authorId,
 			rulebookId: casePlays.rulebookId,
 			sportId: casePlays.sportId,
+			isHidden: casePlays.isHidden,
 			createdAt: casePlays.createdAt,
 			updatedAt: casePlays.updatedAt,
 			author: {
@@ -124,10 +128,36 @@ export const getCasePlayById = async (id: string, database?: Database) => {
 	return result[0] ?? null;
 };
 
+export const getPublicCasePlayById = async (id: string, database?: Database) => {
+	const db = resolveDb(database);
+	const result = await db
+		.select({ id: casePlays.id })
+		.from(casePlays)
+		.where(and(eq(casePlays.id, id), eq(casePlays.isHidden, false)))
+		.limit(1);
+
+	return result[0] ? getCasePlayById(id, db) : null;
+};
+
+const shouldHideCasePlay = async (input: CasePlayMutationInput, db: Database) => {
+	if (input.isHidden || !input.authorId) {
+		return Boolean(input.isHidden);
+	}
+
+	const result = await db
+		.select({ firstName: authors.firstName, lastName: authors.lastName })
+		.from(authors)
+		.where(eq(authors.id, input.authorId))
+		.limit(1);
+	const authorName = `${result[0]?.firstName ?? ''} ${result[0]?.lastName ?? ''}`.trim().toLocaleLowerCase();
+	return authorName === 'nirsa';
+};
+
 export const createCasePlay = async (input: CasePlayMutationInput, database?: Database) => {
 	const db = resolveDb(database);
 	const timestamp = new Date().toISOString();
 	const id = randomUUID();
+	const isHidden = await shouldHideCasePlay(input, db);
 
 	await db.insert(casePlays).values({
 		id,
@@ -143,6 +173,7 @@ export const createCasePlay = async (input: CasePlayMutationInput, database?: Da
 		authorId: input.authorId || null,
 		rulebookId: input.rulebookId || null,
 		sportId: input.sportId || null,
+		isHidden,
 		createdAt: timestamp,
 		updatedAt: timestamp
 	});
@@ -152,6 +183,7 @@ export const createCasePlay = async (input: CasePlayMutationInput, database?: Da
 
 export const updateCasePlay = async (id: string, input: CasePlayMutationInput, database?: Database) => {
 	const db = resolveDb(database);
+	const isHidden = await shouldHideCasePlay(input, db);
 
 	await db
 		.update(casePlays)
@@ -168,6 +200,7 @@ export const updateCasePlay = async (id: string, input: CasePlayMutationInput, d
 			authorId: input.authorId || null,
 			rulebookId: input.rulebookId || null,
 			sportId: input.sportId || null,
+			isHidden,
 			updatedAt: new Date().toISOString()
 		})
 		.where(eq(casePlays.id, id));

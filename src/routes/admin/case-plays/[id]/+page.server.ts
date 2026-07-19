@@ -16,7 +16,8 @@ const getCasePlayInput = (formData: FormData) => ({
 	authorId: readOptionalId(formData, 'authorId'),
 	rulebookId: readOptionalId(formData, 'rulebookId'),
 	sportId: readOptionalId(formData, 'sportId'),
-	sourceKey: readOptionalText(formData, 'sourceKey')
+	sourceKey: readOptionalText(formData, 'sourceKey'),
+	isHidden: formData.get('isHidden') === 'on'
 });
 
 export const load = (async ({ params }) => {

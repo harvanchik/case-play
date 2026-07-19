@@ -3,7 +3,13 @@
 	import { onMount, tick } from 'svelte';
 	import { driver, type DriveStep, type Driver } from 'driver.js';
 	import 'driver.js/dist/driver.css';
-	import { exportPlayBuilderPdf, exportPlayBuilderRaster, renderPlayBuilderCanvas } from '$lib/play-builder-export';
+	import {
+		exportPlayBuilderPdf,
+		exportPlayBuilderRaster,
+		renderPlayBuilderCanvas,
+		type ExportPrompt,
+		type ExportPromptRun
+	} from '$lib/play-builder-export';
 	import {
 		DEFAULT_PLAY_BUILDER_FIELD_SETTINGS,
 		decodePlayBuilderDocument,
@@ -66,6 +72,7 @@
 	type Scene = PlayBuilderScene;
 	type ArrowKind = Extract<PathKind, 'run' | 'pass' | 'kick'>;
 	type ToolbarPresetTool = 'deflag' | 'bean-bag' | ArrowKind | 'line-of-scrimmage' | 'line-to-gain';
+	type FieldSide = 'a' | 'b';
 	type ExportBackground = 'transparent' | 'grass' | 'color';
 	const exportBackgroundOptions: { id: ExportBackground; label: string; description: string }[] = [
 		{ id: 'transparent', label: 'Transparent', description: 'Field is surrounded by a transparent background.' },
@@ -77,6 +84,8 @@
 
 	export let initialDocument: SerializedPlayBuilderDocument | null = null;
 	export let savedPlayId: string | null = null;
+	export let exportPrompt: string | null = null;
+	export let exportPromptSource: HTMLElement | null = null;
 
 	type ToolIcon = 'event' | 'line-of-scrimmage' | 'line-to-gain';
 	type ToolOption = {
@@ -299,6 +308,7 @@
 	let exportBackgroundOpacity = 1;
 	let exportFieldBorderColor = '#1c1917';
 	let exportFieldBorderOpacity = 0;
+	let includeExportPrompt = Boolean(exportPrompt?.trim());
 	let exportColorPicker: 'background' | 'border' | null = null;
 	let exportSettingsHydrated = false;
 	let toolPreferencesHydrated = false;
@@ -333,6 +343,7 @@
 	let toolbarEditorTop = 0;
 	let toolbarEditorElement: HTMLElement;
 	let toolbarGuideYardage: number | '' = '';
+	let toolbarGuideSide: FieldSide = 'a';
 	let toolbarGuideHistorySaved = false;
 	let toolbarGuideYardageInput: HTMLInputElement;
 	let dragTarget: DragTarget | null = null;
@@ -351,8 +362,10 @@
 	let editingDownGuideId: number | null = null;
 	let editingDownGuide: FieldGuide | undefined;
 	let downYardageValue: number | '' = '';
+	let downGuideSide: FieldSide = 'a';
 	let downYardageHistorySaved = false;
 	let losYardageValue: number | '' = '';
+	let editingGuideSide: FieldSide = 'a';
 	let losYardageHistorySaved = false;
 	let guideYardageInput: HTMLInputElement;
 	let suppressDownMarkerClick = false;
@@ -619,6 +632,7 @@
 			| 'showNoRunZoneText'
 			| 'showTeamBoxes'
 			| 'showDownMarker'
+			| 'showLineOfScrimmageMarker'
 		>;
 		label: string;
 		description: string;
@@ -713,6 +727,12 @@
 			label: 'Down Marker',
 			description: 'Show the down and calculated distance at the Line to Gain.',
 			fieldTypes: ['traditional', 'four-v-four', 'unified']
+		},
+		{
+			key: 'showLineOfScrimmageMarker',
+			label: 'L.O.S. Yard Marker',
+			description: 'Show the Line of Scrimmage yard line on the opposite sideline.',
+			fieldTypes: ['traditional', 'four-v-four', 'unified']
 		}
 	];
 	$: fieldLayout = fieldLayouts[fieldSettings.fieldType];
@@ -758,6 +778,12 @@
 		const yards = yardsForX(x);
 		return Math.round(Math.min(yards - leftGoalYards(), rightGoalYards() - yards) * 2) / 2;
 	};
+	const fieldSideForX = (x: number): FieldSide =>
+		yardsForX(x) <= (leftGoalYards() + rightGoalYards()) / 2 ? 'a' : 'b';
+	const xForFieldSideYardLine = (side: FieldSide, yardLine: number, kind: 'line-of-scrimmage' | 'line-to-gain') => {
+		const x = xForYards(side === 'a' ? leftGoalYards() + yardLine : rightGoalYards() - yardLine);
+		return kind === 'line-of-scrimmage' ? clampLineOfScrimmageX(x) : clampLineToGainX(x);
+	};
 	const maximumLosYardLine = () => (rightGoalYards() - leftGoalYards()) / 2;
 	const lineToGainDirection = (lineToGainX: number, scrimmageX: number) => {
 		const currentDirection = Math.sign(lineToGainX - scrimmageX);
@@ -783,6 +809,13 @@
 		const half = !Number.isInteger(distance);
 		const wholeYards = Math.floor(distance);
 		const base = half && wholeYards === 0 ? `${down} &` : `${down} & ${half ? wholeYards : distance}`;
+		return { base, half, baseWidth: base.length * 5.8 };
+	};
+	const lineOfScrimmageMarkerDisplay = (x: number) => {
+		const yardLine = losYardLine(x);
+		const half = !Number.isInteger(yardLine);
+		const wholeYards = Math.floor(yardLine);
+		const base = half && wholeYards === 0 ? '' : String(half ? wholeYards : yardLine);
 		return { base, half, baseWidth: base.length * 5.8 };
 	};
 	$: fieldSnapXs = [
@@ -1270,6 +1303,67 @@
 			padding: exportBackground === 'transparent' && !rendersOnWhite && !hasCustomBorder ? undefined : 12
 		};
 	};
+	const exportPromptOptions = (): ExportPrompt | undefined => {
+		const text = exportPrompt?.trim();
+		if (!includeExportPrompt || !text) return undefined;
+		const style = exportPromptSource ? getComputedStyle(exportPromptSource) : null;
+		const fontSize = Number.parseFloat(style?.fontSize ?? '') || 18;
+		const parsedLineHeight = Number.parseFloat(style?.lineHeight ?? '');
+		const runs: ExportPromptRun[] = [];
+		if (exportPromptSource) {
+			const collectRuns = (node: Node) => {
+				if (node instanceof HTMLBRElement) {
+					runs.push({
+						text: '\n',
+						fontFamily: style?.fontFamily || 'ui-sans-serif, system-ui, sans-serif',
+						fontSize,
+						fontWeight: style?.fontWeight || '400',
+						fontStyle: style?.fontStyle || 'normal',
+						color: style?.color || '#1c1917'
+					});
+					return;
+				}
+				if (node instanceof Text) {
+					if (!node.textContent) return;
+					const parent = node.parentElement ?? exportPromptSource;
+					const runStyle = getComputedStyle(parent);
+					const isContainer = parent === exportPromptSource;
+					runs.push({
+						text: node.textContent,
+						fontFamily: runStyle.fontFamily || style?.fontFamily || 'ui-sans-serif, system-ui, sans-serif',
+						fontSize: Number.parseFloat(runStyle.fontSize) || fontSize,
+						fontWeight: runStyle.fontWeight || style?.fontWeight || '400',
+						fontStyle: runStyle.fontStyle || style?.fontStyle || 'normal',
+						color: runStyle.color || style?.color || '#1c1917',
+						backgroundColor: isContainer ? undefined : runStyle.backgroundColor,
+						textDecorationLine: runStyle.textDecorationLine,
+						paddingLeft: isContainer ? 0 : Number.parseFloat(runStyle.paddingLeft) || 0,
+						paddingRight: isContainer ? 0 : Number.parseFloat(runStyle.paddingRight) || 0
+					});
+					return;
+				}
+				node.childNodes.forEach(collectRuns);
+			};
+			exportPromptSource.childNodes.forEach(collectRuns);
+		}
+		return {
+			text,
+			runs,
+			fontFamily: style?.fontFamily || 'ui-sans-serif, system-ui, sans-serif',
+			fontSize,
+			fontWeight: style?.fontWeight || '400',
+			fontStyle: style?.fontStyle || 'normal',
+			lineHeight: Number.isFinite(parsedLineHeight) ? parsedLineHeight : fontSize * 1.425,
+			color: style?.color || '#1c1917',
+			backgroundColor: style?.backgroundColor || '#ffffff',
+			borderColor: style?.borderTopColor || '#1c1917',
+			borderWidth: Number.parseFloat(style?.borderTopWidth ?? '') || 2,
+			paddingTop: Number.parseFloat(style?.paddingTop ?? '') || 16,
+			paddingRight: Number.parseFloat(style?.paddingRight ?? '') || 16,
+			paddingBottom: Number.parseFloat(style?.paddingBottom ?? '') || 16,
+			paddingLeft: Number.parseFloat(style?.paddingLeft ?? '') || 16
+		};
+	};
 	const exportImage = async (format: 'png' | 'jpg' | 'webp' | 'pdf') => {
 		if (actionInProgress) return;
 		actionInProgress = format;
@@ -1277,7 +1371,10 @@
 		let restorePlayId: number | null = null;
 		try {
 			if (format !== 'pdf') {
-				await exportPlayBuilderRaster(svg, format, exportRenderOptions(format));
+				await exportPlayBuilderRaster(svg, format, {
+					...exportRenderOptions(format),
+					prompt: exportPromptOptions()
+				});
 			} else {
 				storeActivePlayState();
 				restorePlayId = playEntries[activePlayIndex].id;
@@ -1738,6 +1835,34 @@
 		losYardageValue = '';
 		losYardageHistorySaved = false;
 	};
+	const moveGuideToFieldSide = (guide: FieldGuide, side: FieldSide, saveOnce: () => void) => {
+		if (guide.kind !== 'line-of-scrimmage' && guide.kind !== 'line-to-gain') return guide.x;
+		const nextX = xForFieldSideYardLine(side, losYardLine(guide.x), guide.kind);
+		if (Math.abs(nextX - guide.x) > 0.01) saveOnce();
+		return nextX;
+	};
+	const setEditingGuideSide = (side: FieldSide) => {
+		if (!editingGuide || (editingGuide.kind !== 'line-of-scrimmage' && editingGuide.kind !== 'line-to-gain')) return;
+		editingGuideSide = side;
+		const nextX = moveGuideToFieldSide(editingGuide, side, () => {
+			if (!losYardageHistorySaved) saveHistory();
+			losYardageHistorySaved = true;
+		});
+		if (Math.abs(nextX - editingGuide.x) <= 0.01) return;
+		guides = guides.map((guide) => (guide.id === editingGuideId ? { ...guide, x: nextX } : guide));
+		losYardageValue = editingGuide.kind === 'line-of-scrimmage' ? losYardLine(nextX) : (guideDistanceYards(nextX, lineOfScrimmageX) ?? '');
+	};
+	const setDownGuideSide = (side: FieldSide) => {
+		if (!editingDownGuide) return;
+		downGuideSide = side;
+		const nextX = moveGuideToFieldSide(editingDownGuide, side, () => {
+			if (!downYardageHistorySaved) saveHistory();
+			downYardageHistorySaved = true;
+		});
+		if (Math.abs(nextX - editingDownGuide.x) <= 0.01) return;
+		guides = guides.map((guide) => (guide.id === editingDownGuideId ? { ...guide, x: nextX } : guide));
+		downYardageValue = guideDistanceYards(nextX, lineOfScrimmageX) ?? '';
+	};
 	const commitPathEditor = () => {
 		editingPathId = null;
 	};
@@ -1766,6 +1891,7 @@
 		downYardageValue = distance;
 		const direction = lineToGainDirection(editingDownGuide.x, lineOfScrimmageX);
 		const nextX = clampLineToGainX(lineOfScrimmageX + direction * distance * (fieldWidth / fieldLayout.totalYards));
+		downGuideSide = fieldSideForX(nextX);
 		if (Math.abs(nextX - editingDownGuide.x) <= 0.01) return;
 		if (!downYardageHistorySaved) {
 			saveHistory();
@@ -1786,9 +1912,7 @@
 		if (editingGuide.kind === 'line-of-scrimmage') {
 			const yardLine = Math.max(0.5, Math.min(maximumLosYardLine(), Math.round(requestedYards * 2) / 2));
 			losYardageValue = yardLine;
-			const currentYards = yardsForX(editingGuide.x);
-			const onLeftHalf = currentYards <= (leftGoalYards() + rightGoalYards()) / 2;
-			nextX = clampLineOfScrimmageX(xForYards(onLeftHalf ? leftGoalYards() + yardLine : rightGoalYards() - yardLine));
+			nextX = xForFieldSideYardLine(editingGuideSide, yardLine, 'line-of-scrimmage');
 		} else {
 			if (lineOfScrimmageX === null) return;
 			const maximum = maximumDownMarkerYardage(editingGuide.x, lineOfScrimmageX);
@@ -1796,6 +1920,7 @@
 			losYardageValue = distance;
 			const direction = lineToGainDirection(editingGuide.x, lineOfScrimmageX);
 			nextX = clampLineToGainX(lineOfScrimmageX + direction * distance * (fieldWidth / fieldLayout.totalYards));
+			editingGuideSide = fieldSideForX(nextX);
 		}
 		if (Math.abs(nextX - editingGuide.x) <= 0.01) return;
 		if (!losYardageHistorySaved) {
@@ -1803,6 +1928,7 @@
 			losYardageHistorySaved = true;
 		}
 		guides = guides.map((guide) => (guide.id === editingGuideId ? { ...guide, x: nextX } : guide));
+		editingGuideSide = fieldSideForX(nextX);
 	};
 	const moveEditingGuideByYard = (direction: -1 | 1) => {
 		if (!editingGuide || (editingGuide.kind !== 'line-of-scrimmage' && editingGuide.kind !== 'line-to-gain')) return;
@@ -1817,6 +1943,7 @@
 			losYardageHistorySaved = true;
 		}
 		guides = guides.map((guide) => (guide.id === editingGuideId ? { ...guide, x: nextX } : guide));
+		editingGuideSide = fieldSideForX(nextX);
 		losYardageValue = editingGuide.kind === 'line-of-scrimmage' ? losYardLine(nextX) : (guideDistanceYards(nextX, lineOfScrimmageX) ?? '');
 	};
 	const commitDownMarkerEditor = () => {
@@ -1881,6 +2008,7 @@
 		editingTeamBoxY = null;
 		editingTeamBoxIndex = null;
 		downYardageValue = guideDistanceYards(guide.x, lineOfScrimmageX) ?? '';
+		downGuideSide = fieldSideForX(guide.x);
 		downYardageHistorySaved = false;
 		editingDownGuideId = guide.id;
 	};
@@ -1947,6 +2075,7 @@
 		editingDownGuideId = null;
 		guideEditColor = guide.color;
 		guideEditStyle = guide.style;
+		if (guide.kind === 'line-of-scrimmage' || guide.kind === 'line-to-gain') editingGuideSide = fieldSideForX(guide.x);
 		losYardageValue =
 			guide.kind === 'line-of-scrimmage'
 				? losYardLine(guide.x)
@@ -1960,6 +2089,10 @@
 			guideYardageInput?.select();
 		}
 		completeTutorialAction(`edit:${guide.kind}`);
+	};
+	const startEditingLineOfScrimmageMarker = async (event: Event, guide: FieldGuide) => {
+		if (guide.kind !== 'line-of-scrimmage' || suppressDownMarkerClick || tool === 'event' || tool === 'free-draw') return;
+		await startEditingGuide(event, guide);
 	};
 	const startEditingPath = (event: Event, path: FieldPath) => {
 		if (tool === 'event') return;
@@ -1989,6 +2122,7 @@
 		toolbarGuideHistorySaved = false;
 		if (selectedTool === 'line-of-scrimmage' || selectedTool === 'line-to-gain') {
 			const existing = guides.find((guide) => guide.kind === selectedTool);
+			toolbarGuideSide = existing ? fieldSideForX(existing.x) : 'a';
 			const defaultYardages = {
 				traditional: { 'line-of-scrimmage': 14, 'line-to-gain': 6 },
 				'four-v-four': { 'line-of-scrimmage': 10, 'line-to-gain': 10 },
@@ -2042,6 +2176,20 @@
 			guides = guides.map((guide) => (guide.id === existing.id ? { ...guide, style } : guide));
 		}
 	};
+	const setToolbarGuideSide = (side: FieldSide) => {
+		if (toolbarEditorTool !== 'line-of-scrimmage' && toolbarEditorTool !== 'line-to-gain') return;
+		toolbarGuideSide = side;
+		const existing = guides.find((guide) => guide.kind === toolbarEditorTool);
+		if (!existing) return;
+		const nextX = moveGuideToFieldSide(existing, side, () => {
+			if (!toolbarGuideHistorySaved) saveHistory();
+			toolbarGuideHistorySaved = true;
+		});
+		if (Math.abs(nextX - existing.x) <= 0.01) return;
+		guides = guides.map((guide) => (guide.id === existing.id ? { ...guide, x: nextX } : guide));
+		toolbarGuideYardage =
+			existing.kind === 'line-of-scrimmage' ? losYardLine(nextX) : (guideDistanceYards(nextX, lineOfScrimmageX) ?? '');
+	};
 	const updateToolbarGuideYardage = (event: Event) => {
 		if (toolbarEditorTool !== 'line-of-scrimmage' && toolbarEditorTool !== 'line-to-gain') return;
 		const rawValue = (event.currentTarget as HTMLInputElement).value;
@@ -2055,9 +2203,7 @@
 		if (toolbarEditorTool === 'line-of-scrimmage') {
 			const yardLine = Math.max(0.5, Math.min(maximumLosYardLine(), Math.round(requested * 2) / 2));
 			toolbarGuideYardage = yardLine;
-			const existing = guides.find((guide) => guide.kind === toolbarEditorTool);
-			const onLeftHalf = !existing || yardsForX(existing.x) <= (leftGoalYards() + rightGoalYards()) / 2;
-			nextX = clampLineOfScrimmageX(xForYards(onLeftHalf ? leftGoalYards() + yardLine : rightGoalYards() - yardLine));
+			nextX = xForFieldSideYardLine(toolbarGuideSide, yardLine, 'line-of-scrimmage');
 		} else {
 			if (lineOfScrimmageX === null) return;
 			const existing = guides.find((guide) => guide.kind === toolbarEditorTool);
@@ -2066,6 +2212,7 @@
 			toolbarGuideYardage = distance;
 			const direction = lineToGainDirection(existing?.x ?? lineOfScrimmageX + 1, lineOfScrimmageX);
 			nextX = clampLineToGainX(lineOfScrimmageX + direction * distance * (fieldWidth / fieldLayout.totalYards));
+			toolbarGuideSide = fieldSideForX(nextX);
 		}
 		const existing = guides.find((guide) => guide.kind === toolbarEditorTool);
 		if (existing && Math.abs(existing.x - nextX) <= 0.01) return;
@@ -2308,6 +2455,7 @@
 			return;
 		if (editorElement?.contains(target)) return;
 		if (editingDownGuideId !== null && target instanceof Element && target.closest('[data-down-marker]')) return;
+		if (editingGuideId !== null && target instanceof Element && target.closest('[data-los-marker]')) return;
 		if (target instanceof Element && target.closest('[data-builder-tool]')) {
 			commitActiveEditor();
 			return;
@@ -2824,6 +2972,7 @@
 		if (key === 'fieldType') discardFreeDrawings();
 		fieldSettings = { ...fieldSettings, [key]: value };
 		if (key === 'showDownMarker' && value === false) editingDownGuideId = null;
+		if (key === 'showLineOfScrimmageMarker' && value === false && editingGuide?.kind === 'line-of-scrimmage') editingGuideId = null;
 		clearPlacementSnap();
 		if (key === 'fieldType') completeTutorialAction('settings-field-type');
 		if (key === 'fieldColor') completeTutorialAction('settings-field-color');
@@ -2843,6 +2992,7 @@
 			| 'showNoRunZoneText'
 			| 'showTeamBoxes'
 			| 'showDownMarker'
+			| 'showLineOfScrimmageMarker'
 		>
 	) => updateFieldSetting(key, !fieldSettings[key]);
 	const resetFieldSettings = () => {
@@ -3821,6 +3971,17 @@
 				>
 					{#if toolbarEditorTool === 'line-of-scrimmage' || toolbarEditorTool === 'line-to-gain'}
 						{@const toolbarEditingLos = toolbarEditorTool === 'line-of-scrimmage'}
+						<button
+							type="button"
+							aria-label={`Field side ${toolbarGuideSide.toUpperCase()}; switch to ${toolbarGuideSide === 'a' ? 'B' : 'A'}`}
+							title={`${toolbarGuideSide.toUpperCase()} Side`}
+							on:click={() => setToolbarGuideSide(toolbarGuideSide === 'a' ? 'b' : 'a')}
+							class="h-7 w-7 shrink-0 cursor-pointer border border-stone-900 text-[11px] font-black"
+							class:bg-stone-900={toolbarGuideSide === 'a'}
+							class:text-white={toolbarGuideSide === 'a'}
+							class:bg-white={toolbarGuideSide === 'b'}
+							class:text-stone-950={toolbarGuideSide === 'b'}>{toolbarGuideSide.toUpperCase()}</button
+						>
 						<input
 							bind:this={toolbarGuideYardageInput}
 							type="number"
@@ -3836,7 +3997,9 @@
 							disabled={!toolbarEditingLos && lineOfScrimmageX === null}
 							aria-label={toolbarEditingLos ? 'Line of Scrimmage yard line' : 'Line to Gain distance'}
 							title={toolbarEditingLos ? 'L.O.S. yard line' : 'L.T.G. distance'}
-							class="down-yardage-input h-7 w-10 border-0 bg-stone-100 px-1 text-center text-[10px] font-black text-stone-800 outline-none hover:bg-stone-200 focus:bg-white focus:ring-1 focus:ring-stone-700 focus:ring-inset disabled:opacity-40"
+							class="down-yardage-input h-7 border-0 bg-stone-100 px-1 text-center text-[10px] font-black text-stone-800 outline-none hover:bg-stone-200 focus:bg-white focus:ring-1 focus:ring-stone-700 focus:ring-inset disabled:opacity-40"
+							class:w-8={toolbarEditingLos}
+							class:w-10={!toolbarEditingLos}
 							on:focus={(event) => event.currentTarget.select()}
 							on:input={updateToolbarGuideYardage}
 							on:keydown|stopPropagation={(event) => {
@@ -5479,6 +5642,71 @@
 								</g>
 							{/each}
 						{/if}
+						{#if hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-of-scrimmage' && fieldSettings.showLineOfScrimmageMarker}
+							{@const previewGuideX = wholeYardLineOfScrimmageX(placementSnapX ?? hoverPoint.x)}
+							{@const previewLosMarker = lineOfScrimmageMarkerDisplay(previewGuideX)}
+							<g class="los-marker-graphic" opacity="0.72" pointer-events="none">
+								<rect x={previewGuideX - 20} y={fieldBottom - 9} width="40" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
+								<text
+									x={previewGuideX - (previewLosMarker.half ? 3.5 : 0)}
+									y={fieldBottom + 3.5}
+									text-anchor="middle"
+									fill="#ffffff"
+									font-size="10"
+									font-weight="900">{previewLosMarker.base}</text
+								>
+								{#if previewLosMarker.half}
+									{@const fractionX = previewGuideX + previewLosMarker.baseWidth / 2 - 1.5}
+									<g fill="#ffffff" font-size="5.5" font-weight="900" text-anchor="middle">
+										<text x={fractionX} y={fieldBottom - 1.5}>1</text>
+										<line x1={fractionX - 2.5} y1={fieldBottom + 0.25} x2={fractionX + 2.5} y2={fieldBottom + 0.25} stroke="#ffffff" stroke-width="0.8" />
+										<text x={fractionX} y={fieldBottom + 5.5}>2</text>
+									</g>
+								{/if}
+							</g>
+						{/if}
+						{#if fieldSettings.showLineOfScrimmageMarker}
+							{#each guides.filter((guide) => guide.kind === 'line-of-scrimmage') as guide (guide.id)}
+								{@const markerDisplay = lineOfScrimmageMarkerDisplay(guide.x)}
+								<g
+									class="los-marker-graphic"
+									data-los-marker
+									data-export-los-marker
+									data-field-element
+									data-field-type="guide"
+									role="button"
+									tabindex="0"
+									aria-label={`Line of Scrimmage at the ${losYardLine(guide.x)} yard line`}
+									on:pointerdown|stopPropagation={(event) => beginOnGuide(event, guide, true)}
+									on:click|stopPropagation={(event) => startEditingLineOfScrimmageMarker(event, guide)}
+									on:dblclick|stopPropagation={(event) => startEditingLineOfScrimmageMarker(event, guide)}
+									on:keydown|stopPropagation={(event) => {
+										if (event.key === 'Enter' || event.key === ' ') startEditingLineOfScrimmageMarker(event, guide);
+									}}
+									class:cursor-grab={!isDragging('guide', guide.id)}
+									class:cursor-grabbing={isDragging('guide', guide.id)}
+								>
+									<rect x={guide.x - 20} y={fieldBottom - 9} width="40" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
+									<text
+										x={guide.x - (markerDisplay.half ? 3.5 : 0)}
+										y={fieldBottom + 3.5}
+										text-anchor="middle"
+										fill="#ffffff"
+										font-size="10"
+										font-weight="900"
+										pointer-events="none">{markerDisplay.base}</text
+									>
+									{#if markerDisplay.half}
+										{@const fractionX = guide.x + markerDisplay.baseWidth / 2 - 1.5}
+										<g fill="#ffffff" font-size="5.5" font-weight="900" text-anchor="middle" pointer-events="none">
+											<text x={fractionX} y={fieldBottom - 1.5}>1</text>
+											<line x1={fractionX - 2.5} y1={fieldBottom + 0.25} x2={fractionX + 2.5} y2={fieldBottom + 0.25} stroke="#ffffff" stroke-width="0.8" />
+											<text x={fractionX} y={fieldBottom + 5.5}>2</text>
+										</g>
+									{/if}
+								</g>
+							{/each}
+						{/if}
 					</g>
 				</svg>
 
@@ -5502,6 +5730,17 @@
 								class:!text-[#ff5a1f]={(editingDownGuide.down ?? '1st') === option.id}>{option.label}</button
 							>
 						{/each}
+						<button
+							type="button"
+							aria-label={`Field side ${downGuideSide.toUpperCase()}; switch to ${downGuideSide === 'a' ? 'B' : 'A'}`}
+							title={`${downGuideSide.toUpperCase()} Side`}
+							on:click={() => setDownGuideSide(downGuideSide === 'a' ? 'b' : 'a')}
+							class="h-7 w-7 shrink-0 cursor-pointer border border-stone-900 text-[11px] font-black"
+							class:bg-stone-900={downGuideSide === 'a'}
+							class:text-white={downGuideSide === 'a'}
+							class:bg-white={downGuideSide === 'b'}
+							class:text-stone-950={downGuideSide === 'b'}>{downGuideSide.toUpperCase()}</button
+						>
 						<label class="sr-only" for="custom-down-yardage">Custom yardage</label>
 						<input
 							id="custom-down-yardage"
@@ -5650,6 +5889,17 @@
 					>
 						{#if editingGuide?.kind === 'line-of-scrimmage' || editingGuide?.kind === 'line-to-gain'}
 							{@const editingLos = editingGuide.kind === 'line-of-scrimmage'}
+							<button
+								type="button"
+								aria-label={`Field side ${editingGuideSide.toUpperCase()}; switch to ${editingGuideSide === 'a' ? 'B' : 'A'}`}
+								title={`${editingGuideSide.toUpperCase()} Side`}
+								on:click={() => setEditingGuideSide(editingGuideSide === 'a' ? 'b' : 'a')}
+								class="h-7 w-7 shrink-0 cursor-pointer border border-stone-900 text-[11px] font-black"
+								class:bg-stone-900={editingGuideSide === 'a'}
+								class:text-white={editingGuideSide === 'a'}
+								class:bg-white={editingGuideSide === 'b'}
+								class:text-stone-950={editingGuideSide === 'b'}>{editingGuideSide.toUpperCase()}</button
+							>
 							<label class="sr-only" for="guide-yardage">{editingLos ? 'Line of Scrimmage yard line' : 'Line to Gain distance'}</label>
 							<input
 								bind:this={guideYardageInput}
@@ -5662,7 +5912,9 @@
 								bind:value={losYardageValue}
 								aria-label={editingLos ? 'Line of Scrimmage yard line' : 'Line to Gain distance'}
 								title={editingLos ? 'L.O.S. yard line' : 'L.T.G. distance'}
-								class="down-yardage-input h-7 w-10 border-0 bg-stone-100 px-1 text-center text-[10px] font-black text-stone-800 outline-none hover:bg-stone-200 focus:bg-white focus:ring-1 focus:ring-stone-700 focus:ring-inset"
+								class="down-yardage-input h-7 border-0 bg-stone-100 px-1 text-center text-[10px] font-black text-stone-800 outline-none hover:bg-stone-200 focus:bg-white focus:ring-1 focus:ring-stone-700 focus:ring-inset"
+								class:w-8={editingLos}
+								class:w-10={!editingLos}
 								on:focus={(event) => (event.currentTarget as HTMLInputElement).select()}
 								on:input={updateGuideYardage}
 								on:keydown|stopPropagation={(event) => {
@@ -5878,6 +6130,17 @@
 			</header>
 
 			<div class="space-y-4 p-3">
+				{#if exportPrompt?.trim()}
+					<section>
+						<label class="flex cursor-pointer items-center justify-between gap-3 border border-stone-400 bg-white p-2 hover:border-stone-900">
+							<span>
+								<strong class="block text-xs font-black">Include Case Play Prompt</strong>
+								<span class="mt-0.5 block text-[10px] leading-tight text-stone-600">Places the prompt above PNG, JPG, and WebP exports.</span>
+							</span>
+							<input bind:checked={includeExportPrompt} type="checkbox" class="h-4 w-4 cursor-pointer accent-stone-900" />
+						</label>
+					</section>
+				{/if}
 				<section>
 					<h3 class="mb-1.5 text-[10px] font-black tracking-wide uppercase">Background</h3>
 					<div class="grid gap-1" role="radiogroup" aria-label="Export background">
@@ -6535,6 +6798,9 @@
 	@container (max-width: 900px) {
 		.down-marker-graphic {
 			transform: translateY(22px);
+		}
+		.los-marker-graphic {
+			transform: translateY(-22px);
 		}
 	}
 	.drawing-cursor,

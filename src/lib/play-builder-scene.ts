@@ -21,6 +21,7 @@ export type PlayBuilderFieldSettings = {
 	showNoRunZoneText: boolean;
 	showTeamBoxes: boolean;
 	showDownMarker: boolean;
+	showLineOfScrimmageMarker: boolean;
 	teamBoxTopLabel: string;
 	teamBoxBottomLabel: string;
 	fieldType: PlayBuilderFieldType;
@@ -78,7 +79,8 @@ const fieldSettingKeys = [
 	'showThirtyYardMarker',
 	'showTeamBoxes',
 	'showNoRunZoneText',
-	'showDownMarker'
+	'showDownMarker',
+	'showLineOfScrimmageMarker'
 ] as const;
 
 type LegacyMarkerTuple = [number, number, number, number, string | null, number | null];
@@ -121,6 +123,7 @@ export const DEFAULT_PLAY_BUILDER_FIELD_SETTINGS: Readonly<PlayBuilderFieldSetti
 	showNoRunZoneText: false,
 	showTeamBoxes: true,
 	showDownMarker: true,
+	showLineOfScrimmageMarker: true,
 	teamBoxTopLabel: 'TEAM BOX',
 	teamBoxBottomLabel: 'TEAM BOX',
 	fieldType: 'traditional',
@@ -147,7 +150,17 @@ type SerializedPlayBuilderDocumentV4 = {
 	p: [string, SerializedPlayBuilderScene, FieldSettingsTuple][];
 };
 
-export type SerializedPlayBuilderDocument = SerializedPlayBuilderDocumentV2 | SerializedPlayBuilderDocumentV3 | SerializedPlayBuilderDocumentV4;
+type SerializedPlayBuilderDocumentV5 = {
+	v: 5;
+	a: number;
+	p: [string, SerializedPlayBuilderScene, FieldSettingsTuple][];
+};
+
+export type SerializedPlayBuilderDocument =
+	| SerializedPlayBuilderDocumentV2
+	| SerializedPlayBuilderDocumentV3
+	| SerializedPlayBuilderDocumentV4
+	| SerializedPlayBuilderDocumentV5;
 
 const quantize = (value: number) => Math.round(value * 10);
 const dequantize = (value: number) => value / 10;
@@ -352,7 +365,11 @@ const encodeFieldSettings = (settings: PlayBuilderFieldSettings): FieldSettingsT
 	settings.teamBoxBottomLabel
 ];
 
-const decodeFieldSettings = (value: unknown, includesDownMarkerSetting: boolean): PlayBuilderFieldSettings => {
+const decodeFieldSettings = (
+	value: unknown,
+	includesDownMarkerSetting: boolean,
+	includesLineOfScrimmageMarkerSetting: boolean
+): PlayBuilderFieldSettings => {
 	if (
 		!Array.isArray(value) ||
 		(value.length !== 3 && value.length !== 4 && value.length !== 5) ||
@@ -369,6 +386,7 @@ const decodeFieldSettings = (value: unknown, includesDownMarkerSetting: boolean)
 	const settings = defaultPlayBuilderFieldSettings();
 	fieldSettingKeys.forEach((key, index) => {
 		if (key === 'showDownMarker' && !includesDownMarkerSetting) return;
+		if (key === 'showLineOfScrimmageMarker' && !includesLineOfScrimmageMarkerSetting) return;
 		settings[key] = (Number(value[0]) & (1 << index)) !== 0;
 	});
 	settings.fieldType = fieldTypes[Number(value[1])];
@@ -381,7 +399,7 @@ const decodeFieldSettings = (value: unknown, includesDownMarkerSetting: boolean)
 };
 
 export const encodePlayBuilderDocument = (document: PlayBuilderDocument): SerializedPlayBuilderDocument => ({
-	v: 4,
+	v: 5,
 	a: document.activePlayIndex,
 	p: document.plays.map((play) => [play.name, encodePlayBuilderScene(play.scene), encodeFieldSettings(play.settings)])
 });
@@ -393,7 +411,7 @@ export const decodePlayBuilderDocument = (value: unknown): PlayBuilderDocument =
 	if (!value || typeof value !== 'object') throw new Error('Invalid play builder document.');
 	const document = value as Partial<SerializedPlayBuilderDocument>;
 	if (
-		(document.v !== 2 && document.v !== 3 && document.v !== 4) ||
+		(document.v !== 2 && document.v !== 3 && document.v !== 4 && document.v !== 5) ||
 		!Number.isInteger(document.a) ||
 		!Array.isArray(document.p) ||
 		document.p.length < 1 ||
@@ -411,7 +429,10 @@ export const decodePlayBuilderDocument = (value: unknown): PlayBuilderDocument =
 		return {
 			name,
 			scene: decodePlayBuilderScene(item[1]),
-			settings: document.v === 2 ? defaultPlayBuilderFieldSettings() : decodeFieldSettings(item[2], document.v === 4)
+			settings:
+				document.v === 2
+					? defaultPlayBuilderFieldSettings()
+					: decodeFieldSettings(item[2], document.v === 4 || document.v === 5, document.v === 5)
 		};
 	});
 	return { activePlayIndex: Number(document.a), plays };

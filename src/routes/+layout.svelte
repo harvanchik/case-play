@@ -10,7 +10,7 @@
 
 <svelte:head>
 	<link rel="canonical" href={canonicalUrl} />
-	<meta property="og:site_name" content="caseplay.org" />
+	<meta property="og:site_name" content="CasePlay.org" />
 	<meta property="og:url" content={canonicalUrl} />
 	<meta property="og:locale" content="en_US" />
 </svelte:head>
