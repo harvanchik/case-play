@@ -1,13 +1,24 @@
-@import url('https://fonts.googleapis.com/css2?family=Barriecito&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Neucha&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Dokdo&display=swap');
-
 @import 'tailwindcss';
 
 @plugin 'tailwind-scrollbar';
 
+@font-face {
+	font-family: 'Neucha';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/neucha-latin.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Dokdo';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/dokdo-latin.woff2') format('woff2');
+}
+
 @theme {
-	--font-barriecito: 'Barriecito', sans-serif;
 	--font-neucha: 'Neucha', sans-serif;
 	--font-dokdo: 'Dokdo', sans-serif;
 }

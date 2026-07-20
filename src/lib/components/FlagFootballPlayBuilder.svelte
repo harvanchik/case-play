@@ -86,6 +86,7 @@
 	export let savedPlayId: string | null = null;
 	export let exportPrompt: string | null = null;
 	export let exportPromptSource: HTMLElement | null = null;
+	export let viewOnly = false;
 
 	type ToolIcon = 'event' | 'line-of-scrimmage' | 'line-to-gain';
 	type ToolOption = {
@@ -1133,6 +1134,7 @@
 		discardFreeDrawings();
 	};
 	const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+		if (viewOnly) return;
 		if (!hasUnsavedChanges) return;
 		event.preventDefault();
 		event.returnValue = '';
@@ -1567,6 +1569,15 @@
 	];
 	const beanBagImage = (color: GuideColor | undefined) =>
 		`/images/bean-bag-${color === 'white' || color === 'black' || color === 'pink' ? color : 'blue'}.webp`;
+	const toolbarAsset = (path: string) => path.replace('/images/', '/images/toolbar/');
+	const toolbarToolImage = (item: ToolOption) =>
+		toolbarAsset(
+			item.id === 'deflag'
+				? deflagImage(deflagPlacementColor)
+				: item.id === 'bean-bag'
+					? beanBagImage(beanBagPlacementColor)
+					: item.image ?? '/images/football.webp'
+		);
 	const eventWidth = (label = 'EVENT') => Math.max(eventTagWidth, Math.min(154, label.length * 6.6 + 16));
 	const penaltyLabelLines = (label = '') => {
 		const maxCharacters = 12;
@@ -2249,6 +2260,7 @@
 		else clearEditorState();
 	};
 	const handleGlobalKeydown = (event: KeyboardEvent) => {
+		if (viewOnly) return;
 		const target = event.target as HTMLElement | null;
 		const isEditableTarget = target?.matches('input, textarea, select, [contenteditable="true"]') ?? false;
 		if (tutorialActive) {
@@ -3846,9 +3858,13 @@
 	bind:this={builderRoot}
 	on:pointerdown={markTutorialSeen}
 	class="relative border-2 border-stone-900 bg-stone-800 shadow-lg select-none"
-	aria-label="Flag football play builder"
+	class:view-only={viewOnly}
+	class:pointer-events-none={viewOnly}
+	inert={viewOnly}
+	role={viewOnly ? 'img' : undefined}
+	aria-label={viewOnly ? 'Shared flag football play diagram' : 'Flag football play builder'}
 >
-	<div data-tutorial="draw-workspace" class="flex gap-2 p-2">
+	<div data-tutorial="draw-workspace" class="flex gap-2 p-2" aria-hidden={viewOnly}>
 		<div class="tool-column relative my-auto w-10 shrink-0 sm:w-12">
 			<div class="flex w-full flex-col gap-px bg-stone-500 p-px" role="toolbar" aria-label="Drawing tools">
 				{#each toolRows as row}
@@ -3903,11 +3919,7 @@
 										</svg>
 									{:else if item.image}
 										<img
-											src={item.id === 'deflag'
-												? deflagImage(deflagPlacementColor)
-												: item.id === 'bean-bag'
-													? beanBagImage(beanBagPlacementColor)
-													: item.image}
+										src={toolbarToolImage(item)}
 											alt=""
 											class="h-8 w-8 object-contain"
 											class:!h-7={item.id === 'free-draw'}
@@ -4249,7 +4261,7 @@
 							on:click={() => runGuardedAction(clear)}
 							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-35"
 						>
-							<img src="/images/trash-can.webp" alt="" class="h-4 w-4 object-contain" draggable="false" loading="lazy" />
+							<img src="/images/toolbar/trash-can.webp" alt="" class="h-4 w-4 object-contain" draggable="false" loading="lazy" />
 							<span class="text-[8px] leading-none font-semibold">Clear All</span>
 						</button>
 					</HoverTooltip>
@@ -5998,7 +6010,7 @@
 						style:left={`${deletePosition.x / 10}%`}
 						style:top={`${(deletePosition.y / 484) * 100}%`}
 					>
-						<img src="/images/trash-can.webp" alt="" class="h-4 w-4 object-contain invert" draggable="false" loading="lazy" />
+						<img src="/images/toolbar/trash-can.webp" alt="" class="h-4 w-4 object-contain invert" draggable="false" loading="lazy" />
 					</button>
 				{/if}
 			</div>
@@ -6062,11 +6074,7 @@
 			{:else if item.image}
 				<div class="flex h-11 w-11 items-center justify-center border border-stone-400 bg-stone-100">
 					<img
-						src={item.id === 'deflag'
-							? deflagImage(deflagPlacementColor)
-							: item.id === 'bean-bag'
-								? beanBagImage(beanBagPlacementColor)
-								: item.image}
+					src={toolbarToolImage(item)}
 						alt=""
 						class="h-9 w-9 object-contain"
 						draggable="false"
@@ -6790,6 +6798,22 @@
 	}
 	.field-canvas {
 		aspect-ratio: 1000 / 484;
+	}
+	.view-only {
+		border: 0;
+		box-shadow: none;
+	}
+	.view-only [data-tutorial='draw-workspace'] {
+		gap: 0;
+		padding: 0;
+	}
+	.view-only .tool-column,
+	.view-only .play-builder-interaction > :not(.field-canvas) {
+		display: none !important;
+	}
+	.view-only .play-builder-interaction,
+	.view-only .field-canvas {
+		width: 100%;
 	}
 	.tool-column {
 		container-type: inline-size;

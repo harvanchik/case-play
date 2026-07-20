@@ -7,5 +7,12 @@ export const load: PageServerLoad = async ({ params }) => {
 	if (!/^[A-Za-z0-9_-]{12}$/.test(params.playId)) throw error(404, 'Saved play not found.');
 	const saved = await getPlayBuilderDiagram(params.playId);
 	if (!saved) throw error(404, 'Saved play not found.');
-	return { playId: saved.id, initialDocument: parseStoredPlayBuilderDocument(saved.documentJson) };
+	const initialDocument = parseStoredPlayBuilderDocument(saved.documentJson);
+	const activePlayName = initialDocument.p[initialDocument.a]?.[0]?.trim() || 'Shared Play';
+	return {
+		playId: saved.id,
+		initialDocument,
+		activePlayName,
+		playCount: initialDocument.p.length
+	};
 };

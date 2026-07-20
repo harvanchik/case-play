@@ -4,14 +4,51 @@
 	import PlayBuilderAttribution from '$lib/components/PlayBuilderAttribution.svelte';
 	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
 	import DesktopPlayBuilderGate from '$lib/components/DesktopPlayBuilderGate.svelte';
+
+	const pageTitle = 'Flag Football Play Builder | Draw, Save & Share Plays | CasePlay.org';
+	const pageDescription =
+		'Create flag football play diagrams online. Draw routes, place players and officials, customize fields, save plays, and share or export your diagrams.';
+	const socialImage = 'https://caseplay.org/images/flag-football-play-builder-social.png';
+	const structuredData = {
+		'@context': 'https://schema.org',
+		'@type': 'WebApplication',
+		name: 'Flag Football Play Builder',
+		url: 'https://caseplay.org/play-builder',
+		description: pageDescription,
+		applicationCategory: 'SportsApplication',
+		operatingSystem: 'Any web browser',
+		browserRequirements: 'Requires a desktop-sized screen for editing',
+		isAccessibleForFree: true,
+		image: socialImage,
+		featureList: [
+			'Draw run, pass, and punt routes',
+			'Place players, officials, footballs, flags, and field markers',
+			'Use traditional, 4v4, and unified flag football fields',
+			'Save and share multi-play diagrams',
+			'Export diagrams as PNG, JPG, WebP, or PDF'
+		],
+		creator: { '@type': 'Person', name: 'Jake Harvanchik', url: 'https://caseplay.org/about' },
+		publisher: { '@type': 'Organization', name: 'CasePlay.org', url: 'https://caseplay.org' }
+	};
 </script>
 
 <svelte:head>
-	<title>Play Builder | CasePlay.org</title>
-	<meta name="description" content="Build a flag football play on a full-screen field diagram." />
-	<meta property="og:title" content="Flag Football Play Builder" />
-	<meta property="og:description" content="Create, annotate, export, save, and share flag football play diagrams for officiating education." />
+	<title>{pageTitle}</title>
+	<meta name="description" content={pageDescription} />
+	<meta name="robots" content="index, follow, max-image-preview:large" />
+	<meta property="og:title" content={pageTitle} />
+	<meta property="og:description" content={pageDescription} />
 	<meta property="og:type" content="website" />
+	<meta property="og:image" content={socialImage} />
+	<meta property="og:image:secure_url" content={socialImage} />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:image:alt" content="Flag Football Play Builder field diagram from CasePlay.org" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content={pageTitle} />
+	<meta name="twitter:description" content={pageDescription} />
+	<meta name="twitter:image" content={socialImage} />
+	{@html `<script type="application/ld+json">${JSON.stringify(structuredData).replace(/</g, '\\u003c')}</script>`}
 </svelte:head>
 
 <PublicSiteNav compact />

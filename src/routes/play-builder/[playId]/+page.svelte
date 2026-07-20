@@ -7,15 +7,28 @@
 	import type { PageData } from './$types';
 
 	export let data: PageData;
+
+	const socialImage = 'https://caseplay.org/images/flag-football-play-builder-social.png';
+	$: pageTitle = `${data.activePlayName} | Shared Flag Football Play | CasePlay.org`;
+	$: pageDescription = `View “${data.activePlayName},” a shared flag football diagram${data.playCount > 1 ? ` with ${data.playCount} plays` : ''} created in the CasePlay.org Flag Football Play Builder.`;
 </script>
 
 <svelte:head>
-	<title>Shared Play | CasePlay.org</title>
-	<meta name="description" content="View and edit a shared NIRSA flag football play diagram." />
-	<meta name="robots" content="noindex, follow" />
-	<meta property="og:title" content="Shared Flag Football Play" />
-	<meta property="og:description" content="View and edit a shared flag football diagram." />
+	<title>{pageTitle}</title>
+	<meta name="description" content={pageDescription} />
+	<meta name="robots" content="noindex, follow, max-image-preview:large" />
+	<meta property="og:title" content={pageTitle} />
+	<meta property="og:description" content={pageDescription} />
 	<meta property="og:type" content="website" />
+	<meta property="og:image" content={socialImage} />
+	<meta property="og:image:secure_url" content={socialImage} />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:image:alt" content="Shared flag football play diagram from CasePlay.org" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content={pageTitle} />
+	<meta name="twitter:description" content={pageDescription} />
+	<meta name="twitter:image" content={socialImage} />
 </svelte:head>
 
 <PublicSiteNav compact />
@@ -23,6 +36,15 @@
 	<div aria-hidden="true" class="pointer-events-none fixed inset-0 z-0 bg-[url(/svg/graph.svg)]"></div>
 	<div aria-hidden="true" class="pointer-events-none fixed inset-0 z-0 bg-stone-100/[97%]"></div>
 	<DesktopPlayBuilderGate>
+		<div slot="mobile" class="relative z-10 mx-auto flex min-h-[calc(100vh-6rem)] w-full max-w-3xl flex-col justify-center py-6">
+			<header class="mb-3 text-center">
+				<p class="text-xs font-black tracking-[0.16em] text-stone-500 uppercase">Shared Play · View Only</p>
+				<h1 class="mt-1 text-xl font-black text-stone-900">{data.activePlayName}</h1>
+			</header>
+			<div class="w-full overflow-hidden border-2 border-stone-900 bg-stone-800 shadow-lg">
+				<FlagFootballPlayBuilder initialDocument={data.initialDocument} savedPlayId={data.playId} viewOnly />
+			</div>
+		</div>
 		<div
 			class="relative z-10 grid w-full grid-cols-1 items-stretch gap-4 lg:absolute lg:inset-4 lg:w-auto lg:grid-cols-[minmax(0,1fr)_clamp(180px,18vw,300px)]"
 			style="min-height: calc(100vh - 4rem);"
