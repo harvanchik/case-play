@@ -5,7 +5,7 @@
 	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
 	import DesktopPlayBuilderGate from '$lib/components/DesktopPlayBuilderGate.svelte';
 
-	const pageTitle = 'Flag Football Play Builder | Draw, Save & Share Plays | CasePlay.org';
+	const pageTitle = 'Flag Football Play Builder | caseplay.org';
 	const pageDescription =
 		'Create flag football play diagrams online. Draw routes, place players and officials, customize fields, save plays, and share or export your diagrams.';
 	const socialImage = 'https://caseplay.org/play-builder/social.png?v=2';

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, replaceState } from '$app/navigation';
 	import { onMount, tick } from 'svelte';
 	import { driver, type DriveStep, type Driver } from 'driver.js';
 	import 'driver.js/dist/driver.css';
@@ -958,6 +958,13 @@
 		history = pushBuilderState(history, builderSnapshot());
 		future = [];
 	};
+	const syncActivePlayUrl = (index = activePlayIndex) => {
+		if (!savedPlayId || typeof window === 'undefined') return;
+		const url = new URL(window.location.href);
+		if (playEntries.length > 1) url.searchParams.set('play', String(index + 1));
+		else url.searchParams.delete('play');
+		replaceState(`${url.pathname}${url.search}${url.hash}`, {});
+	};
 	const applyBuilderState = (state: BuilderState) => {
 		playEntries = state.plays.map((play) => ({ ...play, scene: cloneScene(play.scene), settings: { ...play.settings } }));
 		nextPlayEntryId = state.nextPlayEntryId;
@@ -968,6 +975,7 @@
 			playEntries.findIndex((play) => play.id === state.activePlayId)
 		);
 		activePlayIndex = index;
+		syncActivePlayUrl(index);
 		fieldSettings = { ...playEntries[index].settings };
 		nextId = maxSceneId(playEntries[index].scene) + 1;
 		applyScene(playEntries[index].scene);
@@ -982,10 +990,11 @@
 			index === activePlayIndex ? { ...play, scene: sceneSnapshot(), settings: { ...fieldSettings } } : play
 		);
 	};
-	const loadPlayAtIndex = (index: number) => {
+	const loadPlayAtIndex = (index: number, updateUrl = true) => {
 		const play = playEntries[index];
 		if (!play) return;
 		activePlayIndex = index;
+		if (updateUrl) syncActivePlayUrl(index);
 		fieldSettings = { ...play.settings };
 		nextId = maxSceneId(play.scene) + 1;
 		applyScene(play.scene);
@@ -1011,13 +1020,23 @@
 		}
 		return `Play ${nextPlayNumber}`;
 	};
+	const nextDefaultPlayNumber = () =>
+		Math.max(
+			0,
+			...playEntries.map((play) => {
+				const match = /^Play (\d+)$/.exec(play.name);
+				return match ? Number(match[1]) : 0;
+			})
+		) + 1;
 	const addPlay = () => {
 		if (dismissEditorForAction() || suppressNextClick || playEntries.length >= PLAY_BUILDER_MAX_PLAYS) return;
 		saveHistory();
 		storeActivePlayState();
+		const playNumber = nextDefaultPlayNumber();
+		nextPlayNumber = playNumber + 1;
 		const play: PlayEntry = {
 			id: nextPlayEntryId++,
-			name: uniquePlayName(`Play ${nextPlayNumber++}`),
+			name: uniquePlayName(`Play ${playNumber}`),
 			scene: blankScene(),
 			settings: { ...fieldSettings }
 		};
@@ -1194,7 +1213,8 @@
 			savedSceneKey = JSON.stringify(currentSerializedDocument());
 			showActionMessage('Saved');
 			sessionStorage.setItem('play-builder-action-message', JSON.stringify({ message: 'Saved', expiresAt: Date.now() + 10_000 }));
-			await goto(`/play-builder/${id}`, { replaceState: true, keepFocus: true, noScroll: true });
+			const playQuery = playEntries.length > 1 ? `?play=${activePlayIndex + 1}` : '';
+			await goto(`/play-builder/${id}${playQuery}`, { replaceState: true, keepFocus: true, noScroll: true });
 			return true;
 		} catch (error) {
 			showActionMessage(error instanceof Error ? error.message : 'Unable to save play.');
@@ -1381,7 +1401,7 @@
 				restorePlayId = playEntries[activePlayIndex].id;
 				const canvases: HTMLCanvasElement[] = [];
 				for (let index = 0; index < playEntries.length; index += 1) {
-					loadPlayAtIndex(index);
+					loadPlayAtIndex(index, false);
 					await tick();
 					await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 					canvases.push(
@@ -1400,7 +1420,7 @@
 			if (restorePlayId !== null) {
 				const restoreIndex = playEntries.findIndex((play) => play.id === restorePlayId);
 				if (restoreIndex >= 0) {
-					loadPlayAtIndex(restoreIndex);
+					loadPlayAtIndex(restoreIndex, false);
 					await tick();
 				}
 			}
@@ -5992,7 +6012,7 @@
 						title="Delete element"
 						aria-label="Delete element"
 						on:pointerdown|preventDefault|stopPropagation={deleteHoveredElement}
-						class="absolute z-20 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors hover:!bg-red-600 focus-visible:!bg-red-600 focus-visible:outline-2 focus-visible:outline-white"
+						class="element-delete-button absolute z-20 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white"
 						style:left={`${deletePosition.x / 10}%`}
 						style:top={`${(deletePosition.y / 484) * 100}%`}
 					>
@@ -6186,9 +6206,11 @@
 											exportBackground = 'color';
 											exportColorPicker = exportColorPicker === 'background' ? null : 'background';
 										}}
-										class="m-2 h-8 w-12 shrink-0 cursor-pointer border-2 border-white shadow-[0_0_0_1px_#57534e]"
-										style:background={exportBackgroundColor}
-									></button>
+										class="relative m-2 h-8 w-12 shrink-0 cursor-pointer overflow-hidden border-2 border-white shadow-[0_0_0_1px_#57534e]"
+										style="background-color: #fff; background-image: linear-gradient(45deg,#d6d3d1 25%,transparent 25%),linear-gradient(-45deg,#d6d3d1 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#d6d3d1 75%),linear-gradient(-45deg,transparent 75%,#d6d3d1 75%); background-size: 8px 8px; background-position: 0 0,0 4px,4px -4px,-4px 0;"
+									>
+										<span class="absolute inset-0" style:background={exportBackgroundColor} style:opacity={exportBackgroundOpacity}></span>
+									</button>
 								{/if}
 							</div>
 						{/each}
@@ -6812,6 +6834,10 @@
 	}
 	.view-only .field-canvas {
 		pointer-events: none;
+	}
+	.element-delete-button:hover,
+	.element-delete-button:focus-visible {
+		background-color: #dc2626 !important;
 	}
 	.tool-column {
 		container-type: inline-size;
