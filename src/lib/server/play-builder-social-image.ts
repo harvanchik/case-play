@@ -12,6 +12,28 @@ import {
 	type PlayBuilderScene,
 	type Point
 } from '$lib/play-builder-scene';
+import neuchaFontDataUrl from './fonts/neucha-latin.ttf?inline';
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+let socialImageFontPath: string | undefined;
+const getSocialImageFontPath = () => {
+	if (socialImageFontPath) return socialImageFontPath;
+	socialImageFontPath = join(tmpdir(), 'caseplay-neucha.ttf');
+	writeFileSync(socialImageFontPath, Buffer.from(neuchaFontDataUrl.slice(neuchaFontDataUrl.indexOf(',') + 1), 'base64'));
+	return socialImageFontPath;
+};
+
+export const playBuilderSocialRenderOptions = () => ({
+	fitTo: { mode: 'width' as const, value: 1200 },
+	font: {
+		fontFiles: [getSocialImageFontPath()],
+		loadSystemFonts: false,
+		defaultFontFamily: 'Neucha',
+		sansSerifFamily: 'Neucha'
+	}
+});
 
 type FieldLayout = {
 	totalYards: number;
@@ -370,18 +392,19 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 };
 
 export const renderPlayBuilderSocialSvg = (document: PlayBuilderDocument) => {
-	const active = document.plays[document.activePlayIndex] ?? document.plays[0];
+	const activePlayIndex = document.plays[document.activePlayIndex] ? document.activePlayIndex : 0;
+	const active = document.plays[activePlayIndex];
 	const field = renderField(active.scene, active.settings);
-	return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+	return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="Neucha">
 		<defs><pattern id="graph" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#e7e5e4" stroke-width="1" opacity=".58"/></pattern></defs>
 		<rect width="1200" height="630" fill="#fafaf9"/><rect width="1200" height="630" fill="url(#graph)"/>
-		<text x="78" y="205" fill="#1c1917" font-family="Arial, sans-serif" font-size="58" font-weight="900">FLAG</text>
-		<text x="78" y="266" fill="#1c1917" font-family="Arial, sans-serif" font-size="58" font-weight="900">FOOTBALL</text>
-		<text x="78" y="327" fill="#1c1917" font-family="Arial, sans-serif" font-size="58" font-weight="900">PLAY BUILDER</text>
-		<text x="78" y="390" fill="#44403c" font-family="Arial, sans-serif" font-size="25">Create, annotate, save, export, and share</text>
-		<text x="78" y="425" fill="#44403c" font-family="Arial, sans-serif" font-size="25">clear flag football play diagrams.</text>
+		<text x="78" y="132" fill="#57534e" font-size="28" font-weight="900" letter-spacing="2">CASEPLAY.ORG</text>
+		<text x="78" y="205" fill="#1c1917" font-size="58" font-weight="900">FLAG</text>
+		<text x="78" y="266" fill="#1c1917" font-size="58" font-weight="900">FOOTBALL</text>
+		<text x="78" y="327" fill="#1c1917" font-size="58" font-weight="900">PLAY BUILDER</text>
+		<text x="78" y="405" fill="#44403c" font-size="34" font-weight="900">PLAY ${activePlayIndex + 1}</text>
 		<rect x="78" y="466" width="474" height="60" fill="#1c1917"/>
-		<text x="99" y="507" fill="#fff" font-family="Arial, sans-serif" font-size="25" font-weight="900" letter-spacing="1">CASEPLAY.ORG/PLAY-BUILDER</text>
+		<text x="99" y="507" fill="#fff" font-size="25" font-weight="900" letter-spacing="1">CASEPLAY.ORG/PLAY-BUILDER</text>
 		<rect x="562" y="173" width="628" height="304" fill="#000" opacity=".14"/>
 		${field}
 	</svg>`;

@@ -1,12 +1,13 @@
 import { Resvg } from '@resvg/resvg-js';
-import { defaultSocialPlayBuilderDocument, renderPlayBuilderSocialSvg } from '$lib/server/play-builder-social-image';
+import {
+	defaultSocialPlayBuilderDocument,
+	playBuilderSocialRenderOptions,
+	renderPlayBuilderSocialSvg
+} from '$lib/server/play-builder-social-image';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = () => {
-	const image = new Resvg(renderPlayBuilderSocialSvg(defaultSocialPlayBuilderDocument()), {
-		fitTo: { mode: 'width', value: 1200 },
-		font: { loadSystemFonts: true, defaultFontFamily: 'Arial' }
-	})
+	const image = new Resvg(renderPlayBuilderSocialSvg(defaultSocialPlayBuilderDocument()), playBuilderSocialRenderOptions())
 		.render()
 		.asPng();
 	const body = image.buffer.slice(image.byteOffset, image.byteOffset + image.byteLength) as ArrayBuffer;
