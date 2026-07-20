@@ -177,9 +177,7 @@
 	const tools = toolRows.flat();
 	const helpPlayerTools = tools.filter((item) => ['team-a', 'team-k', 'team-b', 'team-r'].includes(item.id));
 	const helpOfficialTools = tools.filter((item) => ['official-r', 'official-l', 'official-b', 'official-f'].includes(item.id));
-	const helpElementTools = tools.filter((item) =>
-		['ball', 'flag', 'bean-bag', 'deflag', 'event', 'run', 'pass', 'kick'].includes(item.id)
-	);
+	const helpElementTools = tools.filter((item) => ['ball', 'flag', 'bean-bag', 'deflag', 'event', 'run', 'pass', 'kick'].includes(item.id));
 	const helpGuideTools = tools.filter((item) => ['line-of-scrimmage', 'line-to-gain'].includes(item.id));
 	const helpDrawTool = tools.find((item) => item.id === 'free-draw')!;
 	const toolHelp: Record<Tool, string> = {
@@ -779,8 +777,7 @@
 		const yards = yardsForX(x);
 		return Math.round(Math.min(yards - leftGoalYards(), rightGoalYards() - yards) * 2) / 2;
 	};
-	const fieldSideForX = (x: number): FieldSide =>
-		yardsForX(x) <= (leftGoalYards() + rightGoalYards()) / 2 ? 'a' : 'b';
+	const fieldSideForX = (x: number): FieldSide => (yardsForX(x) <= (leftGoalYards() + rightGoalYards()) / 2 ? 'a' : 'b');
 	const isAtMidfieldX = (x: number) => Math.abs(yardsForX(x) - (leftGoalYards() + rightGoalYards()) / 2) < 0.01;
 	const xForFieldSideYardLine = (side: FieldSide, yardLine: number, kind: 'line-of-scrimmage' | 'line-to-gain') => {
 		const x = xForYards(side === 'a' ? leftGoalYards() + yardLine : rightGoalYards() - yardLine);
@@ -818,11 +815,7 @@
 		const half = !Number.isInteger(yardLine);
 		const wholeYards = Math.floor(yardLine);
 		const side = fieldSideForX(x).toUpperCase();
-		const base = isAtMidfieldX(x)
-			? String(yardLine)
-			: half && wholeYards === 0
-				? `${side}'s`
-				: `${side}'s ${half ? wholeYards : yardLine}`;
+		const base = isAtMidfieldX(x) ? String(yardLine) : half && wholeYards === 0 ? `${side}'s` : `${side}'s ${half ? wholeYards : yardLine}`;
 		return { base, half, baseWidth: base.length * 5.8 };
 	};
 	$: fieldSnapXs = [
@@ -1579,7 +1572,7 @@
 				? deflagImage(deflagPlacementColor)
 				: item.id === 'bean-bag'
 					? beanBagImage(beanBagPlacementColor)
-					: item.image ?? '/images/football.webp'
+					: (item.image ?? '/images/football.webp')
 		);
 	const eventWidth = (label = 'EVENT') => Math.max(eventTagWidth, Math.min(154, label.length * 6.6 + 16));
 	const penaltyLabelLines = (label = '') => {
@@ -1680,10 +1673,10 @@
 			const element = svg.querySelector<SVGGElement>(`[data-layer-type="marker"][data-layer-id="${layer.id}"]`);
 			if (element) svg.appendChild(element);
 		}
-		const drawingLayer = svg.querySelector<SVGGElement>('[data-free-drawing-layer]');
-		if (drawingLayer) svg.appendChild(drawingLayer);
 		const downMarkerLayer = svg.querySelector<SVGGElement>('[data-down-marker-layer]');
 		if (downMarkerLayer) svg.appendChild(downMarkerLayer);
+		const drawingLayer = svg.querySelector<SVGGElement>('[data-free-drawing-layer]');
+		if (drawingLayer) svg.appendChild(drawingLayer);
 	};
 	const raiseLayer = (type: LayerType, id: number) => {
 		layerOrder = [...layerOrder.filter((layer) => layer.type !== type || layer.id !== id), { type, id }];
@@ -2207,8 +2200,7 @@
 		});
 		if (Math.abs(nextX - existing.x) <= 0.01) return;
 		guides = guides.map((guide) => (guide.id === existing.id ? { ...guide, x: nextX } : guide));
-		toolbarGuideYardage =
-			existing.kind === 'line-of-scrimmage' ? losYardLine(nextX) : (guideDistanceYards(nextX, lineOfScrimmageX) ?? '');
+		toolbarGuideYardage = existing.kind === 'line-of-scrimmage' ? losYardLine(nextX) : (guideDistanceYards(nextX, lineOfScrimmageX) ?? '');
 	};
 	const updateToolbarGuideYardage = (event: Event) => {
 		if (toolbarEditorTool !== 'line-of-scrimmage' && toolbarEditorTool !== 'line-to-gain') return;
@@ -2541,12 +2533,7 @@
 		tutorialStep(tutorialToolTarget('bean-bag'), '6. Select Bean Bag', 'Select <strong>Bean Bag</strong>.', 'tool:bean-bag'),
 		tutorialStep('[data-tutorial="field"]', 'Place the Bean Bag', 'Click the field to place the bean bag.', 'place:bean-bag'),
 		tutorialStep(tutorialLatestLayer('marker', 'bean-bag'), 'Set the Bean Bag Color', 'Double-click the bean bag.', 'edit:bean-bag'),
-		tutorialStep(
-			'[data-tutorial="marker-editor"]',
-			'Choose a Bean Bag Color',
-			'Choose any color, or keep blue.',
-			'color:bean-bag'
-		),
+		tutorialStep('[data-tutorial="marker-editor"]', 'Choose a Bean Bag Color', 'Choose any color, or keep blue.', 'color:bean-bag'),
 		tutorialStep(tutorialToolTarget('deflag'), '7. Select Flag Belt', 'Select <strong>Flag Belt</strong>.', 'tool:deflag'),
 		tutorialStep('[data-tutorial="field"]', 'Place the Flag Belt', 'Click where the runner was deflagged.', 'place:deflag'),
 		tutorialStep(tutorialLatestLayer('marker', 'deflag'), 'Edit the Flag Belt', 'Double-click the flag belt.', 'edit:deflag'),
@@ -3862,9 +3849,6 @@
 	on:pointerdown={markTutorialSeen}
 	class="relative border-2 border-stone-900 bg-stone-800 shadow-lg select-none"
 	class:view-only={viewOnly}
-	class:pointer-events-none={viewOnly}
-	inert={viewOnly}
-	role={viewOnly ? 'img' : undefined}
 	aria-label={viewOnly ? 'Shared flag football play diagram' : 'Flag football play builder'}
 >
 	<div data-tutorial="draw-workspace" class="flex gap-2 p-2" aria-hidden={viewOnly}>
@@ -3905,11 +3889,7 @@
 									class:!text-white={tool === item.id}
 								>
 									{#if isArrowKind(item.id)}
-										<svg
-											viewBox="0 0 32 32"
-											class="block h-8 w-8"
-											aria-hidden="true"
-										>
+										<svg viewBox="0 0 32 32" class="block h-8 w-8" aria-hidden="true">
 											<path
 												d={toolbarArrowShaft(item.id)}
 												fill="none"
@@ -3922,7 +3902,7 @@
 										</svg>
 									{:else if item.image}
 										<img
-										src={toolbarToolImage(item)}
+											src={toolbarToolImage(item)}
 											alt=""
 											class="h-8 w-8 object-contain"
 											class:!h-7={item.id === 'free-draw'}
@@ -3938,11 +3918,7 @@
 										</svg>
 									{:else if item.icon === 'line-of-scrimmage' || item.icon === 'line-to-gain'}
 										{@const guideToolId = item.icon}
-										<span
-											class="relative block h-8 w-4 border border-stone-900"
-											style:background-color={fieldPalette.field}
-											aria-hidden="true"
-										>
+										<span class="relative block h-8 w-4 border border-stone-900" style:background-color={fieldPalette.field} aria-hidden="true">
 											<span
 												class="absolute top-0.5 bottom-0.5 left-1/2 -translate-x-1/2 border-l-2"
 												class:border-dashed={guidePlacementStyles[guideToolId] === 'dashed'}
@@ -4637,14 +4613,7 @@
 								{@const teamBoxWidth = xForYards(teamBox[1]) - xForYards(teamBox[0])}
 								{@const teamBoxTextHitWidth = Math.min(teamBoxWidth, Math.max(56, teamBoxLabel.length * 9 + 18))}
 								<g>
-									<rect
-										x={xForYards(teamBox[0])}
-										y={teamBoxY}
-										width={teamBoxWidth}
-										height="20"
-										fill="transparent"
-										pointer-events="none"
-									/>
+									<rect x={xForYards(teamBox[0])} y={teamBoxY} width={teamBoxWidth} height="20" fill="transparent" pointer-events="none" />
 									<rect
 										data-pdf-outline
 										x={xForYards(teamBox[0]) - 4}
@@ -5683,7 +5652,14 @@
 									{@const fractionX = previewGuideX + previewLosMarker.baseWidth / 2 - 1.5}
 									<g fill="#ffffff" font-size="5.5" font-weight="900" text-anchor="middle">
 										<text x={fractionX} y={fieldBottom - 1.5}>1</text>
-										<line x1={fractionX - 2.5} y1={fieldBottom + 0.25} x2={fractionX + 2.5} y2={fieldBottom + 0.25} stroke="#ffffff" stroke-width="0.8" />
+										<line
+											x1={fractionX - 2.5}
+											y1={fieldBottom + 0.25}
+											x2={fractionX + 2.5}
+											y2={fieldBottom + 0.25}
+											stroke="#ffffff"
+											stroke-width="0.8"
+										/>
 										<text x={fractionX} y={fieldBottom + 5.5}>2</text>
 									</g>
 								{/if}
@@ -5724,7 +5700,14 @@
 										{@const fractionX = guide.x + markerDisplay.baseWidth / 2 - 1.5}
 										<g fill="#ffffff" font-size="5.5" font-weight="900" text-anchor="middle" pointer-events="none">
 											<text x={fractionX} y={fieldBottom - 1.5}>1</text>
-											<line x1={fractionX - 2.5} y1={fieldBottom + 0.25} x2={fractionX + 2.5} y2={fieldBottom + 0.25} stroke="#ffffff" stroke-width="0.8" />
+											<line
+												x1={fractionX - 2.5}
+												y1={fieldBottom + 0.25}
+												x2={fractionX + 2.5}
+												y2={fieldBottom + 0.25}
+												stroke="#ffffff"
+												stroke-width="0.8"
+											/>
 											<text x={fractionX} y={fieldBottom + 5.5}>2</text>
 										</g>
 									{/if}
@@ -6019,6 +6002,26 @@
 			</div>
 		</div>
 	</div>
+	{#if viewOnly}
+		<nav
+			class="view-only-play-tabs play-tabs-scroll overflow-x-auto overflow-y-hidden bg-stone-800 p-2"
+			aria-label="Plays in this shared play builder"
+		>
+			<div class="flex w-max min-w-full items-stretch gap-1">
+				{#each playEntries as play, index (play.id)}
+					<button
+						type="button"
+						aria-label={`View ${play.name}`}
+						aria-current={index === activePlayIndex ? 'page' : undefined}
+						on:click={() => switchPlay(play.id)}
+						class="flex h-9 min-w-20 shrink-0 cursor-pointer items-center justify-center border border-stone-500 bg-stone-100 px-3 text-[10px] font-black whitespace-nowrap text-stone-800 hover:bg-white aria-[current=page]:border-white aria-[current=page]:bg-stone-950 aria-[current=page]:text-white"
+					>
+						{play.name}
+					</button>
+				{/each}
+			</div>
+		</nav>
+	{/if}
 </section>
 
 {#snippet exportColorSpectrum(picker: 'background' | 'border', color: string)}
@@ -6076,14 +6079,7 @@
 				</div>
 			{:else if item.image}
 				<div class="flex h-11 w-11 items-center justify-center border border-stone-400 bg-stone-100">
-					<img
-					src={toolbarToolImage(item)}
-						alt=""
-						class="h-9 w-9 object-contain"
-						draggable="false"
-						loading="lazy"
-						decoding="async"
-					/>
+					<img src={toolbarToolImage(item)} alt="" class="h-9 w-9 object-contain" draggable="false" loading="lazy" decoding="async" />
 				</div>
 			{:else if item.icon === 'event'}
 				<div class="flex h-11 w-11 items-center justify-center border border-stone-400 bg-stone-100">
@@ -6095,11 +6091,7 @@
 			{:else if item.icon === 'line-of-scrimmage' || item.icon === 'line-to-gain'}
 				{@const guideToolId = item.icon}
 				<div class="flex h-11 w-11 items-center justify-center border border-stone-400 bg-stone-100">
-					<span
-						class="relative block h-9 w-5 border border-stone-900"
-						style:background-color={fieldPalette.field}
-						aria-hidden="true"
-					>
+					<span class="relative block h-9 w-5 border border-stone-900" style:background-color={fieldPalette.field} aria-hidden="true">
 						<span
 							class="absolute top-0.5 bottom-0.5 left-1/2 -translate-x-1/2 border-l-2"
 							class:border-dashed={guidePlacementStyles[guideToolId] === 'dashed'}
@@ -6817,6 +6809,9 @@
 	.view-only .play-builder-interaction,
 	.view-only .field-canvas {
 		width: 100%;
+	}
+	.view-only .field-canvas {
+		pointer-events: none;
 	}
 	.tool-column {
 		container-type: inline-size;

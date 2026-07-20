@@ -37,10 +37,6 @@
 	<div aria-hidden="true" class="pointer-events-none fixed inset-0 z-0 bg-stone-100/[97%]"></div>
 	<DesktopPlayBuilderGate>
 		<div slot="mobile" class="relative z-10 mx-auto flex min-h-[calc(100vh-6rem)] w-full max-w-3xl flex-col justify-center py-6">
-			<header class="mb-3 text-center">
-				<p class="text-xs font-black tracking-[0.16em] text-stone-500 uppercase">Shared Play · View Only</p>
-				<h1 class="mt-1 text-xl font-black text-stone-900">{data.activePlayName}</h1>
-			</header>
 			<div class="w-full overflow-hidden border-2 border-stone-900 bg-stone-800 shadow-lg">
 				<FlagFootballPlayBuilder initialDocument={data.initialDocument} savedPlayId={data.playId} viewOnly />
 			</div>
