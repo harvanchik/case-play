@@ -1420,7 +1420,10 @@
 			copyFeedbackTimer = null;
 		}
 		copyConfirmed = false;
-		const url = window.location.href;
+		const shareUrl = new URL(window.location.href);
+		if (playEntries.length > 1) shareUrl.searchParams.set('play', String(activePlayIndex + 1));
+		else shareUrl.searchParams.delete('play');
+		const url = shareUrl.toString();
 		let copied = false;
 		if (navigator.clipboard?.writeText) {
 			try {

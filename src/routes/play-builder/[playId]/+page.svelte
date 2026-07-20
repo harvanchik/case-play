@@ -8,7 +8,7 @@
 
 	export let data: PageData;
 
-	$: socialImage = `https://caseplay.org/play-builder/${data.playId}/social.png?v=${encodeURIComponent(data.updatedAt)}`;
+	$: socialImage = `https://caseplay.org/play-builder/${data.playId}/social.png?play=${data.activePlayNumber}&v=${encodeURIComponent(data.updatedAt)}`;
 	$: pageTitle = `${data.activePlayName} | Shared Flag Football Play | CasePlay.org`;
 	$: pageDescription = `View “${data.activePlayName},” a shared flag football diagram${data.playCount > 1 ? ` with ${data.playCount} plays` : ''} created in the CasePlay.org Flag Football Play Builder.`;
 </script>
