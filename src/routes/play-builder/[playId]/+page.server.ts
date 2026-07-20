@@ -13,6 +13,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		playId: saved.id,
 		initialDocument,
 		activePlayName,
-		playCount: initialDocument.p.length
+		playCount: initialDocument.p.length,
+		updatedAt: saved.updatedAt
 	};
 };
