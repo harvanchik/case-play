@@ -780,6 +780,7 @@
 	};
 	const fieldSideForX = (x: number): FieldSide =>
 		yardsForX(x) <= (leftGoalYards() + rightGoalYards()) / 2 ? 'a' : 'b';
+	const isAtMidfieldX = (x: number) => Math.abs(yardsForX(x) - (leftGoalYards() + rightGoalYards()) / 2) < 0.01;
 	const xForFieldSideYardLine = (side: FieldSide, yardLine: number, kind: 'line-of-scrimmage' | 'line-to-gain') => {
 		const x = xForYards(side === 'a' ? leftGoalYards() + yardLine : rightGoalYards() - yardLine);
 		return kind === 'line-of-scrimmage' ? clampLineOfScrimmageX(x) : clampLineToGainX(x);
@@ -815,7 +816,12 @@
 		const yardLine = losYardLine(x);
 		const half = !Number.isInteger(yardLine);
 		const wholeYards = Math.floor(yardLine);
-		const base = half && wholeYards === 0 ? '' : String(half ? wholeYards : yardLine);
+		const side = fieldSideForX(x).toUpperCase();
+		const base = isAtMidfieldX(x)
+			? String(yardLine)
+			: half && wholeYards === 0
+				? `${side}'s`
+				: `${side}'s ${half ? wholeYards : yardLine}`;
 		return { base, half, baseWidth: base.length * 5.8 };
 	};
 	$: fieldSnapXs = [
@@ -3971,17 +3977,20 @@
 				>
 					{#if toolbarEditorTool === 'line-of-scrimmage' || toolbarEditorTool === 'line-to-gain'}
 						{@const toolbarEditingLos = toolbarEditorTool === 'line-of-scrimmage'}
-						<button
-							type="button"
-							aria-label={`Field side ${toolbarGuideSide.toUpperCase()}; switch to ${toolbarGuideSide === 'a' ? 'B' : 'A'}`}
-							title={`${toolbarGuideSide.toUpperCase()} Side`}
-							on:click={() => setToolbarGuideSide(toolbarGuideSide === 'a' ? 'b' : 'a')}
-							class="h-7 w-7 shrink-0 cursor-pointer border border-stone-900 text-[11px] font-black"
-							class:bg-stone-900={toolbarGuideSide === 'a'}
-							class:text-white={toolbarGuideSide === 'a'}
-							class:bg-white={toolbarGuideSide === 'b'}
-							class:text-stone-950={toolbarGuideSide === 'b'}>{toolbarGuideSide.toUpperCase()}</button
-						>
+						{@const toolbarEditingGuide = guides.find((guide) => guide.kind === toolbarEditorTool)}
+						{#if !toolbarEditingGuide || !isAtMidfieldX(toolbarEditingGuide.x)}
+							<button
+								type="button"
+								aria-label={`Field side ${toolbarGuideSide.toUpperCase()}; switch to ${toolbarGuideSide === 'a' ? 'B' : 'A'}`}
+								title={`${toolbarGuideSide.toUpperCase()} Side`}
+								on:click={() => setToolbarGuideSide(toolbarGuideSide === 'a' ? 'b' : 'a')}
+								class="h-7 w-7 shrink-0 cursor-pointer border border-stone-900 text-[11px] font-black"
+								class:bg-stone-900={toolbarGuideSide === 'a'}
+								class:text-white={toolbarGuideSide === 'a'}
+								class:bg-white={toolbarGuideSide === 'b'}
+								class:text-stone-950={toolbarGuideSide === 'b'}>{toolbarGuideSide.toUpperCase()}</button
+							>
+						{/if}
 						<input
 							bind:this={toolbarGuideYardageInput}
 							type="number"
@@ -5646,7 +5655,7 @@
 							{@const previewGuideX = wholeYardLineOfScrimmageX(placementSnapX ?? hoverPoint.x)}
 							{@const previewLosMarker = lineOfScrimmageMarkerDisplay(previewGuideX)}
 							<g class="los-marker-graphic" opacity="0.72" pointer-events="none">
-								<rect x={previewGuideX - 20} y={fieldBottom - 9} width="40" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
+								<rect x={previewGuideX - 26} y={fieldBottom - 9} width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
 								<text
 									x={previewGuideX - (previewLosMarker.half ? 3.5 : 0)}
 									y={fieldBottom + 3.5}
@@ -5686,7 +5695,7 @@
 									class:cursor-grab={!isDragging('guide', guide.id)}
 									class:cursor-grabbing={isDragging('guide', guide.id)}
 								>
-									<rect x={guide.x - 20} y={fieldBottom - 9} width="40" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
+									<rect x={guide.x - 26} y={fieldBottom - 9} width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
 									<text
 										x={guide.x - (markerDisplay.half ? 3.5 : 0)}
 										y={fieldBottom + 3.5}
@@ -5730,17 +5739,19 @@
 								class:!text-[#ff5a1f]={(editingDownGuide.down ?? '1st') === option.id}>{option.label}</button
 							>
 						{/each}
-						<button
-							type="button"
-							aria-label={`Field side ${downGuideSide.toUpperCase()}; switch to ${downGuideSide === 'a' ? 'B' : 'A'}`}
-							title={`${downGuideSide.toUpperCase()} Side`}
-							on:click={() => setDownGuideSide(downGuideSide === 'a' ? 'b' : 'a')}
-							class="h-7 w-7 shrink-0 cursor-pointer border border-stone-900 text-[11px] font-black"
-							class:bg-stone-900={downGuideSide === 'a'}
-							class:text-white={downGuideSide === 'a'}
-							class:bg-white={downGuideSide === 'b'}
-							class:text-stone-950={downGuideSide === 'b'}>{downGuideSide.toUpperCase()}</button
-						>
+						{#if !isAtMidfieldX(editingDownGuide.x)}
+							<button
+								type="button"
+								aria-label={`Field side ${downGuideSide.toUpperCase()}; switch to ${downGuideSide === 'a' ? 'B' : 'A'}`}
+								title={`${downGuideSide.toUpperCase()} Side`}
+								on:click={() => setDownGuideSide(downGuideSide === 'a' ? 'b' : 'a')}
+								class="h-7 w-7 shrink-0 cursor-pointer border border-stone-900 text-[11px] font-black"
+								class:bg-stone-900={downGuideSide === 'a'}
+								class:text-white={downGuideSide === 'a'}
+								class:bg-white={downGuideSide === 'b'}
+								class:text-stone-950={downGuideSide === 'b'}>{downGuideSide.toUpperCase()}</button
+							>
+						{/if}
 						<label class="sr-only" for="custom-down-yardage">Custom yardage</label>
 						<input
 							id="custom-down-yardage"
@@ -5889,17 +5900,19 @@
 					>
 						{#if editingGuide?.kind === 'line-of-scrimmage' || editingGuide?.kind === 'line-to-gain'}
 							{@const editingLos = editingGuide.kind === 'line-of-scrimmage'}
-							<button
-								type="button"
-								aria-label={`Field side ${editingGuideSide.toUpperCase()}; switch to ${editingGuideSide === 'a' ? 'B' : 'A'}`}
-								title={`${editingGuideSide.toUpperCase()} Side`}
-								on:click={() => setEditingGuideSide(editingGuideSide === 'a' ? 'b' : 'a')}
-								class="h-7 w-7 shrink-0 cursor-pointer border border-stone-900 text-[11px] font-black"
-								class:bg-stone-900={editingGuideSide === 'a'}
-								class:text-white={editingGuideSide === 'a'}
-								class:bg-white={editingGuideSide === 'b'}
-								class:text-stone-950={editingGuideSide === 'b'}>{editingGuideSide.toUpperCase()}</button
-							>
+							{#if !isAtMidfieldX(editingGuide.x)}
+								<button
+									type="button"
+									aria-label={`Field side ${editingGuideSide.toUpperCase()}; switch to ${editingGuideSide === 'a' ? 'B' : 'A'}`}
+									title={`${editingGuideSide.toUpperCase()} Side`}
+									on:click={() => setEditingGuideSide(editingGuideSide === 'a' ? 'b' : 'a')}
+									class="h-7 w-7 shrink-0 cursor-pointer border border-stone-900 text-[11px] font-black"
+									class:bg-stone-900={editingGuideSide === 'a'}
+									class:text-white={editingGuideSide === 'a'}
+									class:bg-white={editingGuideSide === 'b'}
+									class:text-stone-950={editingGuideSide === 'b'}>{editingGuideSide.toUpperCase()}</button
+								>
+							{/if}
 							<label class="sr-only" for="guide-yardage">{editingLos ? 'Line of Scrimmage yard line' : 'Line to Gain distance'}</label>
 							<input
 								bind:this={guideYardageInput}
