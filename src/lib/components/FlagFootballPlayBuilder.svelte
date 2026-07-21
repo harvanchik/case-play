@@ -199,7 +199,7 @@
 		run: 'Drag from any point—or directly from a player—to draw a solid running route. Double-click the route to change its color and line style.',
 		pass: 'Drag to draw a dashed forward-pass arc. Its curve, changing thickness, and shadow show the ball traveling through the air. Double-click to format it.',
 		kick: 'Drag to draw a higher punt or kick arc. Double-click to change its color or line style.',
-		'line-of-scrimmage': 'Places one dashed white L.O.S. Reformatting its color or style turns it into a custom cross-field line.',
+		'line-of-scrimmage': 'Places one L.O.S. Reformatting its color or style keeps it as the L.O.S.; placing it again replaces the prior line.',
 		'line-to-gain':
 			'Places one solid yellow L.T.G. with a linked down marker. Placing it again replaces the prior L.T.G.; select the marker to change the down.',
 		'free-draw':
@@ -1798,6 +1798,7 @@
 		return marker ? { x: marker.x, y: marker.y } : path.start;
 	};
 	const scheduleDeleteTargetAtPointer = (target: SelectedTarget, event: PointerEvent) => {
+		if (viewOnly) return;
 		const marker = target.type === 'marker' ? markers.find((item) => item.id === target.id) : undefined;
 		const usesSidelineArea = marker ? isSidelineMarkerKind(marker.kind) : false;
 		const point = usesSidelineArea ? clampSidelineMarkerPoint(canvasPointFromEvent(event)) : pointFromEvent(event);
@@ -1813,6 +1814,10 @@
 		}, 220);
 	};
 	const deleteHoveredElement = () => {
+		if (viewOnly) {
+			clearDeleteState();
+			return;
+		}
 		if (!deleteTarget) return;
 		saveHistory();
 		removeElementTarget(deleteTarget);
@@ -2002,10 +2007,7 @@
 		if (editingPath && editingPath.color === color) return;
 		saveHistory();
 		guideEditColor = color;
-		if (editingGuide)
-			guides = guides.map((guide) =>
-				guide.id === editingGuideId ? { ...guide, color, kind: guide.kind === 'line-of-scrimmage' ? 'custom' : guide.kind } : guide
-			);
+		if (editingGuide) guides = guides.map((guide) => (guide.id === editingGuideId ? { ...guide, color } : guide));
 		if (editingPath) {
 			paths = paths.map((path) => (path.id === editingPathId ? { ...path, color } : path));
 		}
@@ -2017,10 +2019,7 @@
 		if (editingPath && editingPath.style === style) return;
 		saveHistory();
 		guideEditStyle = style;
-		if (editingGuide)
-			guides = guides.map((guide) =>
-				guide.id === editingGuideId ? { ...guide, style, kind: guide.kind === 'line-of-scrimmage' ? 'custom' : guide.kind } : guide
-			);
+		if (editingGuide) guides = guides.map((guide) => (guide.id === editingGuideId ? { ...guide, style } : guide));
 		if (editingPath) paths = paths.map((path) => (path.id === editingPathId ? { ...path, style } : path));
 	};
 	const commitActiveEditor = () => {
@@ -2031,6 +2030,7 @@
 		else if (editingDownGuideId !== null) commitDownMarkerEditor();
 	};
 	const startEditingDownMarker = (event: Event, guide: FieldGuide) => {
+		if (viewOnly) return;
 		if (guide.kind !== 'line-to-gain' || suppressDownMarkerClick || tool === 'event' || tool === 'free-draw') return;
 		event.preventDefault();
 		event.stopPropagation();
@@ -2046,6 +2046,7 @@
 		editingDownGuideId = guide.id;
 	};
 	const startEditingTeamBox = async (event: Event, teamBoxY: number, teamBoxIndex: number) => {
+		if (viewOnly) return;
 		event.preventDefault();
 		clearDeleteState();
 		editingMarkerId = null;
@@ -2060,6 +2061,7 @@
 		teamBoxEditInput?.select();
 	};
 	const startEditingMarker = async (event: Event, marker: FieldMarker) => {
+		if (viewOnly) return;
 		if (!isEditableMarker(marker) || (tool === 'event' && marker.kind !== 'ball')) return;
 		event.preventDefault();
 		clearDeleteState();
@@ -2099,6 +2101,7 @@
 		completeTutorialAction('label:ball');
 	};
 	const startEditingGuide = async (event: Event, guide: FieldGuide) => {
+		if (viewOnly) return;
 		if (tool === 'event') return;
 		event.preventDefault();
 		clearDeleteState();
@@ -2124,10 +2127,12 @@
 		completeTutorialAction(`edit:${guide.kind}`);
 	};
 	const startEditingLineOfScrimmageMarker = async (event: Event, guide: FieldGuide) => {
+		if (viewOnly) return;
 		if (guide.kind !== 'line-of-scrimmage' || suppressDownMarkerClick || tool === 'event' || tool === 'free-draw') return;
 		await startEditingGuide(event, guide);
 	};
 	const startEditingPath = (event: Event, path: FieldPath) => {
+		if (viewOnly) return;
 		if (tool === 'event') return;
 		event.preventDefault();
 		clearDeleteState();
@@ -2475,6 +2480,7 @@
 		buttons?.[nextIndex]?.focus();
 	};
 	const handleWindowPointerDown = (event: PointerEvent) => {
+		if (viewOnly) return;
 		const target = event.target as Node;
 		if (editingPlayId !== null && !playMenuElement?.contains(target)) editingPlayId = null;
 		if (deleteTarget && !deleteButtonElement?.contains(target)) clearDeleteState();
@@ -3152,6 +3158,7 @@
 		action();
 	};
 	const handleMarkerKeydown = (event: KeyboardEvent, marker: FieldMarker) => {
+		if (viewOnly) return;
 		if (event.key === 'Enter' || event.key === 'F2') {
 			startEditingMarker(event, marker);
 			return;
@@ -3162,6 +3169,7 @@
 		deleteHoveredElement();
 	};
 	const handleGuideKeydown = (event: KeyboardEvent, guide: FieldGuide) => {
+		if (viewOnly) return;
 		if (event.key === 'Enter' || event.key === 'F2') {
 			startEditingGuide(event, guide);
 			return;
@@ -3172,6 +3180,7 @@
 		deleteHoveredElement();
 	};
 	const handlePathKeydown = (event: KeyboardEvent, path: FieldPath) => {
+		if (viewOnly) return;
 		if (event.key === 'Enter' || event.key === 'F2') {
 			startEditingPath(event, path);
 			return;
@@ -3227,6 +3236,7 @@
 		return { type, id };
 	};
 	const eraseElementAtClientPoint = (clientX: number, clientY: number) => {
+		if (viewOnly) return;
 		const target = selectedTargetAtClientPoint(clientX, clientY);
 		if (!target) return;
 		if (!eraseHistorySaved) {
@@ -3236,6 +3246,7 @@
 		removeElementTarget(target);
 	};
 	const beginStylusEraser = (event: PointerEvent) => {
+		if (viewOnly) return;
 		if (!isStylusEraserEvent(event)) return;
 		event.preventDefault();
 		event.stopPropagation();
@@ -3255,6 +3266,7 @@
 		}
 	};
 	const beginFreeDrawing = (event: PointerEvent) => {
+		if (viewOnly) return;
 		event.preventDefault();
 		clearDeleteState();
 		clearPlacementSnap();
@@ -3316,6 +3328,7 @@
 	};
 
 	const beginOnField = async (event: PointerEvent) => {
+		if (viewOnly) return;
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
 		clearDeleteState();
@@ -3360,6 +3373,7 @@
 		}
 	};
 	const beginOnMarker = async (event: PointerEvent, marker: FieldMarker) => {
+		if (viewOnly) return;
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
 		const snappedX = placementSnapX;
@@ -3403,6 +3417,7 @@
 		};
 	};
 	const beginOnPath = async (event: PointerEvent, path: FieldPath, mode: 'whole' | 'start' | 'end' = 'whole') => {
+		if (viewOnly) return;
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
 		clearPlacementSnap();
@@ -3443,6 +3458,7 @@
 		};
 	};
 	const beginOnGuide = async (event: PointerEvent, guide: FieldGuide, fromDownMarker = false) => {
+		if (viewOnly) return;
 		if (event.button !== 0 || suppressNextClick) return;
 		if (fromDownMarker && editingDownGuideId === guide.id) {
 			event.preventDefault();
@@ -3470,6 +3486,7 @@
 		dragTarget = { type: 'guide', id: guide.id, pointerStart: pointFromEvent(event), xStart: guide.x, moved: false, fromDownMarker };
 	};
 	const continuePointer = (event: PointerEvent) => {
+		if (viewOnly) return;
 		if (stylusEraserActive) {
 			event.preventDefault();
 			const point = canvasPointFromEvent(event);
@@ -3601,6 +3618,7 @@
 		}
 	};
 	const endPointer = (event: PointerEvent) => {
+		if (viewOnly) return;
 		if (stylusEraserActive) {
 			const point = canvasPointFromEvent(event);
 			eraseFreeStrokesAlong(lastErasePoint ?? point, point);
@@ -4578,8 +4596,10 @@
 					class:erasing-cursor={tool === 'free-draw' && freeDrawMode === 'erase'}
 					class:!cursor-grabbing={dragTarget?.moved}
 					style="touch-action: none;"
+					style:pointer-events={viewOnly ? 'none' : undefined}
 					role="application"
 					aria-label="Blank horizontal NIRSA flag football field drawing area"
+					aria-disabled={viewOnly}
 					on:pointerdown|capture={beginStylusEraser}
 					on:pointerdown={beginOnField}
 					on:pointermove={continuePointer}
@@ -6005,7 +6025,7 @@
 					</form>
 				{/if}
 
-				{#if deleteTarget && deletePosition}
+				{#if !viewOnly && deleteTarget && deletePosition}
 					<button
 						bind:this={deleteButtonElement}
 						type="button"

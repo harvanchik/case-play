@@ -12,26 +12,51 @@ import {
 	type PlayBuilderScene,
 	type Point
 } from '$lib/play-builder-scene';
+import beanBagBlackImage from './social-assets/bean-bag-black.png?inline';
+import beanBagBlueImage from './social-assets/bean-bag-blue.png?inline';
+import beanBagPinkImage from './social-assets/bean-bag-pink.png?inline';
+import beanBagWhiteImage from './social-assets/bean-bag-white.png?inline';
+import flagBeltBlueImage from './social-assets/flag-belt-blue.png?inline';
+import flagBeltCyanImage from './social-assets/flag-belt-cyan.png?inline';
+import flagBeltGreenImage from './social-assets/flag-belt-green.png?inline';
+import flagBeltOrangeImage from './social-assets/flag-belt-orange.png?inline';
+import flagBeltPurpleImage from './social-assets/flag-belt-purple.png?inline';
+import flagBeltRedImage from './social-assets/flag-belt.png?inline';
+import flagBeltYellowImage from './social-assets/flag-belt-yellow.png?inline';
+import footballImage from './social-assets/football.png?inline';
+import officialBackJudgeImage from './social-assets/official-back-judge.png?inline';
+import officialFieldJudgeImage from './social-assets/official-field-judge.png?inline';
+import officialLineJudgeImage from './social-assets/official-line-judge.png?inline';
+import officialRefereeImage from './social-assets/official-referee.png?inline';
+import penaltyFlagImage from './social-assets/penalty-flag.png?inline';
 import dokdoFontDataUrl from './fonts/dokdo-latin.ttf?inline';
+import interBlackFontDataUrl from './fonts/inter-black-latin.ttf?inline';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 let socialImageDokdoFontPath: string | undefined;
+let socialImageInterFontPath: string | undefined;
 const getSocialImageDokdoFontPath = () => {
 	if (socialImageDokdoFontPath) return socialImageDokdoFontPath;
 	socialImageDokdoFontPath = join(tmpdir(), 'caseplay-dokdo.ttf');
 	writeFileSync(socialImageDokdoFontPath, Buffer.from(dokdoFontDataUrl.slice(dokdoFontDataUrl.indexOf(',') + 1), 'base64'));
 	return socialImageDokdoFontPath;
 };
+const getSocialImageInterFontPath = () => {
+	if (socialImageInterFontPath) return socialImageInterFontPath;
+	socialImageInterFontPath = join(tmpdir(), 'caseplay-inter-black.ttf');
+	writeFileSync(socialImageInterFontPath, Buffer.from(interBlackFontDataUrl.slice(interBlackFontDataUrl.indexOf(',') + 1), 'base64'));
+	return socialImageInterFontPath;
+};
 
 export const playBuilderSocialRenderOptions = () => ({
 	fitTo: { mode: 'width' as const, value: 1200 },
 	font: {
-		fontFiles: [getSocialImageDokdoFontPath()],
-		loadSystemFonts: true,
-		defaultFontFamily: 'Arial',
-		sansSerifFamily: 'Arial'
+		fontFiles: [getSocialImageDokdoFontPath(), getSocialImageInterFontPath()],
+		loadSystemFonts: false,
+		defaultFontFamily: 'Inter',
+		sansSerifFamily: 'Inter'
 	}
 });
 
@@ -163,6 +188,28 @@ const colors: Record<GuideColor, string> = {
 	pink: '#f06292'
 };
 
+const officialMarkerImages = {
+	'official-r': officialRefereeImage,
+	'official-l': officialLineJudgeImage,
+	'official-b': officialBackJudgeImage,
+	'official-f': officialFieldJudgeImage
+} as const;
+const flagBeltImages: Partial<Record<GuideColor, string>> = {
+	red: flagBeltRedImage,
+	orange: flagBeltOrangeImage,
+	yellow: flagBeltYellowImage,
+	green: flagBeltGreenImage,
+	cyan: flagBeltCyanImage,
+	blue: flagBeltBlueImage,
+	purple: flagBeltPurpleImage
+};
+const beanBagImages: Partial<Record<GuideColor, string>> = {
+	blue: beanBagBlueImage,
+	white: beanBagWhiteImage,
+	black: beanBagBlackImage,
+	pink: beanBagPinkImage
+};
+
 const escapeXml = (value: string) =>
 	value.replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&apos;', '"': '&quot;' })[character] ?? character);
 const dashArray = (style: GuideStyle, compact = false) =>
@@ -186,30 +233,29 @@ const freehandPath = (points: Point[]) => {
 
 const renderMarker = (marker: FieldMarker) => {
 	const label = escapeXml(marker.label ?? '');
+	const renderImageMarker = (asset: string, size: number) =>
+		`<g><image href="${asset}" x="${marker.x - size / 2}" y="${marker.y - size / 2}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid meet"/>${label ? `<text x="${marker.x}" y="${marker.y + size / 2 + 9}" text-anchor="middle" fill="#fff" stroke="#111827" stroke-width="2" paint-order="stroke" font-size="8" font-weight="900">${label}</text>` : ''}</g>`;
 	if (marker.kind === 'team-a' || marker.kind === 'team-k' || marker.kind === 'team-b' || marker.kind === 'team-r') {
 		const dark = marker.kind === 'team-a' || marker.kind === 'team-k';
 		return `<g><circle cx="${marker.x}" cy="${marker.y}" r="14" fill="${dark ? '#1c1917' : '#ffffff'}" stroke="${dark ? '#ffffff' : '#1c1917'}" stroke-width="2.6"/><text x="${marker.x}" y="${marker.y + 4}" text-anchor="middle" fill="${dark ? '#ffffff' : '#1c1917'}" font-size="9" font-weight="900">${label}</text></g>`;
 	}
 	if (marker.kind.startsWith('official-')) {
-		const official = marker.kind.slice(-1).toUpperCase();
-		return `<g><circle cx="${marker.x}" cy="${marker.y}" r="17" fill="#ffffff" stroke="#111827" stroke-width="3"/><path d="M ${marker.x - 13} ${marker.y - 9} Q ${marker.x} ${marker.y - 20} ${marker.x + 13} ${marker.y - 9}" fill="#111827"/><text x="${marker.x}" y="${marker.y + 6}" text-anchor="middle" fill="#111827" font-size="14" font-weight="900">${official}</text>${label ? `<text x="${marker.x}" y="${marker.y + 28}" text-anchor="middle" fill="#fff" stroke="#111827" stroke-width="2" paint-order="stroke" font-size="8" font-weight="800">${label}</text>` : ''}</g>`;
+		return renderImageMarker(officialMarkerImages[marker.kind as keyof typeof officialMarkerImages], 46.28);
 	}
 	if (marker.kind === 'ball') {
-		return `<g transform="rotate(-8 ${marker.x} ${marker.y})"><ellipse cx="${marker.x}" cy="${marker.y}" rx="14" ry="8.5" fill="#a84d21" stroke="#582810" stroke-width="2"/><path d="M ${marker.x - 5} ${marker.y} H ${marker.x + 5} M ${marker.x - 3} ${marker.y - 3} V ${marker.y + 3} M ${marker.x} ${marker.y - 3} V ${marker.y + 3} M ${marker.x + 3} ${marker.y - 3} V ${marker.y + 3}" stroke="#fff" stroke-width="1"/></g>`;
+		return renderImageMarker(footballImage, 30);
 	}
 	if (marker.kind === 'event') {
 		const width = Math.max(47, Math.min(154, (marker.label?.length ?? 5) * 6.6 + 16));
 		return `<g><rect x="${marker.x - width / 2}" y="${marker.y - 10.5}" width="${width}" height="21" fill="#fff" stroke="#1c1917" stroke-width="2"/><text x="${marker.x}" y="${marker.y + 3.5}" text-anchor="middle" fill="#1c1917" font-size="8.5" font-weight="900">${label || 'EVENT'}</text></g>`;
 	}
 	if (marker.kind === 'flag') {
-		return `<g><circle cx="${marker.x - 5}" cy="${marker.y + 8}" r="5" fill="#242424"/><path d="M ${marker.x - 3} ${marker.y + 4} L ${marker.x - 1} ${marker.y - 13} L ${marker.x + 13} ${marker.y - 7} L ${marker.x + 2} ${marker.y + 2} Z" fill="#facc15" stroke="#8a5a00" stroke-width="1.5"/></g>`;
+		return renderImageMarker(penaltyFlagImage, 31.5);
 	}
 	if (marker.kind === 'bean-bag') {
-		const fill = colors[marker.color ?? 'blue'];
-		return `<g transform="rotate(-24 ${marker.x} ${marker.y})"><rect x="${marker.x - 10}" y="${marker.y - 12}" width="12" height="22" fill="${fill}" stroke="#172554" stroke-width="1.5"/><rect x="${marker.x}" y="${marker.y - 8}" width="12" height="22" fill="${fill}" stroke="#172554" stroke-width="1.5"/></g>`;
+		return renderImageMarker(beanBagImages[marker.color ?? 'blue'] ?? beanBagBlueImage, 31.5);
 	}
-	const beltColor = colors[marker.color ?? 'red'];
-	return `<g><path d="M ${marker.x - 15} ${marker.y - 7} Q ${marker.x} ${marker.y - 12} ${marker.x + 15} ${marker.y - 7}" fill="none" stroke="#fff" stroke-width="4"/><path d="M ${marker.x - 10} ${marker.y - 5} v18 M ${marker.x} ${marker.y - 7} v20 M ${marker.x + 10} ${marker.y - 5} v18" stroke="${beltColor}" stroke-width="5"/></g>`;
+	return renderImageMarker(flagBeltImages[marker.color ?? 'red'] ?? flagBeltRedImage, 33.75);
 };
 
 const airborneLift = (kind: 'pass' | 'kick', start: Point, end: Point, fieldTop: number) => {
@@ -252,6 +298,19 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 	const fieldBottom = fieldTop + fieldHeight;
 	const yardsToPixels = fieldWidth / layout.totalYards;
 	const xForYards = (yards: number) => fieldLeft + yards * yardsToPixels;
+	const yardsForX = (x: number) => (x - fieldLeft) / yardsToPixels;
+	const leftGoalYards = layout.goalLines[0];
+	const rightGoalYards = layout.goalLines.at(-1) ?? layout.totalYards;
+	const lineOfScrimmageMarkerDisplay = (x: number) => {
+		const yards = yardsForX(x);
+		const yardLine = Math.round(Math.min(yards - leftGoalYards, rightGoalYards - yards) * 2) / 2;
+		const atMidfield = Math.abs(yards - (leftGoalYards + rightGoalYards) / 2) < 0.01;
+		const side = yards <= (leftGoalYards + rightGoalYards) / 2 ? 'A' : 'B';
+		const half = !Number.isInteger(yardLine);
+		const wholeYards = Math.floor(yardLine);
+		const base = atMidfield ? String(yardLine) : half && wholeYards === 0 ? `${side}'s` : `${side}'s ${half ? wholeYards : yardLine}`;
+		return { base, half, baseWidth: base.length * 5.8 };
+	};
 	const fieldAngle = -(Math.atan2(fieldHeight, fieldWidth) * 180) / Math.PI;
 	const arrowMarkers = (Object.keys(colors) as GuideColor[])
 		.map(
@@ -358,13 +417,18 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 		.join('');
 	const los = scene.guides.find((guide) => guide.kind === 'line-of-scrimmage');
 	const ltg = scene.guides.find((guide) => guide.kind === 'line-to-gain');
+	const losMarker = los ? lineOfScrimmageMarkerDisplay(los.x) : undefined;
 	const indicators = `${
 		settings.showDownMarker && ltg
 			? `<g><rect x="${ltg.x - 32}" y="${fieldTop - 9}" width="64" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5"/><text x="${ltg.x}" y="${fieldTop + 4}" text-anchor="middle" fill="#ff5a1f" font-size="10" font-weight="900">${escapeXml(downText(ltg, los, yardsToPixels))}</text></g>`
 			: ''
 	}${
-		settings.showLineOfScrimmageMarker && los
-			? `<g><rect x="${los.x - 26}" y="${fieldBottom - 9}" width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5"/><text x="${los.x}" y="${fieldBottom + 4}" text-anchor="middle" fill="#fff" font-size="10" font-weight="900">L.O.S.</text></g>`
+		settings.showLineOfScrimmageMarker && los && losMarker
+			? `<g><rect x="${los.x - 26}" y="${fieldBottom - 9}" width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5"/><text x="${los.x - (losMarker.half ? 3.5 : 0)}" y="${fieldBottom + 3.5}" text-anchor="middle" fill="#fff" font-size="10" font-weight="900">${escapeXml(losMarker.base)}</text>${
+					losMarker.half
+						? `<g fill="#fff" font-size="5.5" font-weight="900" text-anchor="middle"><text x="${los.x + losMarker.baseWidth / 2 - 1.5}" y="${fieldBottom - 1.5}">1</text><line x1="${los.x + losMarker.baseWidth / 2 - 4}" y1="${fieldBottom + 0.25}" x2="${los.x + losMarker.baseWidth / 2 + 1}" y2="${fieldBottom + 0.25}" stroke="#fff" stroke-width="0.8"/><text x="${los.x + losMarker.baseWidth / 2 - 1.5}" y="${fieldBottom + 5.5}">2</text></g>`
+						: ''
+				}</g>`
 			: ''
 	}`;
 
@@ -380,6 +444,8 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 		<rect x="${fieldLeft}" y="${fieldTop}" width="${fieldWidth}" height="${fieldHeight}" fill="url(#field-stripe)"/>
 		<rect x="${fieldLeft}" y="${fieldTop}" width="${xForYards(layout.goalLines[0]) - fieldLeft}" height="${fieldHeight}" fill="${palette.endZone}"/>
 		<rect x="${xForYards(layout.goalLines.at(-1) ?? layout.totalYards)}" y="${fieldTop}" width="${fieldRight - xForYards(layout.goalLines.at(-1) ?? layout.totalYards)}" height="${fieldHeight}" fill="${palette.endZone}"/>
+		<rect x="${fieldLeft}" y="${fieldTop}" width="${xForYards(layout.goalLines[0]) - fieldLeft}" height="${fieldHeight}" fill="url(#field-stripe)"/>
+		<rect x="${xForYards(layout.goalLines.at(-1) ?? layout.totalYards)}" y="${fieldTop}" width="${fieldRight - xForYards(layout.goalLines.at(-1) ?? layout.totalYards)}" height="${fieldHeight}" fill="url(#field-stripe)"/>
 		${layout.shadedZones.map((zone) => `<rect x="${xForYards(zone[0])}" y="${fieldTop}" width="${xForYards(zone[1]) - xForYards(zone[0])}" height="${fieldHeight}" fill="rgba(0,0,0,.06)"/>`).join('')}
 		${layout.noRunZones.map((zone) => `<rect x="${xForYards(zone[0])}" y="${fieldTop}" width="${xForYards(zone[1]) - xForYards(zone[0])}" height="${fieldHeight}" fill="rgba(255,255,255,.16)"/>`).join('')}
 		<rect x="${fieldLeft}" y="${fieldTop}" width="${fieldWidth}" height="${fieldHeight}" fill="none" stroke="#fff" stroke-width="3"/>
@@ -396,13 +462,13 @@ export const renderPlayBuilderSocialSvg = (document: PlayBuilderDocument) => {
 	const activePlayIndex = document.plays[document.activePlayIndex] ? document.activePlayIndex : 0;
 	const active = document.plays[activePlayIndex];
 	const field = renderField(active.scene, active.settings);
-	return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="Arial, sans-serif">
+	return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="Inter, sans-serif">
 		<defs><pattern id="graph" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#e7e5e4" stroke-width="1" opacity=".58"/></pattern></defs>
 		<rect width="1200" height="630" fill="#fafaf9"/><rect width="1200" height="630" fill="url(#graph)"/>
 		<text x="600" y="62" text-anchor="middle" fill="#1c1917" font-family="Dokdo" font-size="68" font-weight="400" letter-spacing="2.5">FLAG FOOTBALL PLAY BUILDER</text>
 		${field}
 		<rect x="350" y="574" width="500" height="46" fill="#1c1917"/>
-		<text x="600" y="605" text-anchor="middle" fill="#fff" font-size="23" font-weight="900" letter-spacing="3">CASEPLAY.ORG/PLAY-BUILDER</text>
+		<text x="600" y="605" text-anchor="middle" fill="#fff" font-size="23" font-weight="900" letter-spacing="5">CASEPLAY.ORG/PLAY-BUILDER</text>
 	</svg>`;
 };
 
