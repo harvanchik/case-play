@@ -12,26 +12,26 @@ import {
 	type PlayBuilderScene,
 	type Point
 } from '$lib/play-builder-scene';
-import neuchaFontDataUrl from './fonts/neucha-latin.ttf?inline';
+import dokdoFontDataUrl from './fonts/dokdo-latin.ttf?inline';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-let socialImageFontPath: string | undefined;
-const getSocialImageFontPath = () => {
-	if (socialImageFontPath) return socialImageFontPath;
-	socialImageFontPath = join(tmpdir(), 'caseplay-neucha.ttf');
-	writeFileSync(socialImageFontPath, Buffer.from(neuchaFontDataUrl.slice(neuchaFontDataUrl.indexOf(',') + 1), 'base64'));
-	return socialImageFontPath;
+let socialImageDokdoFontPath: string | undefined;
+const getSocialImageDokdoFontPath = () => {
+	if (socialImageDokdoFontPath) return socialImageDokdoFontPath;
+	socialImageDokdoFontPath = join(tmpdir(), 'caseplay-dokdo.ttf');
+	writeFileSync(socialImageDokdoFontPath, Buffer.from(dokdoFontDataUrl.slice(dokdoFontDataUrl.indexOf(',') + 1), 'base64'));
+	return socialImageDokdoFontPath;
 };
 
 export const playBuilderSocialRenderOptions = () => ({
 	fitTo: { mode: 'width' as const, value: 1200 },
 	font: {
-		fontFiles: [getSocialImageFontPath()],
-		loadSystemFonts: false,
-		defaultFontFamily: 'Neucha',
-		sansSerifFamily: 'Neucha'
+		fontFiles: [getSocialImageDokdoFontPath()],
+		loadSystemFonts: true,
+		defaultFontFamily: 'Arial',
+		sansSerifFamily: 'Arial'
 	}
 });
 
@@ -368,12 +368,13 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 			: ''
 	}`;
 
-	return `<svg x="552" y="82" width="628" height="466" viewBox="0 0 1000 484" preserveAspectRatio="xMidYMid meet">
+	return `<svg x="30" y="82" width="1140" height="480" viewBox="0 0 1000 484" preserveAspectRatio="xMidYMid meet">
 		<defs>
 			<pattern id="field-stripe" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform="rotate(18)"><rect width="16" height="32" fill="rgba(255,255,255,.035)"/></pattern>
 			${arrowMarkers}
 		</defs>
-		<rect width="1000" height="484" fill="#292524"/>
+		<rect width="1000" height="484" fill="${palette.endZone}"/>
+		<rect width="1000" height="484" fill="url(#field-stripe)"/>
 		${teamBoxes}
 		<rect x="${fieldLeft}" y="${fieldTop}" width="${fieldWidth}" height="${fieldHeight}" fill="${palette.field}"/>
 		<rect x="${fieldLeft}" y="${fieldTop}" width="${fieldWidth}" height="${fieldHeight}" fill="url(#field-stripe)"/>
@@ -395,18 +396,13 @@ export const renderPlayBuilderSocialSvg = (document: PlayBuilderDocument) => {
 	const activePlayIndex = document.plays[document.activePlayIndex] ? document.activePlayIndex : 0;
 	const active = document.plays[activePlayIndex];
 	const field = renderField(active.scene, active.settings);
-	return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="Neucha">
+	return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="Arial, sans-serif">
 		<defs><pattern id="graph" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#e7e5e4" stroke-width="1" opacity=".58"/></pattern></defs>
 		<rect width="1200" height="630" fill="#fafaf9"/><rect width="1200" height="630" fill="url(#graph)"/>
-		<text x="78" y="132" fill="#57534e" font-size="28" font-weight="900" letter-spacing="2">CASEPLAY.ORG</text>
-		<text x="78" y="205" fill="#1c1917" font-size="58" font-weight="900">FLAG</text>
-		<text x="78" y="266" fill="#1c1917" font-size="58" font-weight="900">FOOTBALL</text>
-		<text x="78" y="327" fill="#1c1917" font-size="58" font-weight="900">PLAY BUILDER</text>
-		<text x="78" y="405" fill="#44403c" font-size="34" font-weight="900">PLAY ${activePlayIndex + 1}</text>
-		<rect x="78" y="466" width="474" height="60" fill="#1c1917"/>
-		<text x="99" y="507" fill="#fff" font-size="25" font-weight="900" letter-spacing="1">CASEPLAY.ORG/PLAY-BUILDER</text>
-		<rect x="562" y="173" width="628" height="304" fill="#000" opacity=".14"/>
+		<text x="600" y="62" text-anchor="middle" fill="#1c1917" font-family="Dokdo" font-size="68" font-weight="400" letter-spacing="2.5">FLAG FOOTBALL PLAY BUILDER</text>
 		${field}
+		<rect x="350" y="574" width="500" height="46" fill="#1c1917"/>
+		<text x="600" y="605" text-anchor="middle" fill="#fff" font-size="23" font-weight="900" letter-spacing="3">CASEPLAY.ORG/PLAY-BUILDER</text>
 	</svg>`;
 };
 
