@@ -4962,6 +4962,21 @@
 						<filter id="builder-air-shadow" x="-15%" y="-40%" width="130%" height="180%">
 							<feGaussianBlur stdDeviation="3" />
 						</filter>
+						<filter id="builder-neon-glow" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB">
+							<feGaussianBlur in="SourceGraphic" stdDeviation="5" result="neon-wide" />
+							<feComponentTransfer in="neon-wide" result="neon-wide-soft">
+								<feFuncA type="linear" slope="0.32" />
+							</feComponentTransfer>
+							<feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="neon-close" />
+							<feComponentTransfer in="neon-close" result="neon-close-soft">
+								<feFuncA type="linear" slope="0.78" />
+							</feComponentTransfer>
+							<feMerge>
+								<feMergeNode in="neon-wide-soft" />
+								<feMergeNode in="neon-close-soft" />
+								<feMergeNode in="SourceGraphic" />
+							</feMerge>
+						</filter>
 						<marker
 							id="builder-path-arrow"
 							viewBox="0 0 10 10"
@@ -6002,6 +6017,7 @@
 									cy={stroke.points[0].y}
 									r={(stroke.width ?? freeDrawStrokeWidth) * 0.85}
 									fill={drawingColor(stroke.color)}
+									filter="url(#builder-neon-glow)"
 								/>
 							{:else}
 								<path
@@ -6012,6 +6028,7 @@
 									stroke-width={stroke.width ?? freeDrawStrokeWidth}
 									stroke-linecap="round"
 									stroke-linejoin="round"
+									filter="url(#builder-neon-glow)"
 								/>
 							{/if}
 						{/each}
@@ -6023,6 +6040,7 @@
 									cy={activeFreeStroke.points[0].y}
 									r={(activeFreeStroke.width ?? freeDrawStrokeWidth) * 0.85}
 									fill={drawingColor(activeFreeStroke.color)}
+									filter="url(#builder-neon-glow)"
 								/>
 							{:else}
 								<path
@@ -6033,6 +6051,7 @@
 									stroke-width={activeFreeStroke.width ?? freeDrawStrokeWidth}
 									stroke-linecap="round"
 									stroke-linejoin="round"
+									filter="url(#builder-neon-glow)"
 								/>
 							{/if}
 						{/if}
@@ -6212,6 +6231,7 @@
 										stroke-linecap="round"
 										stroke-linejoin="round"
 										opacity="0.88"
+										filter="url(#builder-neon-glow)"
 									/>
 								</g>
 							{/each}
@@ -6234,6 +6254,7 @@
 										stroke-linecap="round"
 										stroke-linejoin="round"
 										opacity="0.88"
+										filter="url(#builder-neon-glow)"
 									/>
 								</g>
 							{/if}
@@ -6260,11 +6281,12 @@
 									d={laserTrailPath(laserTrail, laserTrailClock)}
 									fill="url(#builder-laser-trail-gradient)"
 									opacity={Math.pow(trailFreshness, 1.25)}
+									filter="url(#builder-neon-glow)"
 								/>
 							{/if}
 							{#if tool === 'laser' && laserPointer && pointerOnField}
 								<circle cx={laserPointer.x} cy={laserPointer.y} r="7" fill={laserColorValue(laserColor)} opacity="0.2" />
-								<circle cx={laserPointer.x} cy={laserPointer.y} r="3" fill={laserColorValue(laserColor)} />
+								<circle cx={laserPointer.x} cy={laserPointer.y} r="3" fill={laserColorValue(laserColor)} filter="url(#builder-neon-glow)" />
 							{/if}
 						</g>
 					{/if}
