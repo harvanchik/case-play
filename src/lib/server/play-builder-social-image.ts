@@ -162,6 +162,31 @@ const fieldLayouts: Record<PlayBuilderFieldType, FieldLayout> = {
 		teamBox: [15, 45],
 		teamBoxSetbackYards: 1,
 		endZonePylonYards: [0, 10, 50, 60]
+	},
+	'nfl-flag': {
+		totalYards: 70,
+		widthYards: 30,
+		goalLines: [10, 60],
+		zoneLines: [10, 35, 60],
+		shadedZones: [],
+		hashLines: [],
+		hashYFractions: [],
+		threeYardMarkers: [20, 50],
+		tenYardMarkers: [],
+		tenYardXs: [],
+		fourteenYardXs: [15, 55],
+		thirtyYardMarkers: [],
+		noRunLines: [15, 55],
+		noRunZones: [
+			[10, 15],
+			[55, 60]
+		],
+		yardLabels: [],
+		goalLabelYards: [],
+		endZoneCenters: [5, 65],
+		teamBox: [20, 50],
+		teamBoxSetbackYards: 1.5,
+		endZonePylonYards: [0, 10, 60, 70]
 	}
 };
 
@@ -431,6 +456,15 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 	const los = scene.guides.find((guide) => guide.kind === 'line-of-scrimmage');
 	const ltg = scene.guides.find((guide) => guide.kind === 'line-to-gain');
 	const losMarker = los ? lineOfScrimmageMarkerDisplay(los.x) : undefined;
+	const noRunZoneLabels =
+		settings.showNoRunZoneText && (settings.fieldType === 'unified' || settings.fieldType === 'nfl-flag')
+			? layout.noRunZones
+					.map((zone) => {
+						const center = (xForYards(zone[0]) + xForYards(zone[1])) / 2;
+						return `<text x="${center}" y="${fieldTop + fieldHeight / 2}" transform="rotate(-90 ${center} ${fieldTop + fieldHeight / 2})" text-anchor="middle" fill="rgba(255,255,255,.72)" font-size="15" font-weight="900" letter-spacing="1.5">NO RUN ZONE</text>`;
+					})
+					.join('')
+			: '';
 	const indicators = `${
 		settings.showDownMarker && ltg
 			? `<g><rect x="${ltg.x - 32}" y="${fieldTop - 9}" width="64" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5"/><text x="${ltg.x}" y="${fieldTop + 4}" text-anchor="middle" fill="#ff5a1f" font-size="10" font-weight="900">${escapeXml(downText(ltg, los, yardsToPixels))}</text></g>`
@@ -465,6 +499,7 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 		${layout.zoneLines.map((yard) => `<line x1="${xForYards(yard)}" y1="${fieldTop}" x2="${xForYards(yard)}" y2="${fieldBottom}" stroke="rgba(255,255,255,.86)" stroke-width="3"/>`).join('')}
 		${layout.noRunLines.map((yard) => `<line x1="${xForYards(yard)}" y1="${fieldTop}" x2="${xForYards(yard)}" y2="${fieldBottom}" stroke="rgba(255,255,255,.58)" stroke-width="3" stroke-dasharray="10 8"/>`).join('')}
 		${hashes}${shortLines}${yardNumbers}${goalLetters}
+		${noRunZoneLabels}
 		${settings.showEndZoneText ? layout.endZoneCenters.map((yard, index) => `<text x="${xForYards(yard)}" y="${fieldTop + fieldHeight / 2}" transform="rotate(${index === 0 ? -90 : 90} ${xForYards(yard)} ${fieldTop + fieldHeight / 2})" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,.72)" font-size="26" font-weight="900" letter-spacing="4">END ZONE</text>`).join('') : ''}
 		<text x="${fieldLeft + fieldWidth / 2}" y="${fieldTop + fieldHeight / 2}" transform="rotate(${fieldAngle} ${fieldLeft + fieldWidth / 2} ${fieldTop + fieldHeight / 2})" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,.1)" font-size="52" font-weight="900" letter-spacing="7">CASEPLAY.ORG</text>
 		${guideElements}${xMarks}${renderLayers()}${pylons}${indicators}${freeDrawings}

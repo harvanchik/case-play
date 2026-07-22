@@ -633,6 +633,32 @@
 			teamBoxSetbackYards: 1,
 			endZonePylonYards: [0, 10, 50, 60],
 			endLinePylonFractions: []
+		},
+		'nfl-flag': {
+			totalYards: 70,
+			widthYards: 30,
+			goalLines: [10, 60],
+			zoneLines: [10, 35, 60],
+			shadedZones: [],
+			hashLines: [],
+			hashYFractions: [],
+			threeYardMarkers: [20, 50],
+			tenYardMarkers: [],
+			tenYardXs: [],
+			fourteenYardXs: [15, 55],
+			thirtyYardMarkers: [],
+			noRunLines: [15, 55],
+			noRunZones: [
+				[10, 15],
+				[55, 60]
+			],
+			yardLabels: [],
+			goalLabelYards: [],
+			endZoneCenters: [5, 65],
+			teamBox: [20, 50],
+			teamBoxSetbackYards: 1.5,
+			endZonePylonYards: [0, 10, 60, 70],
+			endLinePylonFractions: []
 		}
 	};
 	const fieldColorOptions: { id: PlayBuilderFieldColor; label: string; field: string; endZone: string }[] = [
@@ -644,9 +670,15 @@
 		{ id: 'purple', label: 'Purple', field: '#73538f', endZone: '#543a6c' }
 	];
 	const fieldTypeOptions: { id: PlayBuilderFieldType; label: string; dimensions: string; description: string }[] = [
-		{ id: 'traditional', label: 'Traditional', dimensions: '100 × 40 yards', description: 'NIRSA 7v7 field with four 20-yard zones.' },
+		{
+			id: 'traditional',
+			label: 'Traditional',
+			dimensions: '100 × 40 yards',
+			description: 'NIRSA 7v7 field with four 20-yard zones and 10-yard end zones.'
+		},
 		{ id: 'four-v-four', label: '4v4', dimensions: '60 × 30 yards', description: 'Two 20-yard playing zones and 10-yard end zones.' },
-		{ id: 'unified', label: 'Unified', dimensions: '60 × 25 yards', description: 'SONA/NIRSA Unified field with 5-yard no-run zones.' }
+		{ id: 'unified', label: 'Unified', dimensions: '60 × 25 yards', description: 'SONA/NIRSA Unified field with 5-yard no-run zones.' },
+		{ id: 'nfl-flag', label: 'NFL Flag', dimensions: '70 × 30 yards', description: 'NFL Flag field with 10-yard end zones and 5-yard no-run zones.' }
 	];
 	const fieldToggleOptions: {
 		key: keyof Pick<
@@ -671,19 +703,19 @@
 	}[] = [
 		{
 			key: 'showYardNumbers',
-			label: '20 and 40 Yard Numbers',
-			description: 'Show the traditional field numbers on both sidelines.',
+			label: 'Yard Line Numbers',
+			description: 'Show the 20- and 40-yard field numbers on both sidelines.',
 			fieldTypes: ['traditional']
 		},
 		{
 			key: 'showYardNumbers',
-			label: '20-Yard Midfield Number',
+			label: 'Yard Line Number',
 			description: 'Show the 20-yard midfield number on both sidelines.',
 			fieldTypes: ['four-v-four']
 		},
 		{
 			key: 'showGoalLetters',
-			label: 'Goal Letters',
+			label: 'Goal Line Letters',
 			description: 'Show the G labels immediately inside each goal line.',
 			fieldTypes: ['traditional']
 		},
@@ -691,88 +723,92 @@
 			key: 'showEndZoneText',
 			label: 'End Zone Text',
 			description: 'Show the vertical END ZONE labels.',
-			fieldTypes: ['traditional', 'four-v-four', 'unified']
+			fieldTypes: ['traditional', 'four-v-four', 'unified', 'nfl-flag']
 		},
 		{
 			key: 'showPylons',
 			label: 'End Zone Pylons',
 			description: 'Show pylons at the end-line and goal-line corners.',
-			fieldTypes: ['traditional', 'four-v-four', 'unified']
+			fieldTypes: ['traditional', 'four-v-four', 'unified', 'nfl-flag']
 		},
 		{
 			key: 'showHashes',
-			label: 'Hash Marks and Pylons',
+			label: 'Hash Marks',
 			description: 'Show field hashes and their matching pylons behind the end zones.',
 			fieldTypes: ['traditional', 'four-v-four']
 		},
 		{
 			key: 'showThreeYardMarker',
 			label: '3-Yard Try Line',
-			description: 'Show the short Try lines three yards from each goal line.',
+			description: 'Show a short mark three yards from each goal line.',
 			fieldTypes: ['traditional', 'four-v-four']
+		},
+		{
+			key: 'showThreeYardMarker',
+			label: '2-Point Try Line',
+			description: 'Show a short mark ten yards from each goal line.',
+			fieldTypes: ['nfl-flag']
 		},
 		{
 			key: 'showTenYardMarker',
 			label: '10-Yard Try Line',
-			description: 'Show the short Try lines ten yards from each goal line.',
+			description: 'Show a short mark ten yards from each goal line.',
 			fieldTypes: ['traditional']
 		},
 		{
 			key: 'showTenYardMarker',
 			label: '10-Yard X',
-			description: 'Show the 10-yard X on each half of the 4v4 field.',
+			description: 'Show the 10-yard X on each half of the field.',
 			fieldTypes: ['four-v-four']
 		},
 		{
 			key: 'showFourteenYardX',
 			label: '14-Yard X',
-			description: 'Show each X used for the traditional starting spot.',
+			description: 'Show the 14-yard X on each half of the field.',
 			fieldTypes: ['traditional']
 		},
 		{
 			key: 'showFourteenYardX',
 			label: '5-Yard X',
-			description: 'Show each X used for the Unified starting spot.',
-			fieldTypes: ['unified']
+			description: 'Show the 5-yard X on each half of the field.',
+			fieldTypes: ['unified', 'nfl-flag']
 		},
 		{
 			key: 'showThirtyYardMarker',
 			label: '30-Yard Marker',
-			description: 'Show the short 30-yard marks near midfield.',
+			description: 'Show a short mark at each 30-yard line.',
 			fieldTypes: ['traditional']
 		},
 		{
 			key: 'showNoRunZoneText',
 			label: 'No-Run Zone Text',
-			description: 'Label each shaded Unified no-run zone.',
-			fieldTypes: ['unified']
+			description: 'Label each shaded no-run zone.',
+			fieldTypes: ['unified', 'nfl-flag']
 		},
 		{
 			key: 'showTeamBoxes',
 			label: 'Team Boxes',
 			description: 'Show the labeled team boxes outside both sidelines.',
-			fieldTypes: ['traditional', 'four-v-four', 'unified']
+			fieldTypes: ['traditional', 'four-v-four', 'unified', 'nfl-flag']
 		},
 		{
 			key: 'showDownMarker',
 			label: 'Down Marker',
 			description: 'Show the down and calculated distance at the Line to Gain.',
-			fieldTypes: ['traditional', 'four-v-four', 'unified']
+			fieldTypes: ['traditional', 'four-v-four', 'unified', 'nfl-flag']
 		},
 		{
 			key: 'showLineOfScrimmageMarker',
 			label: 'L.O.S. Yard Marker',
-			description: 'Show the Line of Scrimmage yard line on the opposite sideline.',
-			fieldTypes: ['traditional', 'four-v-four', 'unified']
+			description: 'Show the Line of Scrimmage yard line on the near sideline.',
+			fieldTypes: ['traditional', 'four-v-four', 'unified', 'nfl-flag']
 		}
 	];
 	$: fieldLayout = fieldLayouts[fieldSettings.fieldType];
 	$: fieldPalette = fieldColorOptions.find((option) => option.id === fieldSettings.fieldColor) ?? fieldColorOptions[0];
 	$: currentFieldDefaults = { ...DEFAULT_PLAY_BUILDER_FIELD_SETTINGS, fieldType: fieldSettings.fieldType };
 	$: fieldSettingsAreDefault = JSON.stringify(fieldSettings) === JSON.stringify(currentFieldDefaults);
-	$: fieldFixtureScale = fieldLayout.teamBox
-		? (484 - 48) / (fieldLayout.widthYards + fieldLayout.teamBoxSetbackYards * 2)
-		: Number.POSITIVE_INFINITY;
+	$: fieldFixtureScale = fieldLayout.teamBox ? (484 - 48) / (fieldLayout.widthYards + fieldLayout.teamBoxSetbackYards * 2) : Number.POSITIVE_INFINITY;
 	$: fieldWidth = Math.min(
 		fieldMaxWidth,
 		fieldMaxHeight * (fieldLayout.totalYards / fieldLayout.widthYards),
@@ -949,9 +985,7 @@
 	const releaseLaserDrawings = () => {
 		if (laserDrawingPointerId !== null && svg?.hasPointerCapture(laserDrawingPointerId)) svg.releasePointerCapture(laserDrawingPointerId);
 		const drawings =
-			activeLaserDrawing && activeLaserDrawing.points.length > 1
-				? [...laserDrawings, { ...activeLaserDrawing, releasedAt: null }]
-				: laserDrawings;
+			activeLaserDrawing && activeLaserDrawing.points.length > 1 ? [...laserDrawings, { ...activeLaserDrawing, releasedAt: null }] : laserDrawings;
 		activeLaserDrawing = null;
 		laserDrawingPointerId = null;
 		laserPointer = null;
@@ -2374,7 +2408,12 @@
 		completeTutorialAction(`edit:${path.kind}`);
 	};
 	const isToolbarPresetTool = (value: Tool): value is ToolbarPresetTool =>
-		value === 'deflag' || value === 'bean-bag' || value === 'laser' || isArrowKind(value) || value === 'line-of-scrimmage' || value === 'line-to-gain';
+		value === 'deflag' ||
+		value === 'bean-bag' ||
+		value === 'laser' ||
+		isArrowKind(value) ||
+		value === 'line-of-scrimmage' ||
+		value === 'line-to-gain';
 	const openToolbarPresetEditor = async (event: MouseEvent, selectedTool: Tool) => {
 		if (!isToolbarPresetTool(selectedTool)) return;
 		event.preventDefault();
@@ -2394,7 +2433,8 @@
 			const defaultYardages = {
 				traditional: { 'line-of-scrimmage': 14, 'line-to-gain': 6 },
 				'four-v-four': { 'line-of-scrimmage': 10, 'line-to-gain': 10 },
-				unified: { 'line-of-scrimmage': 5, 'line-to-gain': 15 }
+				unified: { 'line-of-scrimmage': 5, 'line-to-gain': 15 },
+				'nfl-flag': { 'line-of-scrimmage': 5, 'line-to-gain': 20 }
 			} as const;
 			toolbarGuideYardage = existing
 				? selectedTool === 'line-of-scrimmage'
@@ -3337,7 +3377,8 @@
 		const setupByFieldType: Record<PlayBuilderFieldType, { lineOfScrimmage: number; lineToGain: number; quarterbackDepth: number }> = {
 			traditional: { lineOfScrimmage: 24, lineToGain: 30, quarterbackDepth: 5 },
 			'four-v-four': { lineOfScrimmage: 20, lineToGain: 30, quarterbackDepth: 5 },
-			unified: { lineOfScrimmage: 15, lineToGain: 30, quarterbackDepth: 5 }
+			unified: { lineOfScrimmage: 15, lineToGain: 30, quarterbackDepth: 5 },
+			'nfl-flag': { lineOfScrimmage: 15, lineToGain: 35, quarterbackDepth: 5 }
 		};
 		const setup = setupByFieldType[fieldSettings.fieldType];
 		const lineOfScrimmageX = xForYards(setup.lineOfScrimmage);
@@ -3375,6 +3416,10 @@
 				{ kind: 'official-l', x: lineOfScrimmageX, y: lineJudgeY },
 				{ kind: 'official-b', x: xForYards(setup.lineOfScrimmage + 20), y: fieldTop + fieldHeight * 0.375 },
 				{ kind: 'official-f', x: xForYards(setup.lineOfScrimmage + 10), y: fieldJudgeY }
+			],
+			'nfl-flag': [
+				{ kind: 'official-r', x: standardRefereeX, y: standardRefereeY },
+				{ kind: 'official-l', x: lineOfScrimmageX, y: lineJudgeY }
 			]
 		};
 		const officials = officialPositions[fieldSettings.fieldType].map((position) => ({ id: nextId++, ...position }));
@@ -3768,8 +3813,7 @@
 			if (pointerOnField) {
 				updateLaserPointer(point);
 				continueLaserDrawing(event, point);
-			}
-			else laserPointer = null;
+			} else laserPointer = null;
 			hoverPoint = pointerOnField ? point : null;
 			hoveringElement = false;
 			return;
@@ -4227,8 +4271,7 @@
 											class="h-8 w-8 object-contain"
 											class:!h-7={item.id === 'free-draw'}
 											class:!w-7={item.id === 'free-draw'}
-											class:!h-auto={item.id === 'laser'}
-											class:!w-full={item.id === 'laser'}
+											style={item.id === 'laser' ? 'width: 90%; height: auto;' : undefined}
 											class:invert={item.id === 'free-draw' && tool === item.id}
 											draggable="false"
 											decoding="async"
@@ -4334,13 +4377,7 @@
 						/>
 					{/if}
 					<div class="flex gap-1" aria-label="Preset color">
-						{#each toolbarEditorTool === 'deflag'
-							? deflagColors
-							: toolbarEditorTool === 'bean-bag'
-								? beanBagColors
-								: toolbarEditorTool === 'laser'
-									? laserColors
-									: guideColors as option}
+						{#each toolbarEditorTool === 'deflag' ? deflagColors : toolbarEditorTool === 'bean-bag' ? beanBagColors : toolbarEditorTool === 'laser' ? laserColors : guideColors as option}
 							<button
 								type="button"
 								title={option.label}
@@ -5012,20 +5049,7 @@
 							{@const scoreboardGap = 10}
 							{@const quarterBoxX = xForYards(scoreboardTeamBox[0]) - scoreboardGap - scoreboardWidth}
 							{@const clockBoxX = xForYards(scoreboardTeamBox[1]) + scoreboardGap}
-							{#each [
-								{
-									kind: 'quarter' as const,
-									x: quarterBoxX,
-									value: fieldSettings.gameQuarter.toUpperCase(),
-									label: `Quarter ${fieldSettings.gameQuarter}, click for next quarter`
-								},
-								{
-									kind: 'clock' as const,
-									x: clockBoxX,
-									value: formatPlayBuilderGameClock(fieldSettings.gameClockSeconds),
-									label: `Game clock ${formatPlayBuilderGameClock(fieldSettings.gameClockSeconds)}, click to edit`
-								}
-							] as scoreboardItem}
+							{#each [{ kind: 'quarter' as const, x: quarterBoxX, value: fieldSettings.gameQuarter.toUpperCase(), label: `Quarter ${fieldSettings.gameQuarter}, click for next quarter` }, { kind: 'clock' as const, x: clockBoxX, value: formatPlayBuilderGameClock(fieldSettings.gameClockSeconds), label: `Game clock ${formatPlayBuilderGameClock(fieldSettings.gameClockSeconds)}, click to edit` }] as scoreboardItem}
 								<g data-export-scoreboard>
 									<rect
 										x={scoreboardItem.x}
@@ -5102,8 +5126,7 @@
 										fill="transparent"
 										pointer-events={scoreboardItem.kind === 'clock' && editingScoreboard === 'clock' ? 'none' : 'all'}
 										on:pointerdown|stopPropagation
-										on:click|stopPropagation={(event) =>
-											scoreboardItem.kind === 'quarter' ? cycleGameQuarter(event) : startEditingGameClock(event)}
+										on:click|stopPropagation={(event) => (scoreboardItem.kind === 'quarter' ? cycleGameQuarter(event) : startEditingGameClock(event))}
 										on:keydown={(event) => {
 											if (event.key !== 'Enter' && event.key !== ' ') return;
 											event.preventDefault();
@@ -5266,7 +5289,7 @@
 								pointer-events="none"
 							/>
 						{/each}
-						{#if fieldSettings.fieldType === 'unified' && fieldSettings.showNoRunZoneText}
+						{#if (fieldSettings.fieldType === 'unified' || fieldSettings.fieldType === 'nfl-flag') && fieldSettings.showNoRunZoneText}
 							{#each fieldLayout.noRunZones as zone}
 								{@const noRunCenter = (xForYards(zone[0]) + xForYards(zone[1])) / 2}
 								<text
@@ -6880,7 +6903,7 @@
 			<div class="space-y-6 p-5 sm:p-6">
 				<section>
 					<h3 class="mb-2 text-sm font-black tracking-wide uppercase">Field Type</h3>
-					<div data-tutorial="field-type-options" class="grid gap-2 md:grid-cols-3" role="radiogroup" aria-label="Field type">
+					<div data-tutorial="field-type-options" class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label="Field type">
 						{#each fieldTypeOptions as option}
 							<button
 								type="button"
@@ -6945,7 +6968,10 @@
 								on:click={() => updateFieldSetting('fieldColor', option.id)}
 								class="cursor-pointer border-2 border-stone-400 bg-white/75 p-1.5 text-center hover:border-stone-950 aria-checked:border-stone-950 aria-checked:ring-2 aria-checked:ring-stone-950"
 							>
-								<span class="block h-9 border border-stone-800" style:background={option.field}></span>
+								<span
+									class="block h-9 border border-stone-800"
+									style={`background-color: ${option.field}; background-image: repeating-linear-gradient(108deg, rgba(255, 255, 255, 0.08) 0 16px, rgba(255, 255, 255, 0.035) 16px 32px);`}
+								></span>
 								<span class="mt-1 block text-[10px] font-black">{option.label}</span>
 							</button>
 						{/each}
@@ -7128,11 +7154,11 @@
 						<li>
 							Hold <kbd>Shift</kbd> while moving to snap instantly. Footballs prioritize cross-field lines; L.O.S. and L.T.G. prioritize footballs.
 						</li>
-						<li>Snap points automatically follow the markings available on the selected traditional, 4v4, or Unified field.</li>
+						<li>Snap points automatically follow the markings available on the selected Traditional, 4v4, Unified, or NFL Flag field.</li>
 						<li>
-							<strong>Setup</strong> uses the selected field’s proper starting spot and first line to gain: A’s 14 to A’s 20 on traditional, A’s 10 to midfield
-							on 4v4, or A’s 5 to midfield on Unified. It adds A-1 and the appropriate initial official positions: a four-person crew on traditional and
-							Unified, or the R and LJ on 4v4. One Undo restores the previous diagram.
+							<strong>Setup</strong> uses the selected field’s proper starting spot and first line to gain: A’s 14 to A’s 20 on Traditional, A’s 10 to midfield
+							on 4v4, A’s 5 to midfield on Unified, or A’s 5 to midfield on NFL Flag. It adds A-1 and the appropriate initial official positions: a four-person
+							crew on Traditional and Unified, or the R and LJ on 4v4 and NFL Flag. One Undo restores the previous diagram.
 						</li>
 					</ul>
 				</section>

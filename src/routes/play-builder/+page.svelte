@@ -23,7 +23,7 @@
 		featureList: [
 			'Draw run, pass, and punt routes',
 			'Place players, officials, footballs, flags, and field markers',
-			'Use traditional, 4v4, and unified flag football fields',
+			'Use traditional, 4v4, Unified, and NFL Flag football fields',
 			'Save and share multi-play diagrams',
 			'Export diagrams as PNG, JPG, WebP, or PDF'
 		],
