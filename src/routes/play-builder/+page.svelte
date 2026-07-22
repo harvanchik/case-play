@@ -8,7 +8,7 @@
 	const pageTitle = 'Flag Football Play Builder | caseplay.org';
 	const pageDescription =
 		'Create flag football play diagrams online. Draw routes, place players and officials, customize fields, save plays, and share or export your diagrams.';
-	const socialImage = 'https://caseplay.org/play-builder/social.png?v=2';
+	const socialImage = 'https://caseplay.org/play-builder/social.png?v=3';
 	const structuredData = {
 		'@context': 'https://schema.org',
 		'@type': 'WebApplication',
