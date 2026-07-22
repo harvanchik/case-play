@@ -15,6 +15,9 @@
 		decodePlayBuilderDocument,
 		defaultPlayBuilderFieldSettings,
 		encodePlayBuilderDocument,
+		formatPlayBuilderGameClock,
+		PLAY_BUILDER_GAME_CLOCK_MAX_SECONDS,
+		PLAY_BUILDER_GAME_QUARTERS,
 		PLAY_BUILDER_MAX_PLAYS,
 		PLAY_BUILDER_PLAY_NAME_MAX_LENGTH,
 		PLAY_BUILDER_TEAM_BOX_LABEL_MAX_LENGTH,
@@ -34,6 +37,7 @@
 		type PlayBuilderFieldColor,
 		type PlayBuilderFieldSettings,
 		type PlayBuilderFieldType,
+		type PlayBuilderGameQuarter,
 		type PlayBuilderScene,
 		type PlayerKind,
 		type Point,
@@ -358,6 +362,11 @@
 	let editingTeamBoxIndex: number | null = null;
 	let teamBoxEditValue = '';
 	let teamBoxEditInput: HTMLInputElement;
+	let editingScoreboard: 'quarter' | 'clock' | null = null;
+	let scoreboardEditorX = 0;
+	let scoreboardEditorY = 0;
+	let gameClockEditValue = '00:00';
+	let scoreboardHistorySaved = false;
 	let editingDownGuideId: number | null = null;
 	let editingDownGuide: FieldGuide | undefined;
 	let downYardageValue: number | '' = '';
@@ -901,6 +910,8 @@
 		editingPathId = null;
 		editingTeamBoxY = null;
 		editingTeamBoxIndex = null;
+		editingScoreboard = null;
+		scoreboardHistorySaved = false;
 		editingDownGuideId = null;
 		downYardageValue = '';
 		downYardageHistorySaved = false;
@@ -1915,6 +1926,40 @@
 		editingTeamBoxY = null;
 		editingTeamBoxIndex = null;
 	};
+	const updateGameClock = (seconds: number) => {
+		const nextSeconds = Math.max(0, Math.min(PLAY_BUILDER_GAME_CLOCK_MAX_SECONDS, Math.round(seconds)));
+		gameClockEditValue = formatPlayBuilderGameClock(nextSeconds);
+		if (nextSeconds === fieldSettings.gameClockSeconds) return;
+		if (!scoreboardHistorySaved) saveHistory();
+		scoreboardHistorySaved = true;
+		fieldSettings = { ...fieldSettings, gameClockSeconds: nextSeconds };
+	};
+	const parseGameClock = (value: string) => {
+		const match = value.trim().match(/^(\d{1,2}):([0-5]\d)$/);
+		if (!match) return null;
+		return Number(match[1]) * 60 + Number(match[2]);
+	};
+	const commitScoreboardEditor = () => {
+		if (editingScoreboard === 'clock') {
+			const parsed = parseGameClock(gameClockEditValue);
+			if (parsed === null) gameClockEditValue = formatPlayBuilderGameClock(fieldSettings.gameClockSeconds);
+			else updateGameClock(parsed);
+		}
+		editingScoreboard = null;
+		scoreboardHistorySaved = false;
+	};
+	const adjustGameClock = (seconds: number) => {
+		const enteredSeconds = parseGameClock(gameClockEditValue);
+		updateGameClock((enteredSeconds ?? fieldSettings.gameClockSeconds) + seconds);
+	};
+	const selectGameQuarter = (gameQuarter: PlayBuilderGameQuarter) => {
+		if (gameQuarter !== fieldSettings.gameQuarter) {
+			if (!scoreboardHistorySaved) saveHistory();
+			fieldSettings = { ...fieldSettings, gameQuarter };
+		}
+		editingScoreboard = null;
+		scoreboardHistorySaved = false;
+	};
 	const updateDownMarkerYardage = (event: Event) => {
 		if (!editingDownGuide || lineOfScrimmageX === null) return;
 		const rawValue = (event.currentTarget as HTMLInputElement).value;
@@ -2027,8 +2072,16 @@
 		else if (editingGuideId !== null) commitGuideEditor();
 		else if (editingPathId !== null) commitPathEditor();
 		else if (editingTeamBoxY !== null) commitTeamBoxEditor();
+		else if (editingScoreboard !== null) commitScoreboardEditor();
 		else if (editingDownGuideId !== null) commitDownMarkerEditor();
 	};
+	const hasActiveInlineEditor = () =>
+		editingMarkerId !== null ||
+		editingGuideId !== null ||
+		editingPathId !== null ||
+		editingTeamBoxY !== null ||
+		editingScoreboard !== null ||
+		editingDownGuideId !== null;
 	const startEditingDownMarker = (event: Event, guide: FieldGuide) => {
 		if (viewOnly) return;
 		if (guide.kind !== 'line-to-gain' || suppressDownMarkerClick || tool === 'event' || tool === 'free-draw') return;
@@ -2040,10 +2093,28 @@
 		editingPathId = null;
 		editingTeamBoxY = null;
 		editingTeamBoxIndex = null;
+		editingScoreboard = null;
 		downYardageValue = guideDistanceYards(guide.x, lineOfScrimmageX) ?? '';
 		downGuideSide = fieldSideForX(guide.x);
 		downYardageHistorySaved = false;
 		editingDownGuideId = guide.id;
+	};
+	const startEditingScoreboard = (event: Event, kind: 'quarter' | 'clock', x: number, y: number) => {
+		if (viewOnly) return;
+		event.preventDefault();
+		event.stopPropagation();
+		clearDeleteState();
+		editingMarkerId = null;
+		editingGuideId = null;
+		editingPathId = null;
+		editingDownGuideId = null;
+		editingTeamBoxY = null;
+		editingTeamBoxIndex = null;
+		editingScoreboard = kind;
+		scoreboardEditorX = x;
+		scoreboardEditorY = y;
+		gameClockEditValue = formatPlayBuilderGameClock(fieldSettings.gameClockSeconds);
+		scoreboardHistorySaved = false;
 	};
 	const startEditingTeamBox = async (event: Event, teamBoxY: number, teamBoxIndex: number) => {
 		if (viewOnly) return;
@@ -2053,6 +2124,7 @@
 		editingGuideId = null;
 		editingPathId = null;
 		editingDownGuideId = null;
+		editingScoreboard = null;
 		editingTeamBoxY = teamBoxY;
 		editingTeamBoxIndex = teamBoxIndex;
 		teamBoxEditValue = teamBoxIndex === 0 ? fieldSettings.teamBoxTopLabel : fieldSettings.teamBoxBottomLabel;
@@ -2270,11 +2342,7 @@
 		}
 	};
 	const handleEditorKeydown = (event: KeyboardEvent) => {
-		if (
-			event.key !== 'Escape' ||
-			(editingMarkerId === null && editingGuideId === null && editingPathId === null && editingTeamBoxY === null && editingDownGuideId === null)
-		)
-			return;
+		if (event.key !== 'Escape' || !hasActiveInlineEditor()) return;
 		event.preventDefault();
 		if (editingDownGuideId !== null) commitDownMarkerEditor();
 		else clearEditorState();
@@ -2346,7 +2414,7 @@
 			}
 			return;
 		}
-		if (editingMarkerId !== null || editingGuideId !== null || editingPathId !== null || editingTeamBoxY !== null || editingDownGuideId !== null) {
+		if (hasActiveInlineEditor()) {
 			handleEditorKeydown(event);
 			return;
 		}
@@ -2490,8 +2558,7 @@
 			!(target instanceof Element && target.closest('[data-builder-tool]'))
 		)
 			toolbarEditorTool = null;
-		if (editingMarkerId === null && editingGuideId === null && editingPathId === null && editingTeamBoxY === null && editingDownGuideId === null)
-			return;
+		if (!hasActiveInlineEditor()) return;
 		if (editorElement?.contains(target)) return;
 		if (editingDownGuideId !== null && target instanceof Element && target.closest('[data-down-marker]')) return;
 		if (editingGuideId !== null && target instanceof Element && target.closest('[data-los-marker]')) return;
@@ -2511,8 +2578,7 @@
 		setTimeout(() => (suppressNextClick = false), 0);
 	};
 	const dismissEditorForAction = () => {
-		if (editingMarkerId === null && editingGuideId === null && editingPathId === null && editingTeamBoxY === null && editingDownGuideId === null)
-			return false;
+		if (!hasActiveInlineEditor()) return false;
 		commitActiveEditor();
 		suppressNextClick = true;
 		setTimeout(() => (suppressNextClick = false), 0);
@@ -2942,8 +3008,7 @@
 	};
 	const selectTool = (nextTool: Tool) => {
 		if (suppressNextClick) return;
-		if (editingMarkerId !== null || editingGuideId !== null || editingPathId !== null || editingTeamBoxY !== null || editingDownGuideId !== null)
-			commitActiveEditor();
+		if (hasActiveInlineEditor()) commitActiveEditor();
 		clearDeleteState();
 		clearPlacementSnap();
 		lastPlacementHoverPoint = null;
@@ -4652,6 +4717,10 @@
 								{@const teamBoxLabel = teamBoxIndex === 0 ? fieldSettings.teamBoxTopLabel : fieldSettings.teamBoxBottomLabel}
 								{@const teamBoxWidth = xForYards(teamBox[1]) - xForYards(teamBox[0])}
 								{@const teamBoxTextHitWidth = Math.min(teamBoxWidth, Math.max(56, teamBoxLabel.length * 9 + 18))}
+								{@const scoreboardWidth = 58}
+								{@const scoreboardInset = 4}
+								{@const quarterBoxX = xForYards(teamBox[0]) + scoreboardInset}
+								{@const clockBoxX = xForYards(teamBox[1]) - scoreboardInset - scoreboardWidth}
 								<g>
 									<rect x={xForYards(teamBox[0])} y={teamBoxY} width={teamBoxWidth} height="20" fill="transparent" pointer-events="none" />
 									<rect
@@ -4706,6 +4775,58 @@
 										letter-spacing="2"
 										pointer-events="none">{teamBoxLabel}</text
 									>
+									{#if teamBoxIndex === 0}
+										{#each [
+											{ kind: 'quarter' as const, x: quarterBoxX, value: fieldSettings.gameQuarter.toUpperCase(), label: `Quarter ${fieldSettings.gameQuarter}` },
+											{ kind: 'clock' as const, x: clockBoxX, value: formatPlayBuilderGameClock(fieldSettings.gameClockSeconds), label: `Game clock ${formatPlayBuilderGameClock(fieldSettings.gameClockSeconds)}` }
+										] as scoreboardItem}
+											<g data-export-scoreboard>
+												<rect
+													x={scoreboardItem.x}
+													y={teamBoxY}
+													width={scoreboardWidth}
+													height="20"
+													fill="#111827"
+													stroke="#d2b48c"
+													stroke-width="2"
+													pointer-events="none"
+												/>
+												<text
+													x={scoreboardItem.x + scoreboardWidth / 2}
+													y={teamBoxY + 14}
+													text-anchor="middle"
+													fill="#fef3c7"
+													font-size={scoreboardItem.kind === 'clock' ? 11 : 12}
+													font-weight="900"
+													letter-spacing={scoreboardItem.kind === 'clock' ? 0.5 : 1.5}
+													pointer-events="none">{scoreboardItem.value}</text
+												>
+												<rect
+													data-field-element
+													data-scoreboard-control={scoreboardItem.kind}
+													role="button"
+													tabindex="0"
+													aria-label={`${scoreboardItem.label}, click to edit`}
+													x={scoreboardItem.x}
+													y={teamBoxY}
+													width={scoreboardWidth}
+													height="20"
+													fill="transparent"
+													pointer-events="all"
+													on:pointerdown|stopPropagation
+													on:click|stopPropagation={(event) =>
+														startEditingScoreboard(event, scoreboardItem.kind, scoreboardItem.x + scoreboardWidth / 2, teamBoxY)}
+													on:keydown={(event) => {
+														if (event.key === 'Enter' || event.key === ' ') {
+															event.preventDefault();
+															startEditingScoreboard(event, scoreboardItem.kind, scoreboardItem.x + scoreboardWidth / 2, teamBoxY);
+														}
+													}}
+													class="cursor-pointer focus:outline-none"
+												/>
+											</g>
+										{/each}
+									{/if}
 								</g>
 							{/each}
 						{/if}
@@ -5830,6 +5951,71 @@
 							aria-label="Team box title"
 							class="block h-8 w-full border-0 bg-stone-100 px-2 text-center text-sm font-black tracking-wide text-stone-900 outline-none focus:ring-2 focus:ring-stone-500"
 						/>
+					</form>
+				{/if}
+
+				{#if editingScoreboard !== null}
+					<form
+						bind:this={editorElement}
+						data-scoreboard-editor={editingScoreboard}
+						class="absolute z-20 -translate-x-1/2 bg-white p-2 shadow-xl ring-2 ring-stone-900"
+						class:w-72={editingScoreboard === 'clock'}
+						class:w-64={editingScoreboard === 'quarter'}
+						style:left={`${(scoreboardEditorX / 1000) * 100}%`}
+						style:top={`${((scoreboardEditorY + 27) / 484) * 100}%`}
+						on:submit|preventDefault={commitScoreboardEditor}
+					>
+						{#if editingScoreboard === 'quarter'}
+							<div class="mb-1.5 text-center text-[10px] font-black tracking-[0.16em] text-stone-500 uppercase">Game Quarter</div>
+							<div class="grid grid-cols-5 gap-1" role="group" aria-label="Choose game quarter">
+								{#each PLAY_BUILDER_GAME_QUARTERS as quarter}
+									<button
+										type="button"
+										aria-pressed={fieldSettings.gameQuarter === quarter}
+										class="h-9 border-2 text-xs font-black transition-colors"
+										class:border-[#ff5a1f]={fieldSettings.gameQuarter === quarter}
+										class:bg-orange-50={fieldSettings.gameQuarter === quarter}
+										class:text-[#c2410c]={fieldSettings.gameQuarter === quarter}
+										class:border-stone-300={fieldSettings.gameQuarter !== quarter}
+										class:bg-white={fieldSettings.gameQuarter !== quarter}
+										class:text-stone-700={fieldSettings.gameQuarter !== quarter}
+										on:click={() => selectGameQuarter(quarter)}>{quarter}</button
+									>
+								{/each}
+							</div>
+						{:else}
+							<label for="game-clock-value" class="mb-1.5 block text-center text-[10px] font-black tracking-[0.16em] text-stone-500 uppercase"
+								>Game Time</label
+							>
+							<input
+								id="game-clock-value"
+								bind:value={gameClockEditValue}
+								inputmode="numeric"
+								maxlength="5"
+								pattern="[0-9][0-9]?:[0-5][0-9]"
+								aria-describedby="game-clock-help"
+								class="mx-auto block h-10 w-24 border-2 border-stone-800 bg-stone-950 px-2 text-center font-mono text-xl font-black tracking-wider text-amber-100 outline-none focus:border-[#ff5a1f]"
+								on:focus={(event) => (event.currentTarget as HTMLInputElement).select()}
+							/>
+							<div class="mt-2 grid grid-cols-6 gap-1">
+								{#each [
+									{ label: '−5m', seconds: -300 },
+									{ label: '−1m', seconds: -60 },
+									{ label: '−1s', seconds: -1 },
+									{ label: '+1s', seconds: 1 },
+									{ label: '+1m', seconds: 60 },
+									{ label: '+5m', seconds: 300 }
+								] as adjustment}
+									<button
+										type="button"
+										aria-label={`${adjustment.seconds < 0 ? 'Subtract' : 'Add'} ${Math.abs(adjustment.seconds) >= 60 ? `${Math.abs(adjustment.seconds) / 60} minutes` : `${Math.abs(adjustment.seconds)} second`}`}
+										class="h-8 border border-stone-300 bg-stone-100 text-[10px] font-black text-stone-700 hover:border-stone-500 hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#ff5a1f]"
+										on:click={() => adjustGameClock(adjustment.seconds)}>{adjustment.label}</button
+									>
+								{/each}
+							</div>
+							<p id="game-clock-help" class="mt-1.5 text-center text-[9px] text-stone-500">Type MM:SS or use the quick adjustments.</p>
+						{/if}
 					</form>
 				{/if}
 

@@ -8,6 +8,8 @@ export type GuideStyle = 'solid' | 'dashed' | 'dotted';
 export type DownMarkerValue = '1st' | '2nd' | '3rd' | '4th' | 'pat';
 export type PlayBuilderFieldType = 'traditional' | 'four-v-four' | 'unified';
 export type PlayBuilderFieldColor = 'green' | 'red' | 'navy' | 'light-blue' | 'orange' | 'purple';
+export const PLAY_BUILDER_GAME_QUARTERS = ['1st', '2nd', '3rd', '4th', 'OT'] as const;
+export type PlayBuilderGameQuarter = (typeof PLAY_BUILDER_GAME_QUARTERS)[number];
 export type PlayBuilderFieldSettings = {
 	showYardNumbers: boolean;
 	showGoalLetters: boolean;
@@ -24,6 +26,8 @@ export type PlayBuilderFieldSettings = {
 	showLineOfScrimmageMarker: boolean;
 	teamBoxTopLabel: string;
 	teamBoxBottomLabel: string;
+	gameQuarter: PlayBuilderGameQuarter;
+	gameClockSeconds: number;
 	fieldType: PlayBuilderFieldType;
 	fieldColor: PlayBuilderFieldColor;
 };
@@ -90,7 +94,7 @@ type LegacyGuideTuple = [number, number, number, number, number];
 type GuideTuple = [number, number, number, number, number, number | null];
 type LegacyStrokeTuple = [number, number, number[]];
 type StrokeTuple = [number, number, number, number[]];
-type FieldSettingsTuple = [number, number, number, string?, string?];
+type FieldSettingsTuple = [number, number, number, string?, string?, number?, number?];
 
 export type SerializedPlayBuilderScene = {
 	v: 1;
@@ -108,6 +112,7 @@ export type PlayBuilderDocument = {
 
 export const PLAY_BUILDER_PLAY_NAME_MAX_LENGTH = 64;
 export const PLAY_BUILDER_TEAM_BOX_LABEL_MAX_LENGTH = 32;
+export const PLAY_BUILDER_GAME_CLOCK_MAX_SECONDS = 99 * 60 + 59;
 export const PLAY_BUILDER_MAX_PLAYS = 10;
 
 export const DEFAULT_PLAY_BUILDER_FIELD_SETTINGS: Readonly<PlayBuilderFieldSettings> = {
@@ -126,11 +131,18 @@ export const DEFAULT_PLAY_BUILDER_FIELD_SETTINGS: Readonly<PlayBuilderFieldSetti
 	showLineOfScrimmageMarker: true,
 	teamBoxTopLabel: 'TEAM BOX',
 	teamBoxBottomLabel: 'TEAM BOX',
+	gameQuarter: '1st',
+	gameClockSeconds: 0,
 	fieldType: 'traditional',
 	fieldColor: 'green'
 };
 
 export const defaultPlayBuilderFieldSettings = (): PlayBuilderFieldSettings => ({ ...DEFAULT_PLAY_BUILDER_FIELD_SETTINGS });
+
+export const formatPlayBuilderGameClock = (seconds: number) => {
+	const clamped = Math.max(0, Math.min(PLAY_BUILDER_GAME_CLOCK_MAX_SECONDS, Math.round(seconds)));
+	return `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`;
+};
 
 type SerializedPlayBuilderDocumentV2 = {
 	v: 2;
@@ -156,11 +168,18 @@ type SerializedPlayBuilderDocumentV5 = {
 	p: [string, SerializedPlayBuilderScene, FieldSettingsTuple][];
 };
 
+type SerializedPlayBuilderDocumentV6 = {
+	v: 6;
+	a: number;
+	p: [string, SerializedPlayBuilderScene, FieldSettingsTuple][];
+};
+
 export type SerializedPlayBuilderDocument =
 	| SerializedPlayBuilderDocumentV2
 	| SerializedPlayBuilderDocumentV3
 	| SerializedPlayBuilderDocumentV4
-	| SerializedPlayBuilderDocumentV5;
+	| SerializedPlayBuilderDocumentV5
+	| SerializedPlayBuilderDocumentV6;
 
 const quantize = (value: number) => Math.round(value * 10);
 const dequantize = (value: number) => value / 10;
@@ -362,24 +381,32 @@ const encodeFieldSettings = (settings: PlayBuilderFieldSettings): FieldSettingsT
 	indexOf(fieldTypes, settings.fieldType),
 	indexOf(fieldColors, settings.fieldColor),
 	settings.teamBoxTopLabel,
-	settings.teamBoxBottomLabel
+	settings.teamBoxBottomLabel,
+	indexOf(PLAY_BUILDER_GAME_QUARTERS, settings.gameQuarter),
+	settings.gameClockSeconds
 ];
 
 const decodeFieldSettings = (
 	value: unknown,
 	includesDownMarkerSetting: boolean,
-	includesLineOfScrimmageMarkerSetting: boolean
+	includesLineOfScrimmageMarkerSetting: boolean,
+	includesScoreboardSettings: boolean
 ): PlayBuilderFieldSettings => {
 	if (
 		!Array.isArray(value) ||
-		(value.length !== 3 && value.length !== 4 && value.length !== 5) ||
+		(includesScoreboardSettings ? value.length !== 7 : value.length !== 3 && value.length !== 4 && value.length !== 5) ||
 		!validInteger(value[0]) ||
 		Number(value[0]) < 0 ||
 		Number(value[0]) >= 1 << fieldSettingKeys.length ||
 		!validIndex(value[1], fieldTypes.length) ||
 		!validIndex(value[2], fieldColors.length) ||
-		(value.length >= 4 && (typeof value[3] !== 'string' || value[3].trim().length < 1 || value[3].trim().length > PLAY_BUILDER_TEAM_BOX_LABEL_MAX_LENGTH)) ||
-		(value.length === 5 && (typeof value[4] !== 'string' || value[4].trim().length < 1 || value[4].trim().length > PLAY_BUILDER_TEAM_BOX_LABEL_MAX_LENGTH))
+		(value.length >= 4 &&
+			(typeof value[3] !== 'string' || value[3].trim().length < 1 || value[3].trim().length > PLAY_BUILDER_TEAM_BOX_LABEL_MAX_LENGTH)) ||
+		(value.length >= 5 &&
+			(typeof value[4] !== 'string' || value[4].trim().length < 1 || value[4].trim().length > PLAY_BUILDER_TEAM_BOX_LABEL_MAX_LENGTH)) ||
+		(includesScoreboardSettings && !validIndex(value[5], PLAY_BUILDER_GAME_QUARTERS.length)) ||
+		(includesScoreboardSettings &&
+			(!validInteger(value[6]) || Number(value[6]) < 0 || Number(value[6]) > PLAY_BUILDER_GAME_CLOCK_MAX_SECONDS))
 	) {
 		throw new Error('Invalid field settings.');
 	}
@@ -393,13 +420,17 @@ const decodeFieldSettings = (
 	settings.fieldColor = fieldColors[Number(value[2])];
 	if (value.length >= 4) {
 		settings.teamBoxTopLabel = String(value[3]).trim();
-		settings.teamBoxBottomLabel = value.length === 5 ? String(value[4]).trim() : settings.teamBoxTopLabel;
+		settings.teamBoxBottomLabel = value.length >= 5 ? String(value[4]).trim() : settings.teamBoxTopLabel;
+	}
+	if (includesScoreboardSettings) {
+		settings.gameQuarter = PLAY_BUILDER_GAME_QUARTERS[Number(value[5])];
+		settings.gameClockSeconds = Number(value[6]);
 	}
 	return settings;
 };
 
 export const encodePlayBuilderDocument = (document: PlayBuilderDocument): SerializedPlayBuilderDocument => ({
-	v: 5,
+	v: 6,
 	a: document.activePlayIndex,
 	p: document.plays.map((play) => [play.name, encodePlayBuilderScene(play.scene), encodeFieldSettings(play.settings)])
 });
@@ -411,7 +442,7 @@ export const decodePlayBuilderDocument = (value: unknown): PlayBuilderDocument =
 	if (!value || typeof value !== 'object') throw new Error('Invalid play builder document.');
 	const document = value as Partial<SerializedPlayBuilderDocument>;
 	if (
-		(document.v !== 2 && document.v !== 3 && document.v !== 4 && document.v !== 5) ||
+		(document.v !== 2 && document.v !== 3 && document.v !== 4 && document.v !== 5 && document.v !== 6) ||
 		!Number.isInteger(document.a) ||
 		!Array.isArray(document.p) ||
 		document.p.length < 1 ||
@@ -432,7 +463,7 @@ export const decodePlayBuilderDocument = (value: unknown): PlayBuilderDocument =
 			settings:
 				document.v === 2
 					? defaultPlayBuilderFieldSettings()
-					: decodeFieldSettings(item[2], document.v === 4 || document.v === 5, document.v === 5)
+					: decodeFieldSettings(item[2], Number(document.v) >= 4, Number(document.v) >= 5, Number(document.v) >= 6)
 		};
 	});
 	return { activePlayIndex: Number(document.a), plays };

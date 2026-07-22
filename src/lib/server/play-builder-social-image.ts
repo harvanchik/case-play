@@ -1,5 +1,6 @@
 import {
 	defaultPlayBuilderFieldSettings,
+	formatPlayBuilderGameClock,
 	type FieldGuide,
 	type FieldMarker,
 	type FieldPath,
@@ -325,7 +326,19 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 						const x = xForYards(layout.teamBox![0]);
 						const width = xForYards(layout.teamBox![1]) - x;
 						const label = escapeXml(index === 0 ? settings.teamBoxTopLabel : settings.teamBoxBottomLabel);
-						return `<g><rect x="${x}" y="${y}" width="${width}" height="20" fill="#d2b48c" stroke="rgba(255,255,255,.85)" stroke-width="2"/><text x="${x + width / 2}" y="${y + 14}" text-anchor="middle" fill="#292524" font-size="12" font-weight="900" letter-spacing="2">${label}</text></g>`;
+						const scoreboard =
+							index === 0
+								? [
+										{ x: x + 4, value: settings.gameQuarter.toUpperCase(), fontSize: 12, letterSpacing: 1.5 },
+										{ x: x + width - 62, value: formatPlayBuilderGameClock(settings.gameClockSeconds), fontSize: 11, letterSpacing: 0.5 }
+									]
+									.map(
+										(item) =>
+											`<g><rect x="${item.x}" y="${y}" width="58" height="20" fill="#111827" stroke="#d2b48c" stroke-width="2"/><text x="${item.x + 29}" y="${y + 14}" text-anchor="middle" fill="#fef3c7" font-size="${item.fontSize}" font-weight="900" letter-spacing="${item.letterSpacing}">${item.value}</text></g>`
+									)
+									.join('')
+								: '';
+						return `<g><rect x="${x}" y="${y}" width="${width}" height="20" fill="#d2b48c" stroke="rgba(255,255,255,.85)" stroke-width="2"/><text x="${x + width / 2}" y="${y + 14}" text-anchor="middle" fill="#292524" font-size="12" font-weight="900" letter-spacing="2">${label}</text></g>${scoreboard}`;
 					})
 					.join('')
 			: '';
