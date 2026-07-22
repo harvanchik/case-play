@@ -53,6 +53,7 @@
 		| 'bean-bag'
 		| 'deflag'
 		| 'event'
+		| 'laser'
 		| 'free-draw'
 		| 'run'
 		| 'pass'
@@ -176,6 +177,7 @@
 				icon: 'line-to-gain'
 			}
 		],
+		[{ id: 'laser', label: 'Laser Pointer', symbol: '', shortcut: 'shift+l', shortcutKeys: ['Shift', 'L'], image: '/images/laser-pointer.png' }],
 		[{ id: 'free-draw', label: 'Free Draw', symbol: '', shortcut: 'd', shortcutKeys: ['D'], caption: 'Draw', image: '/images/draw-pen.webp' }]
 	];
 	const tools = toolRows.flat();
@@ -206,6 +208,7 @@
 		'line-of-scrimmage': 'Places one L.O.S. Reformatting its color or style keeps it as the L.O.S.; placing it again replaces the prior line.',
 		'line-to-gain':
 			'Places one solid yellow L.T.G. with a linked down marker. Placing it again replaces the prior L.T.G.; select the marker to change the down.',
+		laser: 'Uses a temporary red laser pointer with a fading trail. It is not saved or included in exports.',
 		'free-draw':
 			'Draws annotations above every other element, including outside the field within the builder. Choose Straight or Squiggle, a color, and a thickness; tap for a dot, drag to draw, or erase whole strokes.'
 	};
@@ -387,6 +390,10 @@
 	let deleteTargetTimer: ReturnType<typeof setTimeout> | null = null;
 	let hoverPoint: Point | null = null;
 	let pointerOnField = false;
+	let laserPointer: Point | null = null;
+	let laserTrail: (Point & { createdAt: number })[] = [];
+	let laserTrailClock = 0;
+	let laserTrailFrame: number | null = null;
 	let hoveringElement = false;
 	let placementSnapX: number | null = null;
 	let placementSnapTimer: ReturnType<typeof setTimeout> | null = null;
@@ -874,6 +881,53 @@
 			x: Math.max(0, Math.min(1000, ((event.clientX - rect.left) / rect.width) * 1000)),
 			y: Math.max(0, Math.min(484, ((event.clientY - rect.top) / rect.height) * 484))
 		};
+	};
+	const refreshLaserTrail = () => {
+		const now = performance.now();
+		laserTrailClock = now;
+		laserTrail = laserTrail.filter((point) => now - point.createdAt < 500);
+		laserTrailFrame = laserTrail.length ? requestAnimationFrame(refreshLaserTrail) : null;
+	};
+	const updateLaserPointer = (point: Point) => {
+		const now = performance.now();
+		const lastPoint = laserTrail.at(-1);
+		laserPointer = point;
+		if (!lastPoint || Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) >= 1.25) {
+			laserTrail = [...laserTrail.slice(-47), { ...point, createdAt: now }];
+		}
+		laserTrailClock = now;
+		const laserLayer = svg?.querySelector<SVGGElement>('[data-laser-pointer-layer]');
+		if (laserLayer?.nextSibling) svg.appendChild(laserLayer);
+		if (laserTrailFrame === null) laserTrailFrame = requestAnimationFrame(refreshLaserTrail);
+	};
+	const laserTrailPath = (points: (Point & { createdAt: number })[], now: number) => {
+		if (points.length < 2) return '';
+		const left: Point[] = [];
+		const right: Point[] = [];
+		for (let index = 0; index < points.length; index += 1) {
+			const point = points[index];
+			const previous = points[Math.max(0, index - 1)];
+			const next = points[Math.min(points.length - 1, index + 1)];
+			const dx = next.x - previous.x;
+			const dy = next.y - previous.y;
+			const length = Math.hypot(dx, dy) || 1;
+			const freshness = Math.min(1, Math.max(0, 1 - (now - point.createdAt) / 500));
+			const halfWidth = 0.08 + Math.pow(freshness, 0.72) * 2.1;
+			const normalX = -dy / length;
+			const normalY = dx / length;
+			left.push({ x: point.x + normalX * halfWidth, y: point.y + normalY * halfWidth });
+			right.push({ x: point.x - normalX * halfWidth, y: point.y - normalY * halfWidth });
+		}
+		const boundary = [...left, ...right.reverse()];
+		const first = boundary[0];
+		const last = boundary.at(-1)!;
+		let path = `M ${(last.x + first.x) / 2} ${(last.y + first.y) / 2}`;
+		for (let index = 0; index < boundary.length; index += 1) {
+			const point = boundary[index];
+			const next = boundary[(index + 1) % boundary.length];
+			path += ` Q ${point.x} ${point.y} ${(point.x + next.x) / 2} ${(point.y + next.y) / 2}`;
+		}
+		return `${path} Z`;
 	};
 	const snapStraightDrawPoint = (start: Point, point: Point): Point => {
 		const dx = point.x - start.x;
@@ -1499,8 +1553,14 @@
 	const isOfficialKind = (kind: MarkerKind | Tool): kind is OfficialKind => officialKinds.includes(kind as OfficialKind);
 	const isOfficialMarker = (marker: FieldMarker): marker is FieldMarker & { kind: OfficialKind } => isOfficialKind(marker.kind);
 	const isSidelineMarkerKind = (kind: MarkerKind | Tool) => playerKinds.includes(kind as PlayerKind) || isOfficialKind(kind);
-	const pointForActiveTool = (point: Point) => (isSidelineMarkerKind(tool) ? clampSidelineMarkerPoint(point) : clampPoint(point));
-	const isPointInActiveToolArea = (point: Point) => (isSidelineMarkerKind(tool) ? isPointInSidelineMarkerArea(point) : isPointOnField(point));
+	const pointForActiveTool = (point: Point) =>
+		tool === 'laser' ? point : isSidelineMarkerKind(tool) ? clampSidelineMarkerPoint(point) : clampPoint(point);
+	const isPointInActiveToolArea = (point: Point) =>
+		tool === 'laser'
+			? point.x >= 0 && point.x <= 1000 && point.y >= 0 && point.y <= 484
+			: isSidelineMarkerKind(tool)
+				? isPointInSidelineMarkerArea(point)
+				: isPointOnField(point);
 	const isEditableMarker = (marker: FieldMarker) =>
 		isTeamMarker(marker) || isOfficialMarker(marker) || ['event', 'ball', 'flag', 'bean-bag', 'deflag'].includes(marker.kind);
 	const isPathTool = (value: Tool): value is Exclude<PathKind, 'line'> => ['run', 'pass', 'kick'].includes(value);
@@ -1598,13 +1658,15 @@
 		`/images/bean-bag-${color === 'white' || color === 'black' || color === 'pink' ? color : 'blue'}.webp`;
 	const toolbarAsset = (path: string) => path.replace('/images/', '/images/toolbar/');
 	const toolbarToolImage = (item: ToolOption) =>
-		toolbarAsset(
-			item.id === 'deflag'
-				? deflagImage(deflagPlacementColor)
-				: item.id === 'bean-bag'
-					? beanBagImage(beanBagPlacementColor)
-					: (item.image ?? '/images/football.webp')
-		);
+		item.id === 'laser'
+			? (item.image ?? '/images/laser-pointer.png')
+			: toolbarAsset(
+					item.id === 'deflag'
+						? deflagImage(deflagPlacementColor)
+						: item.id === 'bean-bag'
+							? beanBagImage(beanBagPlacementColor)
+							: (item.image ?? '/images/football.webp')
+				);
 	const eventWidth = (label = 'EVENT') => Math.max(eventTagWidth, Math.min(154, label.length * 6.6 + 16));
 	const penaltyLabelLines = (label = '') => {
 		const maxCharacters = 12;
@@ -1708,6 +1770,8 @@
 		if (downMarkerLayer) svg.appendChild(downMarkerLayer);
 		const drawingLayer = svg.querySelector<SVGGElement>('[data-free-drawing-layer]');
 		if (drawingLayer) svg.appendChild(drawingLayer);
+		const laserLayer = svg.querySelector<SVGGElement>('[data-laser-pointer-layer]');
+		if (laserLayer) svg.appendChild(laserLayer);
 	};
 	const raiseLayer = (type: LayerType, id: number) => {
 		layerOrder = [...layerOrder.filter((layer) => layer.type !== type || layer.id !== id), { type, id }];
@@ -2084,7 +2148,7 @@
 		editingDownGuideId !== null;
 	const startEditingDownMarker = (event: Event, guide: FieldGuide) => {
 		if (viewOnly) return;
-		if (guide.kind !== 'line-to-gain' || suppressDownMarkerClick || tool === 'event' || tool === 'free-draw') return;
+		if (guide.kind !== 'line-to-gain' || suppressDownMarkerClick || tool === 'event' || tool === 'free-draw' || tool === 'laser') return;
 		event.preventDefault();
 		event.stopPropagation();
 		clearDeleteState();
@@ -2117,7 +2181,7 @@
 		scoreboardHistorySaved = false;
 	};
 	const startEditingTeamBox = async (event: Event, teamBoxY: number, teamBoxIndex: number) => {
-		if (viewOnly) return;
+		if (viewOnly || tool === 'laser') return;
 		event.preventDefault();
 		clearDeleteState();
 		editingMarkerId = null;
@@ -2134,7 +2198,7 @@
 	};
 	const startEditingMarker = async (event: Event, marker: FieldMarker) => {
 		if (viewOnly) return;
-		if (!isEditableMarker(marker) || (tool === 'event' && marker.kind !== 'ball')) return;
+		if (!isEditableMarker(marker) || tool === 'laser' || (tool === 'event' && marker.kind !== 'ball')) return;
 		event.preventDefault();
 		clearDeleteState();
 		editingMarkerId = marker.id;
@@ -2174,7 +2238,7 @@
 	};
 	const startEditingGuide = async (event: Event, guide: FieldGuide) => {
 		if (viewOnly) return;
-		if (tool === 'event') return;
+		if (tool === 'event' || tool === 'laser') return;
 		event.preventDefault();
 		clearDeleteState();
 		editingMarkerId = null;
@@ -2200,12 +2264,12 @@
 	};
 	const startEditingLineOfScrimmageMarker = async (event: Event, guide: FieldGuide) => {
 		if (viewOnly) return;
-		if (guide.kind !== 'line-of-scrimmage' || suppressDownMarkerClick || tool === 'event' || tool === 'free-draw') return;
+		if (guide.kind !== 'line-of-scrimmage' || suppressDownMarkerClick || tool === 'event' || tool === 'free-draw' || tool === 'laser') return;
 		await startEditingGuide(event, guide);
 	};
 	const startEditingPath = (event: Event, path: FieldPath) => {
 		if (viewOnly) return;
-		if (tool === 'event') return;
+		if (tool === 'event' || tool === 'laser') return;
 		event.preventDefault();
 		clearDeleteState();
 		editingMarkerId = null;
@@ -2421,6 +2485,11 @@
 		if (toolbarEditorTool !== null && event.key === 'Escape') {
 			event.preventDefault();
 			toolbarEditorTool = null;
+			return;
+		}
+		if (!event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey && event.key.toLowerCase() === 'l') {
+			event.preventDefault();
+			selectTool('laser');
 			return;
 		}
 		if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase() === 'd') {
@@ -2773,6 +2842,7 @@
 			];
 			return;
 		}
+		if (toolId === 'laser') return;
 		saveHistory();
 		const marker = createMarker(toolId, point);
 		markers = [...markers, marker];
@@ -3397,6 +3467,11 @@
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
 		clearDeleteState();
+		if (tool === 'laser') {
+			const canvasPoint = canvasPointFromEvent(event);
+			if (isPointInActiveToolArea(canvasPoint)) updateLaserPointer(pointForActiveTool(canvasPoint));
+			return;
+		}
 		if (tutorialActive && activeTutorialSteps[tutorialStepIndex]?.data?.waitFor === 'move-and-delete') return;
 		if (tool === 'free-draw') {
 			beginFreeDrawing(event);
@@ -3441,6 +3516,10 @@
 		if (viewOnly) return;
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
+		if (tool === 'laser') {
+			updateLaserPointer(canvasPointFromEvent(event));
+			return;
+		}
 		const snappedX = placementSnapX;
 		clearPlacementSnap();
 		lastPlacementHoverPoint = null;
@@ -3485,6 +3564,10 @@
 		if (viewOnly) return;
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
+		if (tool === 'laser') {
+			updateLaserPointer(canvasPointFromEvent(event));
+			return;
+		}
 		clearPlacementSnap();
 		if (tool === 'event') {
 			await placeEventTag(pointFromEvent(event));
@@ -3525,6 +3608,11 @@
 	const beginOnGuide = async (event: PointerEvent, guide: FieldGuide, fromDownMarker = false) => {
 		if (viewOnly) return;
 		if (event.button !== 0 || suppressNextClick) return;
+		if (tool === 'laser') {
+			event.preventDefault();
+			updateLaserPointer(canvasPointFromEvent(event));
+			return;
+		}
 		if (fromDownMarker && editingDownGuideId === guide.id) {
 			event.preventDefault();
 			return;
@@ -3569,6 +3657,13 @@
 		const canvasPoint = canvasPointFromEvent(event);
 		pointerOnField = isPointInActiveToolArea(canvasPoint);
 		const point = pointForActiveTool(canvasPoint);
+		if (tool === 'laser') {
+			if (pointerOnField) updateLaserPointer(point);
+			else laserPointer = null;
+			hoverPoint = pointerOnField ? point : null;
+			hoveringElement = false;
+			return;
+		}
 		if (!pointerOnField && tool !== 'free-draw' && !drawing && !dragTarget) {
 			hoverPoint = null;
 			hoveringElement = false;
@@ -3684,6 +3779,10 @@
 	};
 	const endPointer = (event: PointerEvent) => {
 		if (viewOnly) return;
+		if (tool === 'laser') {
+			if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+			return;
+		}
 		if (stylusEraserActive) {
 			const point = canvasPointFromEvent(event);
 			eraseFreeStrokesAlong(lastErasePoint ?? point, point);
@@ -3939,6 +4038,7 @@
 			clearActionMessageTimer();
 			if (copyFeedbackTimer) clearTimeout(copyFeedbackTimer);
 			if (deleteTargetTimer) clearTimeout(deleteTargetTimer);
+			if (laserTrailFrame !== null) cancelAnimationFrame(laserTrailFrame);
 			document.removeEventListener('pointerdown', handleWindowPointerDown, true);
 			document.removeEventListener('click', handleWindowClick, true);
 		};
@@ -3959,11 +4059,12 @@
 			<div class="flex w-full flex-col gap-px bg-stone-500 p-px" role="toolbar" aria-label="Drawing tools">
 				{#each toolRows as row}
 					{@const officialRow = row.some((item) => item.id === 'official-r')}
+					{@const laserRow = row.some((item) => item.id === 'laser')}
 					<div
 						data-tutorial={officialRow ? 'official-tools' : undefined}
 						class="flex min-h-0 w-full shrink-0"
 						class:flex-wrap={officialRow}
-						style={`aspect-ratio: ${row.some((item) => item.id === 'line-of-scrimmage') || officialRow ? 1 : row.length} / 1;`}
+						style={`aspect-ratio: ${laserRow ? 2 : row.some((item) => item.id === 'line-of-scrimmage') || officialRow ? 1 : row.length} / 1;`}
 					>
 						{#each row as item, itemIndex}
 							{@const toolbarPathColor = isArrowKind(item.id)
@@ -3985,6 +4086,7 @@
 									on:click={(event) => event.detail === 0 && activateToolbarTool(item.id)}
 									on:dblclick|stopPropagation={(event) => openToolbarPresetEditor(event, item.id)}
 									class="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-0 bg-stone-100 text-xs font-bold text-stone-600 transition-colors hover:bg-white hover:text-stone-900 sm:text-sm"
+									class:flex-row={item.id === 'laser'}
 									class:border-r={(row.length === 2 && itemIndex === 0) || (officialRow && itemIndex % 2 === 0)}
 									class:border-b={officialRow && itemIndex < 2}
 									class:border-stone-400={(row.length === 2 && itemIndex === 0) || officialRow}
@@ -4010,6 +4112,9 @@
 											class="h-8 w-8 object-contain"
 											class:!h-7={item.id === 'free-draw'}
 											class:!w-7={item.id === 'free-draw'}
+											class:!h-5={item.id === 'laser'}
+											class:!w-full={item.id === 'laser'}
+											class:object-fill={item.id === 'laser'}
 											class:invert={item.id === 'free-draw' && tool === item.id}
 											draggable="false"
 											decoding="async"
@@ -4656,6 +4761,7 @@
 					font-family="ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"
 					class="block h-auto w-full select-none"
 					class:cursor-none={!dragTarget?.moved && tool !== 'free-draw' && !isGuideTool(tool) && !isPathTool(tool) && pointerOnField}
+					class:laser-cursor={tool === 'laser' && pointerOnField}
 					class:cursor-crosshair={!dragTarget?.moved && (isGuideTool(tool) || isPathTool(tool)) && pointerOnField}
 					class:drawing-cursor={tool === 'free-draw' && freeDrawMode === 'draw'}
 					class:erasing-cursor={tool === 'free-draw' && freeDrawMode === 'erase'}
@@ -4675,6 +4781,7 @@
 						pointerOnField = isPointInActiveToolArea(canvasPoint);
 						const point = pointForActiveTool(canvasPoint);
 						hoverPoint = pointerOnField || tool === 'free-draw' ? point : null;
+						if (tool === 'laser' && pointerOnField) updateLaserPointer(point);
 						lastPlacementHoverPoint = pointerOnField ? point : null;
 						if (pointerOnField) schedulePlacementSnap(point, event.shiftKey);
 					}}
@@ -4682,6 +4789,7 @@
 						hoverPoint = null;
 						pointerOnField = false;
 						hoveringElement = false;
+						laserPointer = null;
 						clearPlacementSnap();
 						lastPlacementHoverPoint = null;
 					}}
@@ -5876,6 +5984,40 @@
 							{/each}
 						{/if}
 					</g>
+
+					{#if tool === 'laser'}
+						<g data-laser-pointer-layer pointer-events="none">
+							{#if laserTrail.length > 1}
+								{@const trailStart = laserTrail[0]}
+								{@const trailEnd = laserTrail.at(-1)!}
+								{@const trailFreshness = Math.min(1, Math.max(0, 1 - (laserTrailClock - trailEnd.createdAt) / 500))}
+								<defs>
+									<linearGradient
+										id="builder-laser-trail-gradient"
+										x1={trailStart.x}
+										y1={trailStart.y}
+										x2={trailEnd.x}
+										y2={trailEnd.y}
+										gradientUnits="userSpaceOnUse"
+									>
+										<stop offset="0%" stop-color="#ff2020" stop-opacity="0" />
+										<stop offset="30%" stop-color="#ff2020" stop-opacity="0.18" />
+										<stop offset="70%" stop-color="#ff2020" stop-opacity="0.55" />
+										<stop offset="100%" stop-color="#ff2020" stop-opacity="0.82" />
+									</linearGradient>
+								</defs>
+								<path
+									d={laserTrailPath(laserTrail, laserTrailClock)}
+									fill="url(#builder-laser-trail-gradient)"
+									opacity={Math.pow(trailFreshness, 1.25)}
+								/>
+							{/if}
+							{#if laserPointer && pointerOnField}
+								<circle cx={laserPointer.x} cy={laserPointer.y} r="7" fill="#ef4444" opacity="0.2" />
+								<circle cx={laserPointer.x} cy={laserPointer.y} r="3" fill="#ff1717" />
+							{/if}
+						</g>
+					{/if}
 				</svg>
 
 				{#if editingDownGuide}
@@ -7083,6 +7225,10 @@
 			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M4 24 17 5l11 8-11 15H9Z' fill='%23fff' stroke='%231c1917' stroke-width='2' stroke-linejoin='miter'/%3E%3Cpath d='m11 18 8 6' fill='none' stroke='%231c1917' stroke-width='2'/%3E%3C/svg%3E")
 				4 24,
 			crosshair !important;
+	}
+	.laser-cursor,
+	.laser-cursor * {
+		cursor: none !important;
 	}
 	@media (max-height: 850px) {
 		.draw-options-panel {
