@@ -80,7 +80,8 @@
 	type ToolbarPresetTool = 'deflag' | 'bean-bag' | 'laser' | ArrowKind | 'line-of-scrimmage' | 'line-to-gain';
 	type FieldSide = 'a' | 'b';
 	type ExportBackground = 'transparent' | 'grass' | 'color';
-	type LaserDrawing = { points: Point[]; releasedAt: number | null };
+	type LaserDrawing = { points: Point[]; color: LaserColor; releasedAt: number | null };
+	type ActiveLaserDrawing = { points: Point[]; color: LaserColor };
 	const exportBackgroundOptions: { id: ExportBackground; label: string; description: string }[] = [
 		{ id: 'transparent', label: 'Transparent', description: 'Field is surrounded by a transparent background.' },
 		{ id: 'grass', label: 'Grassy', description: 'Field is surrounded by darker striped grass.' },
@@ -212,7 +213,7 @@
 		'line-to-gain':
 			'Places one solid yellow L.T.G. with a linked down marker. Placing it again replaces the prior L.T.G.; select the marker to change the down.',
 		laser:
-			'Move for a fading trail, or click and drag to keep laser strokes visible until you leave Laser Pointer. Double-click the toolbar button to choose a neon color. Laser marks are not saved or exported.',
+			'Move for a fading trail, or click and drag to keep laser strokes visible until you leave Laser Pointer. Press C to clear laser drawings, or double-click the toolbar button to choose a neon color. Laser marks are not saved or exported.',
 		'free-draw':
 			'Draws annotations above every other element, including outside the field within the builder. Choose Straight or Squiggle, a color, and a thickness; tap for a dot, drag to draw, or erase whole strokes.'
 	};
@@ -405,7 +406,7 @@
 	let laserPointer: Point | null = null;
 	let laserTrail: (Point & { createdAt: number })[] = [];
 	let laserDrawings: LaserDrawing[] = [];
-	let activeLaserDrawing: Point[] | null = null;
+	let activeLaserDrawing: ActiveLaserDrawing | null = null;
 	let laserDrawingPointerId: number | null = null;
 	let laserTrailClock = 0;
 	let laserTrailFrame: number | null = null;
@@ -920,28 +921,38 @@
 	};
 	const beginLaserDrawing = (event: PointerEvent, point: Point) => {
 		updateLaserPointer(point);
-		activeLaserDrawing = [point];
+		activeLaserDrawing = { points: [point], color: laserColor };
 		laserDrawingPointerId = event.pointerId;
 		svg.setPointerCapture(event.pointerId);
 	};
 	const continueLaserDrawing = (event: PointerEvent, point: Point) => {
 		if (laserDrawingPointerId !== event.pointerId || !activeLaserDrawing) return;
-		const lastPoint = activeLaserDrawing.at(-1)!;
+		const lastPoint = activeLaserDrawing.points.at(-1)!;
 		if (Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) < 1.25) return;
-		activeLaserDrawing = [...activeLaserDrawing, point];
+		activeLaserDrawing = { ...activeLaserDrawing, points: [...activeLaserDrawing.points, point] };
 	};
 	const finishLaserDrawing = () => {
-		if (activeLaserDrawing && activeLaserDrawing.length > 1) {
-			laserDrawings = [...laserDrawings, { points: activeLaserDrawing, releasedAt: null }];
+		if (activeLaserDrawing && activeLaserDrawing.points.length > 1) {
+			laserDrawings = [...laserDrawings, { ...activeLaserDrawing, releasedAt: null }];
 		}
 		activeLaserDrawing = null;
 		laserDrawingPointerId = null;
 	};
+	const clearLaserDrawings = () => {
+		if (laserDrawingPointerId !== null && svg?.hasPointerCapture(laserDrawingPointerId)) svg.releasePointerCapture(laserDrawingPointerId);
+		laserDrawings = [];
+		activeLaserDrawing = null;
+		laserDrawingPointerId = null;
+		laserTrail = [];
+		laserTrailClock = performance.now();
+		if (laserTrailFrame !== null) cancelAnimationFrame(laserTrailFrame);
+		laserTrailFrame = null;
+	};
 	const releaseLaserDrawings = () => {
 		if (laserDrawingPointerId !== null && svg?.hasPointerCapture(laserDrawingPointerId)) svg.releasePointerCapture(laserDrawingPointerId);
 		const drawings =
-			activeLaserDrawing && activeLaserDrawing.length > 1
-				? [...laserDrawings, { points: activeLaserDrawing, releasedAt: null }]
+			activeLaserDrawing && activeLaserDrawing.points.length > 1
+				? [...laserDrawings, { ...activeLaserDrawing, releasedAt: null }]
 				: laserDrawings;
 		activeLaserDrawing = null;
 		laserDrawingPointerId = null;
@@ -2568,6 +2579,11 @@
 			return;
 		}
 		if (isEditableTarget) return;
+		if (tool === 'laser' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'c') {
+			event.preventDefault();
+			clearLaserDrawings();
+			return;
+		}
 		if (!event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey && event.key.toLowerCase() === 'n') {
 			event.preventDefault();
 			if (actionInProgress === null) void requestNewBoard();
@@ -4165,7 +4181,7 @@
 									on:pointerdown={() => activateToolbarTool(item.id)}
 									on:click={(event) => event.detail === 0 && activateToolbarTool(item.id)}
 									on:dblclick|stopPropagation={(event) => openToolbarPresetEditor(event, item.id)}
-									class="relative flex h-full w-full cursor-pointer flex-col items-center justify-center gap-0 bg-stone-100 text-xs font-bold text-stone-600 transition-colors hover:bg-white hover:text-stone-900 sm:text-sm"
+									class="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-0 bg-stone-100 text-xs font-bold text-stone-600 transition-colors hover:bg-white hover:text-stone-900 sm:text-sm"
 									class:flex-row={item.id === 'laser'}
 									class:border-r={(row.length === 2 && itemIndex === 0) || (officialRow && itemIndex % 2 === 0)}
 									class:border-b={officialRow && itemIndex < 2}
@@ -4192,21 +4208,12 @@
 											class="h-8 w-8 object-contain"
 											class:!h-7={item.id === 'free-draw'}
 											class:!w-7={item.id === 'free-draw'}
-											class:!h-5={item.id === 'laser'}
+											class:!h-auto={item.id === 'laser'}
 											class:!w-full={item.id === 'laser'}
-											class:object-fill={item.id === 'laser'}
-											class:invert={(item.id === 'free-draw' || item.id === 'laser') && tool === item.id}
+											class:invert={item.id === 'free-draw' && tool === item.id}
 											draggable="false"
 											decoding="async"
 										/>
-										{#if item.id === 'laser'}
-											<span
-												class="absolute right-0.5 bottom-0.5 h-2 w-2 rounded-full border border-white"
-												style:background-color={laserColorValue(laserColor)}
-												style:box-shadow={`0 0 4px ${laserColorValue(laserColor)}`}
-												aria-hidden="true"
-											></span>
-										{/if}
 									{:else if item.icon === 'event'}
 										<svg viewBox="0 0 24 24" class="h-7 w-7" aria-hidden="true">
 											<path d="M4 5h16v11H9l-4 3v-3H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
@@ -6081,7 +6088,7 @@
 						{/if}
 					</g>
 
-					{#if tool === 'laser' || laserTrail.length > 0 || laserDrawings.length > 0 || (activeLaserDrawing?.length ?? 0) > 1}
+					{#if tool === 'laser' || laserTrail.length > 0 || laserDrawings.length > 0 || (activeLaserDrawing?.points.length ?? 0) > 1}
 						<g data-laser-pointer-layer pointer-events="none">
 							{#each laserDrawings as drawing}
 								{@const drawingFreshness =
@@ -6094,7 +6101,7 @@
 									<path
 										d={laserDrawingPath(drawing.points)}
 										fill="none"
-										stroke={laserColorValue(laserColor)}
+										stroke={laserColorValue(drawing.color)}
 										stroke-width="8"
 										stroke-linecap="round"
 										stroke-linejoin="round"
@@ -6103,7 +6110,7 @@
 									<path
 										d={laserDrawingPath(drawing.points)}
 										fill="none"
-										stroke={laserColorValue(laserColor)}
+										stroke={laserColorValue(drawing.color)}
 										stroke-width="3.8"
 										stroke-linecap="round"
 										stroke-linejoin="round"
@@ -6111,21 +6118,21 @@
 									/>
 								</g>
 							{/each}
-							{#if activeLaserDrawing && activeLaserDrawing.length > 1}
+							{#if activeLaserDrawing && activeLaserDrawing.points.length > 1}
 								<g data-laser-active-drawing>
 									<path
-										d={laserDrawingPath(activeLaserDrawing)}
+										d={laserDrawingPath(activeLaserDrawing.points)}
 										fill="none"
-										stroke={laserColorValue(laserColor)}
+										stroke={laserColorValue(activeLaserDrawing.color)}
 										stroke-width="8"
 										stroke-linecap="round"
 										stroke-linejoin="round"
 										opacity="0.2"
 									/>
 									<path
-										d={laserDrawingPath(activeLaserDrawing)}
+										d={laserDrawingPath(activeLaserDrawing.points)}
 										fill="none"
-										stroke={laserColorValue(laserColor)}
+										stroke={laserColorValue(activeLaserDrawing.color)}
 										stroke-width="3.8"
 										stroke-linecap="round"
 										stroke-linejoin="round"
