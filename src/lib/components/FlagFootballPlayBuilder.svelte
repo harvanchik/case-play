@@ -79,6 +79,7 @@
 	type ToolbarPresetTool = 'deflag' | 'bean-bag' | ArrowKind | 'line-of-scrimmage' | 'line-to-gain';
 	type FieldSide = 'a' | 'b';
 	type ExportBackground = 'transparent' | 'grass' | 'color';
+	type LaserDrawing = { points: Point[]; releasedAt: number | null };
 	const exportBackgroundOptions: { id: ExportBackground; label: string; description: string }[] = [
 		{ id: 'transparent', label: 'Transparent', description: 'Field is surrounded by a transparent background.' },
 		{ id: 'grass', label: 'Grassy', description: 'Field is surrounded by darker striped grass.' },
@@ -86,6 +87,7 @@
 	];
 	const exportSettingsStorageKey = 'caseplay-play-builder-export-settings-v1';
 	const toolPreferencesStorageKey = 'caseplay-play-builder-tool-preferences-v1';
+	const laserFadeDuration = 500;
 
 	export let initialDocument: SerializedPlayBuilderDocument | null = null;
 	export let savedPlayId: string | null = null;
@@ -208,7 +210,7 @@
 		'line-of-scrimmage': 'Places one L.O.S. Reformatting its color or style keeps it as the L.O.S.; placing it again replaces the prior line.',
 		'line-to-gain':
 			'Places one solid yellow L.T.G. with a linked down marker. Placing it again replaces the prior L.T.G.; select the marker to change the down.',
-		laser: 'Uses a temporary red laser pointer with a fading trail. It is not saved or included in exports.',
+		laser: 'Move for a fading trail, or click and drag to keep laser strokes visible until you leave Laser Pointer. Laser marks are not saved or exported.',
 		'free-draw':
 			'Draws annotations above every other element, including outside the field within the builder. Choose Straight or Squiggle, a color, and a thickness; tap for a dot, drag to draw, or erase whole strokes.'
 	};
@@ -393,6 +395,9 @@
 	let pointerOnField = false;
 	let laserPointer: Point | null = null;
 	let laserTrail: (Point & { createdAt: number })[] = [];
+	let laserDrawings: LaserDrawing[] = [];
+	let activeLaserDrawing: Point[] | null = null;
+	let laserDrawingPointerId: number | null = null;
 	let laserTrailClock = 0;
 	let laserTrailFrame: number | null = null;
 	let hoveringElement = false;
@@ -886,8 +891,10 @@
 	const refreshLaserTrail = () => {
 		const now = performance.now();
 		laserTrailClock = now;
-		laserTrail = laserTrail.filter((point) => now - point.createdAt < 500);
-		laserTrailFrame = laserTrail.length ? requestAnimationFrame(refreshLaserTrail) : null;
+		laserTrail = laserTrail.filter((point) => now - point.createdAt < laserFadeDuration);
+		laserDrawings = laserDrawings.filter((drawing) => drawing.releasedAt === null || now - drawing.releasedAt < laserFadeDuration);
+		const hasFadingDrawing = laserDrawings.some((drawing) => drawing.releasedAt !== null);
+		laserTrailFrame = laserTrail.length || hasFadingDrawing ? requestAnimationFrame(refreshLaserTrail) : null;
 	};
 	const updateLaserPointer = (point: Point) => {
 		const now = performance.now();
@@ -901,6 +908,41 @@
 		if (laserLayer?.nextSibling) svg.appendChild(laserLayer);
 		if (laserTrailFrame === null) laserTrailFrame = requestAnimationFrame(refreshLaserTrail);
 	};
+	const beginLaserDrawing = (event: PointerEvent, point: Point) => {
+		updateLaserPointer(point);
+		activeLaserDrawing = [point];
+		laserDrawingPointerId = event.pointerId;
+		svg.setPointerCapture(event.pointerId);
+	};
+	const continueLaserDrawing = (event: PointerEvent, point: Point) => {
+		if (laserDrawingPointerId !== event.pointerId || !activeLaserDrawing) return;
+		const lastPoint = activeLaserDrawing.at(-1)!;
+		if (Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) < 1.25) return;
+		activeLaserDrawing = [...activeLaserDrawing, point];
+	};
+	const finishLaserDrawing = () => {
+		if (activeLaserDrawing && activeLaserDrawing.length > 1) {
+			laserDrawings = [...laserDrawings, { points: activeLaserDrawing, releasedAt: null }];
+		}
+		activeLaserDrawing = null;
+		laserDrawingPointerId = null;
+	};
+	const releaseLaserDrawings = () => {
+		if (laserDrawingPointerId !== null && svg?.hasPointerCapture(laserDrawingPointerId)) svg.releasePointerCapture(laserDrawingPointerId);
+		const drawings =
+			activeLaserDrawing && activeLaserDrawing.length > 1
+				? [...laserDrawings, { points: activeLaserDrawing, releasedAt: null }]
+				: laserDrawings;
+		activeLaserDrawing = null;
+		laserDrawingPointerId = null;
+		laserPointer = null;
+		if (drawings.length === 0) return;
+		const now = performance.now();
+		laserTrailClock = now;
+		laserDrawings = drawings.map((drawing) => ({ ...drawing, releasedAt: now }));
+		if (laserTrailFrame === null) laserTrailFrame = requestAnimationFrame(refreshLaserTrail);
+	};
+	const laserDrawingPath = (points: Point[]) => points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
 	const laserTrailPath = (points: (Point & { createdAt: number })[], now: number) => {
 		if (points.length < 2) return '';
 		const left: Point[] = [];
@@ -912,7 +954,7 @@
 			const dx = next.x - previous.x;
 			const dy = next.y - previous.y;
 			const length = Math.hypot(dx, dy) || 1;
-			const freshness = Math.min(1, Math.max(0, 1 - (now - point.createdAt) / 500));
+			const freshness = Math.min(1, Math.max(0, 1 - (now - point.createdAt) / laserFadeDuration));
 			const halfWidth = 0.08 + Math.pow(freshness, 0.72) * 2.1;
 			const normalX = -dy / length;
 			const normalY = dx / length;
@@ -2298,6 +2340,7 @@
 		event.stopPropagation();
 		clearEditorState();
 		clearDeleteState();
+		if (tool === 'laser') releaseLaserDrawings();
 		tool = selectedTool;
 		const buttonBounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
 		const columnBounds = (event.currentTarget as HTMLElement).closest('.tool-column')?.getBoundingClientRect();
@@ -3088,6 +3131,7 @@
 	};
 	const selectTool = (nextTool: Tool) => {
 		if (suppressNextClick) return;
+		if (tool === 'laser' && nextTool !== 'laser') releaseLaserDrawings();
 		if (hasActiveInlineEditor()) commitActiveEditor();
 		clearDeleteState();
 		clearPlacementSnap();
@@ -3191,6 +3235,7 @@
 		history = [];
 		future = [];
 		nextId = 1;
+		if (tool === 'laser') releaseLaserDrawings();
 		tool = 'team-a';
 		clearPlacementSnap();
 		lastPlacementHoverPoint = null;
@@ -3294,6 +3339,7 @@
 			{ type: 'marker', id: quarterback.id },
 			...officials.map((official): LayerRef => ({ type: 'marker', id: official.id }))
 		];
+		if (tool === 'laser') releaseLaserDrawings();
 		tool = 'team-a';
 		syncLayerDom();
 		completeTutorialAction('setup-default');
@@ -3479,7 +3525,7 @@
 		clearDeleteState();
 		if (tool === 'laser') {
 			const canvasPoint = canvasPointFromEvent(event);
-			if (isPointInActiveToolArea(canvasPoint)) updateLaserPointer(pointForActiveTool(canvasPoint));
+			if (isPointInActiveToolArea(canvasPoint)) beginLaserDrawing(event, pointForActiveTool(canvasPoint));
 			return;
 		}
 		if (tutorialActive && activeTutorialSteps[tutorialStepIndex]?.data?.waitFor === 'move-and-delete') return;
@@ -3527,7 +3573,7 @@
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
 		if (tool === 'laser') {
-			updateLaserPointer(canvasPointFromEvent(event));
+			beginLaserDrawing(event, canvasPointFromEvent(event));
 			return;
 		}
 		const snappedX = placementSnapX;
@@ -3575,7 +3621,7 @@
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
 		if (tool === 'laser') {
-			updateLaserPointer(canvasPointFromEvent(event));
+			beginLaserDrawing(event, canvasPointFromEvent(event));
 			return;
 		}
 		clearPlacementSnap();
@@ -3620,7 +3666,7 @@
 		if (event.button !== 0 || suppressNextClick) return;
 		if (tool === 'laser') {
 			event.preventDefault();
-			updateLaserPointer(canvasPointFromEvent(event));
+			beginLaserDrawing(event, canvasPointFromEvent(event));
 			return;
 		}
 		if (fromDownMarker && editingDownGuideId === guide.id) {
@@ -3668,7 +3714,10 @@
 		pointerOnField = isPointInActiveToolArea(canvasPoint);
 		const point = pointForActiveTool(canvasPoint);
 		if (tool === 'laser') {
-			if (pointerOnField) updateLaserPointer(point);
+			if (pointerOnField) {
+				updateLaserPointer(point);
+				continueLaserDrawing(event, point);
+			}
 			else laserPointer = null;
 			hoverPoint = pointerOnField ? point : null;
 			hoveringElement = false;
@@ -3790,6 +3839,7 @@
 	const endPointer = (event: PointerEvent) => {
 		if (viewOnly) return;
 		if (tool === 'laser') {
+			if (laserDrawingPointerId === event.pointerId) finishLaserDrawing();
 			if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
 			return;
 		}
@@ -3873,6 +3923,8 @@
 	const cancelPointer = () => {
 		drawing = null;
 		activeFreeStroke = null;
+		activeLaserDrawing = null;
+		laserDrawingPointerId = null;
 		activeFreeDrawShape = freeDrawShape;
 		dragTarget = null;
 		erasingFreeStrokes = false;
@@ -5995,12 +6047,62 @@
 						{/if}
 					</g>
 
-					{#if tool === 'laser'}
+					{#if tool === 'laser' || laserTrail.length > 0 || laserDrawings.length > 0 || (activeLaserDrawing?.length ?? 0) > 1}
 						<g data-laser-pointer-layer pointer-events="none">
+							{#each laserDrawings as drawing}
+								{@const drawingFreshness =
+									drawing.releasedAt === null ? 1 : Math.min(1, Math.max(0, 1 - (laserTrailClock - drawing.releasedAt) / laserFadeDuration))}
+								<g
+									data-laser-drawing
+									data-laser-drawing-state={drawing.releasedAt === null ? 'persistent' : 'fading'}
+									opacity={Math.pow(drawingFreshness, 1.25)}
+								>
+									<path
+										d={laserDrawingPath(drawing.points)}
+										fill="none"
+										stroke="#ff2020"
+										stroke-width="8"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										opacity="0.2"
+									/>
+									<path
+										d={laserDrawingPath(drawing.points)}
+										fill="none"
+										stroke="#ff2020"
+										stroke-width="3.8"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										opacity="0.88"
+									/>
+								</g>
+							{/each}
+							{#if activeLaserDrawing && activeLaserDrawing.length > 1}
+								<g data-laser-active-drawing>
+									<path
+										d={laserDrawingPath(activeLaserDrawing)}
+										fill="none"
+										stroke="#ff2020"
+										stroke-width="8"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										opacity="0.2"
+									/>
+									<path
+										d={laserDrawingPath(activeLaserDrawing)}
+										fill="none"
+										stroke="#ff2020"
+										stroke-width="3.8"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										opacity="0.88"
+									/>
+								</g>
+							{/if}
 							{#if laserTrail.length > 1}
 								{@const trailStart = laserTrail[0]}
 								{@const trailEnd = laserTrail.at(-1)!}
-								{@const trailFreshness = Math.min(1, Math.max(0, 1 - (laserTrailClock - trailEnd.createdAt) / 500))}
+								{@const trailFreshness = Math.min(1, Math.max(0, 1 - (laserTrailClock - trailEnd.createdAt) / laserFadeDuration))}
 								<defs>
 									<linearGradient
 										id="builder-laser-trail-gradient"
@@ -6022,7 +6124,7 @@
 									opacity={Math.pow(trailFreshness, 1.25)}
 								/>
 							{/if}
-							{#if laserPointer && pointerOnField}
+							{#if tool === 'laser' && laserPointer && pointerOnField}
 								<circle cx={laserPointer.x} cy={laserPointer.y} r="7" fill="#ef4444" opacity="0.2" />
 								<circle cx={laserPointer.x} cy={laserPointer.y} r="3" fill="#ff1717" />
 							{/if}
