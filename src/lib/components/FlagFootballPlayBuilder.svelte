@@ -76,7 +76,8 @@
 		  };
 	type Scene = PlayBuilderScene;
 	type ArrowKind = Extract<PathKind, 'run' | 'pass' | 'kick'>;
-	type ToolbarPresetTool = 'deflag' | 'bean-bag' | ArrowKind | 'line-of-scrimmage' | 'line-to-gain';
+	type LaserColor = Extract<GuideColor, 'red' | 'green' | 'blue' | 'purple'>;
+	type ToolbarPresetTool = 'deflag' | 'bean-bag' | 'laser' | ArrowKind | 'line-of-scrimmage' | 'line-to-gain';
 	type FieldSide = 'a' | 'b';
 	type ExportBackground = 'transparent' | 'grass' | 'color';
 	type LaserDrawing = { points: Point[]; releasedAt: number | null };
@@ -210,7 +211,8 @@
 		'line-of-scrimmage': 'Places one L.O.S. Reformatting its color or style keeps it as the L.O.S.; placing it again replaces the prior line.',
 		'line-to-gain':
 			'Places one solid yellow L.T.G. with a linked down marker. Placing it again replaces the prior L.T.G.; select the marker to change the down.',
-		laser: 'Move for a fading trail, or click and drag to keep laser strokes visible until you leave Laser Pointer. Laser marks are not saved or exported.',
+		laser:
+			'Move for a fading trail, or click and drag to keep laser strokes visible until you leave Laser Pointer. Double-click the toolbar button to choose a neon color. Laser marks are not saved or exported.',
 		'free-draw':
 			'Draws annotations above every other element, including outside the field within the builder. Choose Straight or Squiggle, a color, and a thickness; tap for a dot, drag to draw, or erase whole strokes.'
 	};
@@ -237,6 +239,12 @@
 		{ id: 'white', label: 'White', value: '#ffffff' },
 		{ id: 'gray', label: 'Gray', value: '#9ca3af' },
 		{ id: 'black', label: 'Black', value: '#000000' }
+	];
+	const laserColors: { id: LaserColor; label: string; value: string }[] = [
+		{ id: 'red', label: 'Neon red', value: '#ff1744' },
+		{ id: 'green', label: 'Neon green', value: '#39ff14' },
+		{ id: 'blue', label: 'Neon blue', value: '#00b7ff' },
+		{ id: 'purple', label: 'Neon violet', value: '#c026ff' }
 	];
 	const guideStyles: GuideStyle[] = ['solid', 'dashed', 'dotted'];
 	const downMarkerOptions: { id: DownMarkerValue; label: string }[] = [
@@ -347,6 +355,7 @@
 	let arrowPlacementStyles: Record<ArrowKind, GuideStyle> = { run: 'solid', pass: 'dashed', kick: 'dashed' };
 	let guidePlacementColors: Record<'line-of-scrimmage' | 'line-to-gain', GuideColor> = { 'line-of-scrimmage': 'white', 'line-to-gain': 'yellow' };
 	let guidePlacementStyles: Record<'line-of-scrimmage' | 'line-to-gain', GuideStyle> = { 'line-of-scrimmage': 'dashed', 'line-to-gain': 'solid' };
+	let laserColor: LaserColor = 'red';
 	let toolbarEditorTool: ToolbarPresetTool | null = null;
 	let toolbarEditorTop = 0;
 	let toolbarEditorElement: HTMLElement;
@@ -467,7 +476,8 @@
 					arrowColors: arrowPlacementColors,
 					arrowStyles: arrowPlacementStyles,
 					guideColors: guidePlacementColors,
-					guideStyles: guidePlacementStyles
+					guideStyles: guidePlacementStyles,
+					laserColor
 				})
 			);
 		} catch {
@@ -1669,6 +1679,7 @@
 	const editorTop = (marker: FieldMarker) => Math.max(12, Math.min(88, (marker.y / 484) * 100));
 	const guideColor = (color: GuideColor) => (color === 'gold' ? '#d4a017' : (guideColors.find((option) => option.id === color)?.value ?? '#facc15'));
 	const drawingColor = (color: GuideColor) => freeDrawColors.find((option) => option.id === color)?.value ?? guideColor(color);
+	const laserColorValue = (color: LaserColor) => laserColors.find((option) => option.id === color)?.value ?? '#ff1744';
 	const isArrowKind = (kind: PathKind | Tool): kind is ArrowKind => kind === 'run' || kind === 'pass' || kind === 'kick';
 	const arrowPlacementColor = (kind: ArrowKind) => arrowPlacementColors[kind];
 	const toolbarArrowColor = (kind: ArrowKind, color: GuideColor, selected: boolean) => {
@@ -2333,14 +2344,14 @@
 		completeTutorialAction(`edit:${path.kind}`);
 	};
 	const isToolbarPresetTool = (value: Tool): value is ToolbarPresetTool =>
-		value === 'deflag' || value === 'bean-bag' || isArrowKind(value) || value === 'line-of-scrimmage' || value === 'line-to-gain';
+		value === 'deflag' || value === 'bean-bag' || value === 'laser' || isArrowKind(value) || value === 'line-of-scrimmage' || value === 'line-to-gain';
 	const openToolbarPresetEditor = async (event: MouseEvent, selectedTool: Tool) => {
 		if (!isToolbarPresetTool(selectedTool)) return;
 		event.preventDefault();
 		event.stopPropagation();
 		clearEditorState();
 		clearDeleteState();
-		if (tool === 'laser') releaseLaserDrawings();
+		if (tool === 'laser' && selectedTool !== 'laser') releaseLaserDrawings();
 		tool = selectedTool;
 		const buttonBounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
 		const columnBounds = (event.currentTarget as HTMLElement).closest('.tool-column')?.getBoundingClientRect();
@@ -2377,6 +2388,11 @@
 			toolbarEditorTool = null;
 			return;
 		}
+		if (toolbarEditorTool === 'laser') {
+			if (laserColors.some((option) => option.id === color)) laserColor = color as LaserColor;
+			toolbarEditorTool = null;
+			return;
+		}
 		if (isArrowKind(toolbarEditorTool)) {
 			arrowPlacementColors = { ...arrowPlacementColors, [toolbarEditorTool]: color };
 			return;
@@ -2390,7 +2406,7 @@
 		}
 	};
 	const updateToolbarPresetStyle = (style: GuideStyle) => {
-		if (!toolbarEditorTool || toolbarEditorTool === 'deflag' || toolbarEditorTool === 'bean-bag') return;
+		if (!toolbarEditorTool || toolbarEditorTool === 'deflag' || toolbarEditorTool === 'bean-bag' || toolbarEditorTool === 'laser') return;
 		if (isArrowKind(toolbarEditorTool)) {
 			arrowPlacementStyles = { ...arrowPlacementStyles, [toolbarEditorTool]: style };
 			return;
@@ -4015,6 +4031,7 @@
 		}
 	};
 	const isGuideColor = (value: unknown): value is GuideColor => typeof value === 'string' && guideColors.some((option) => option.id === value);
+	const isLaserColor = (value: unknown): value is LaserColor => typeof value === 'string' && laserColors.some((option) => option.id === value);
 	const restoreToolPreferences = () => {
 		try {
 			const raw = localStorage.getItem(toolPreferencesStorageKey);
@@ -4031,6 +4048,7 @@
 				deflagPlacementColor = stored.flagBeltColor;
 			if (typeof stored.beanBagColor === 'string' && beanBagColors.some((option) => option.id === stored.beanBagColor))
 				beanBagPlacementColor = stored.beanBagColor as GuideColor;
+			if (isLaserColor(stored.laserColor)) laserColor = stored.laserColor;
 			if (stored.arrowColors && typeof stored.arrowColors === 'object') {
 				const colors = stored.arrowColors as Record<string, unknown>;
 				arrowPlacementColors = {
@@ -4147,7 +4165,7 @@
 									on:pointerdown={() => activateToolbarTool(item.id)}
 									on:click={(event) => event.detail === 0 && activateToolbarTool(item.id)}
 									on:dblclick|stopPropagation={(event) => openToolbarPresetEditor(event, item.id)}
-									class="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-0 bg-stone-100 text-xs font-bold text-stone-600 transition-colors hover:bg-white hover:text-stone-900 sm:text-sm"
+									class="relative flex h-full w-full cursor-pointer flex-col items-center justify-center gap-0 bg-stone-100 text-xs font-bold text-stone-600 transition-colors hover:bg-white hover:text-stone-900 sm:text-sm"
 									class:flex-row={item.id === 'laser'}
 									class:border-r={(row.length === 2 && itemIndex === 0) || (officialRow && itemIndex % 2 === 0)}
 									class:border-b={officialRow && itemIndex < 2}
@@ -4181,6 +4199,14 @@
 											draggable="false"
 											decoding="async"
 										/>
+										{#if item.id === 'laser'}
+											<span
+												class="absolute right-0.5 bottom-0.5 h-2 w-2 rounded-full border border-white"
+												style:background-color={laserColorValue(laserColor)}
+												style:box-shadow={`0 0 4px ${laserColorValue(laserColor)}`}
+												aria-hidden="true"
+											></span>
+										{/if}
 									{:else if item.icon === 'event'}
 										<svg viewBox="0 0 24 24" class="h-7 w-7" aria-hidden="true">
 											<path d="M4 5h16v11H9l-4 3v-3H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
@@ -4220,11 +4246,13 @@
 						? deflagPlacementColor
 						: toolbarEditorTool === 'bean-bag'
 							? beanBagPlacementColor
-							: isArrowKind(toolbarEditorTool)
-								? arrowPlacementColors[toolbarEditorTool]
-								: guidePlacementColors[toolbarEditorTool]}
+							: toolbarEditorTool === 'laser'
+								? laserColor
+								: isArrowKind(toolbarEditorTool)
+									? arrowPlacementColors[toolbarEditorTool]
+									: guidePlacementColors[toolbarEditorTool]}
 				{@const toolbarPresetStyle =
-					toolbarEditorTool === 'deflag' || toolbarEditorTool === 'bean-bag'
+					toolbarEditorTool === 'deflag' || toolbarEditorTool === 'bean-bag' || toolbarEditorTool === 'laser'
 						? null
 						: isArrowKind(toolbarEditorTool)
 							? arrowPlacementStyles[toolbarEditorTool]
@@ -4280,7 +4308,13 @@
 						/>
 					{/if}
 					<div class="flex gap-1" aria-label="Preset color">
-						{#each toolbarEditorTool === 'deflag' ? deflagColors : toolbarEditorTool === 'bean-bag' ? beanBagColors : guideColors as option}
+						{#each toolbarEditorTool === 'deflag'
+							? deflagColors
+							: toolbarEditorTool === 'bean-bag'
+								? beanBagColors
+								: toolbarEditorTool === 'laser'
+									? laserColors
+									: guideColors as option}
 							<button
 								type="button"
 								title={option.label}
@@ -6060,7 +6094,7 @@
 									<path
 										d={laserDrawingPath(drawing.points)}
 										fill="none"
-										stroke="#ff2020"
+										stroke={laserColorValue(laserColor)}
 										stroke-width="8"
 										stroke-linecap="round"
 										stroke-linejoin="round"
@@ -6069,7 +6103,7 @@
 									<path
 										d={laserDrawingPath(drawing.points)}
 										fill="none"
-										stroke="#ff2020"
+										stroke={laserColorValue(laserColor)}
 										stroke-width="3.8"
 										stroke-linecap="round"
 										stroke-linejoin="round"
@@ -6082,7 +6116,7 @@
 									<path
 										d={laserDrawingPath(activeLaserDrawing)}
 										fill="none"
-										stroke="#ff2020"
+										stroke={laserColorValue(laserColor)}
 										stroke-width="8"
 										stroke-linecap="round"
 										stroke-linejoin="round"
@@ -6091,7 +6125,7 @@
 									<path
 										d={laserDrawingPath(activeLaserDrawing)}
 										fill="none"
-										stroke="#ff2020"
+										stroke={laserColorValue(laserColor)}
 										stroke-width="3.8"
 										stroke-linecap="round"
 										stroke-linejoin="round"
@@ -6112,10 +6146,10 @@
 										y2={trailEnd.y}
 										gradientUnits="userSpaceOnUse"
 									>
-										<stop offset="0%" stop-color="#ff2020" stop-opacity="0" />
-										<stop offset="30%" stop-color="#ff2020" stop-opacity="0.18" />
-										<stop offset="70%" stop-color="#ff2020" stop-opacity="0.55" />
-										<stop offset="100%" stop-color="#ff2020" stop-opacity="0.82" />
+										<stop offset="0%" stop-color={laserColorValue(laserColor)} stop-opacity="0" />
+										<stop offset="30%" stop-color={laserColorValue(laserColor)} stop-opacity="0.18" />
+										<stop offset="70%" stop-color={laserColorValue(laserColor)} stop-opacity="0.55" />
+										<stop offset="100%" stop-color={laserColorValue(laserColor)} stop-opacity="0.82" />
 									</linearGradient>
 								</defs>
 								<path
@@ -6125,8 +6159,8 @@
 								/>
 							{/if}
 							{#if tool === 'laser' && laserPointer && pointerOnField}
-								<circle cx={laserPointer.x} cy={laserPointer.y} r="7" fill="#ef4444" opacity="0.2" />
-								<circle cx={laserPointer.x} cy={laserPointer.y} r="3" fill="#ff1717" />
+								<circle cx={laserPointer.x} cy={laserPointer.y} r="7" fill={laserColorValue(laserColor)} opacity="0.2" />
+								<circle cx={laserPointer.x} cy={laserPointer.y} r="3" fill={laserColorValue(laserColor)} />
 							{/if}
 						</g>
 					{/if}
