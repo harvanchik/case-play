@@ -329,8 +329,8 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 						const scoreboard =
 							index === 0
 								? [
-										{ x: x + 4, value: settings.gameQuarter.toUpperCase(), fontSize: 12, letterSpacing: 1.5 },
-										{ x: x + width - 62, value: formatPlayBuilderGameClock(settings.gameClockSeconds), fontSize: 11, letterSpacing: 0.5 }
+										{ x: x - 62, value: settings.gameQuarter.toUpperCase(), fontSize: 12, letterSpacing: 1.5 },
+										{ x: x + width + 4, value: formatPlayBuilderGameClock(settings.gameClockSeconds), fontSize: 11, letterSpacing: 0.5 }
 									]
 									.map(
 										(item) =>

@@ -369,6 +369,7 @@
 	let scoreboardEditorX = 0;
 	let scoreboardEditorY = 0;
 	let gameClockEditValue = '00:00';
+	let gameClockEditInput: HTMLInputElement;
 	let scoreboardHistorySaved = false;
 	let editingDownGuideId: number | null = null;
 	let editingDownGuide: FieldGuide | undefined;
@@ -2003,6 +2004,14 @@
 		if (!match) return null;
 		return Number(match[1]) * 60 + Number(match[2]);
 	};
+	const updateGameClockEditValue = (event: Event) => {
+		const input = event.currentTarget as HTMLInputElement;
+		let digits = input.value.replace(/\D/g, '').slice(0, 4);
+		if ((event as InputEvent).inputType === 'deleteContentBackward' && /^\d{2}$/.test(input.value)) digits = digits.slice(0, -1);
+		gameClockEditValue = digits.length < 2 ? digits : `${digits.slice(0, 2)}:${digits.slice(2)}`;
+		input.value = gameClockEditValue;
+		input.setSelectionRange(gameClockEditValue.length, gameClockEditValue.length);
+	};
 	const commitScoreboardEditor = () => {
 		if (editingScoreboard === 'clock') {
 			const parsed = parseGameClock(gameClockEditValue);
@@ -2011,10 +2020,6 @@
 		}
 		editingScoreboard = null;
 		scoreboardHistorySaved = false;
-	};
-	const adjustGameClock = (seconds: number) => {
-		const enteredSeconds = parseGameClock(gameClockEditValue);
-		updateGameClock((enteredSeconds ?? fieldSettings.gameClockSeconds) + seconds);
 	};
 	const selectGameQuarter = (gameQuarter: PlayBuilderGameQuarter) => {
 		if (gameQuarter !== fieldSettings.gameQuarter) {
@@ -2163,7 +2168,7 @@
 		downYardageHistorySaved = false;
 		editingDownGuideId = guide.id;
 	};
-	const startEditingScoreboard = (event: Event, kind: 'quarter' | 'clock', x: number, y: number) => {
+	const startEditingScoreboard = async (event: Event, kind: 'quarter' | 'clock', x: number, y: number) => {
 		if (viewOnly) return;
 		event.preventDefault();
 		event.stopPropagation();
@@ -2179,6 +2184,11 @@
 		scoreboardEditorY = y;
 		gameClockEditValue = formatPlayBuilderGameClock(fieldSettings.gameClockSeconds);
 		scoreboardHistorySaved = false;
+		if (kind === 'clock') {
+			await tick();
+			gameClockEditInput?.focus();
+			gameClockEditInput?.select();
+		}
 	};
 	const startEditingTeamBox = async (event: Event, teamBoxY: number, teamBoxIndex: number) => {
 		if (viewOnly || tool === 'laser') return;
@@ -4826,9 +4836,9 @@
 								{@const teamBoxWidth = xForYards(teamBox[1]) - xForYards(teamBox[0])}
 								{@const teamBoxTextHitWidth = Math.min(teamBoxWidth, Math.max(56, teamBoxLabel.length * 9 + 18))}
 								{@const scoreboardWidth = 58}
-								{@const scoreboardInset = 4}
-								{@const quarterBoxX = xForYards(teamBox[0]) + scoreboardInset}
-								{@const clockBoxX = xForYards(teamBox[1]) - scoreboardInset - scoreboardWidth}
+								{@const scoreboardGap = 4}
+								{@const quarterBoxX = xForYards(teamBox[0]) - scoreboardGap - scoreboardWidth}
+								{@const clockBoxX = xForYards(teamBox[1]) + scoreboardGap}
 								<g>
 									<rect x={xForYards(teamBox[0])} y={teamBoxY} width={teamBoxWidth} height="20" fill="transparent" pointer-events="none" />
 									<rect
@@ -6101,7 +6111,7 @@
 						bind:this={editorElement}
 						data-scoreboard-editor={editingScoreboard}
 						class="absolute z-20 -translate-x-1/2 bg-white p-2 shadow-xl ring-2 ring-stone-900"
-						class:w-72={editingScoreboard === 'clock'}
+						class:w-44={editingScoreboard === 'clock'}
 						class:w-64={editingScoreboard === 'quarter'}
 						style:left={`${(scoreboardEditorX / 1000) * 100}%`}
 						style:top={`${((scoreboardEditorY + 27) / 484) * 100}%`}
@@ -6130,33 +6140,19 @@
 								>Game Time</label
 							>
 							<input
+								bind:this={gameClockEditInput}
 								id="game-clock-value"
 								bind:value={gameClockEditValue}
 								inputmode="numeric"
 								maxlength="5"
-								pattern="[0-9][0-9]?:[0-5][0-9]"
+								pattern="[0-9][0-9]:[0-5][0-9]"
 								aria-describedby="game-clock-help"
+								autocomplete="off"
+								enterkeyhint="done"
 								class="mx-auto block h-10 w-24 border-2 border-stone-800 bg-stone-950 px-2 text-center font-mono text-xl font-black tracking-wider text-amber-100 outline-none focus:border-[#ff5a1f]"
-								on:focus={(event) => (event.currentTarget as HTMLInputElement).select()}
+								on:input={updateGameClockEditValue}
 							/>
-							<div class="mt-2 grid grid-cols-6 gap-1">
-								{#each [
-									{ label: '−5m', seconds: -300 },
-									{ label: '−1m', seconds: -60 },
-									{ label: '−1s', seconds: -1 },
-									{ label: '+1s', seconds: 1 },
-									{ label: '+1m', seconds: 60 },
-									{ label: '+5m', seconds: 300 }
-								] as adjustment}
-									<button
-										type="button"
-										aria-label={`${adjustment.seconds < 0 ? 'Subtract' : 'Add'} ${Math.abs(adjustment.seconds) >= 60 ? `${Math.abs(adjustment.seconds) / 60} minutes` : `${Math.abs(adjustment.seconds)} second`}`}
-										class="h-8 border border-stone-300 bg-stone-100 text-[10px] font-black text-stone-700 hover:border-stone-500 hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#ff5a1f]"
-										on:click={() => adjustGameClock(adjustment.seconds)}>{adjustment.label}</button
-									>
-								{/each}
-							</div>
-							<p id="game-clock-help" class="mt-1.5 text-center text-[9px] text-stone-500">Type MM:SS or use the quick adjustments.</p>
+							<p id="game-clock-help" class="mt-1.5 text-center text-[9px] text-stone-500">Type four digits. The colon is added automatically.</p>
 						{/if}
 					</form>
 				{/if}
