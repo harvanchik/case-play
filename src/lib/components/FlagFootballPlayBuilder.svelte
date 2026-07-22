@@ -4115,7 +4115,7 @@
 											class:!h-5={item.id === 'laser'}
 											class:!w-full={item.id === 'laser'}
 											class:object-fill={item.id === 'laser'}
-											class:invert={item.id === 'free-draw' && tool === item.id}
+											class:invert={(item.id === 'free-draw' || item.id === 'laser') && tool === item.id}
 											draggable="false"
 											decoding="async"
 										/>
