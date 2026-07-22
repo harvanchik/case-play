@@ -380,6 +380,7 @@
 	let editingScoreboard: 'clock' | null = null;
 	let gameClockEditValue = '00:00';
 	let gameClockEditInput: HTMLInputElement;
+	let gameClockReplacedSelection = false;
 	let scoreboardHistorySaved = false;
 	let editingDownGuideId: number | null = null;
 	let editingDownGuide: FieldGuide | undefined;
@@ -2065,9 +2066,23 @@
 		if (!match) return null;
 		return Number(match[1]) * 60 + Number(match[2]);
 	};
+	const completedGameClockEditValue = () => {
+		const digits = gameClockEditValue.replace(/\D/g, '');
+		return gameClockReplacedSelection && digits.length >= 1 && digits.length <= 2
+			? `${digits.padEnd(2, '0')}:00`
+			: gameClockEditValue;
+	};
+	const trackGameClockReplacement = (event: InputEvent) => {
+		const input = event.currentTarget as HTMLInputElement;
+		if (event.inputType.startsWith('insert') && input.selectionStart === 0 && input.selectionEnd === input.value.length) {
+			gameClockReplacedSelection = true;
+		}
+	};
 	const stepGameClock = async (direction: -1 | 1) => {
-		const currentSeconds = parseGameClock(gameClockEditValue) ?? fieldSettings.gameClockSeconds;
-		updateGameClock(currentSeconds + direction);
+		const currentSeconds = parseGameClock(completedGameClockEditValue()) ?? fieldSettings.gameClockSeconds;
+		const nextSeconds = Math.max(0, Math.min(PLAY_BUILDER_GAME_CLOCK_MAX_SECONDS, currentSeconds + direction));
+		gameClockReplacedSelection = false;
+		gameClockEditValue = formatPlayBuilderGameClock(nextSeconds);
 		await tick();
 		gameClockEditInput?.select();
 	};
@@ -2081,11 +2096,13 @@
 	};
 	const commitScoreboardEditor = () => {
 		if (editingScoreboard === 'clock') {
+			gameClockEditValue = completedGameClockEditValue();
 			const parsed = parseGameClock(gameClockEditValue);
 			if (parsed === null) gameClockEditValue = formatPlayBuilderGameClock(fieldSettings.gameClockSeconds);
 			else updateGameClock(parsed);
 		}
 		editingScoreboard = null;
+		gameClockReplacedSelection = false;
 		scoreboardHistorySaved = false;
 	};
 	const cycleGameQuarter = (event: Event) => {
@@ -2250,6 +2267,7 @@
 		editingTeamBoxIndex = null;
 		editingScoreboard = 'clock';
 		gameClockEditValue = formatPlayBuilderGameClock(fieldSettings.gameClockSeconds);
+		gameClockReplacedSelection = false;
 		scoreboardHistorySaved = false;
 		await tick();
 		gameClockEditInput?.focus();
@@ -5038,6 +5056,7 @@
 												autocomplete="off"
 												enterkeyhint="done"
 												class="block h-full w-full border-0 bg-transparent p-0 text-center font-mono text-[12px] font-black tracking-[0.075em] text-[#facc15] outline-none"
+												on:beforeinput={trackGameClockReplacement}
 												on:input={updateGameClockEditValue}
 												on:blur={commitScoreboardEditor}
 												on:keydown|stopPropagation={(event) => {
@@ -5051,6 +5070,7 @@
 														event.preventDefault();
 														gameClockEditValue = formatPlayBuilderGameClock(fieldSettings.gameClockSeconds);
 														editingScoreboard = null;
+														gameClockReplacedSelection = false;
 														scoreboardHistorySaved = false;
 													}
 												}}
