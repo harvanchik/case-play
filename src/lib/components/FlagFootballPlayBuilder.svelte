@@ -2065,6 +2065,12 @@
 		if (!match) return null;
 		return Number(match[1]) * 60 + Number(match[2]);
 	};
+	const stepGameClock = async (direction: -1 | 1) => {
+		const currentSeconds = parseGameClock(gameClockEditValue) ?? fieldSettings.gameClockSeconds;
+		updateGameClock(currentSeconds + direction);
+		await tick();
+		gameClockEditInput?.select();
+	};
 	const updateGameClockEditValue = (event: Event) => {
 		const input = event.currentTarget as HTMLInputElement;
 		let digits = input.value.replace(/\D/g, '').slice(0, 4);
@@ -5035,7 +5041,10 @@
 												on:input={updateGameClockEditValue}
 												on:blur={commitScoreboardEditor}
 												on:keydown|stopPropagation={(event) => {
-													if (event.key === 'Enter') {
+													if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+														event.preventDefault();
+														void stepGameClock(event.key === 'ArrowUp' ? 1 : -1);
+													} else if (event.key === 'Enter') {
 														event.preventDefault();
 														commitScoreboardEditor();
 													} else if (event.key === 'Escape') {
