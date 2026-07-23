@@ -266,6 +266,7 @@
 		activePlayId: number;
 		nextPlayEntryId: number;
 		nextPlayNumber: number;
+		laserDrawings: LaserDrawing[];
 	};
 	let playEntries: PlayEntry[] = loadedDocument.plays.map((play, index) => ({
 		id: index + 1,
@@ -379,8 +380,8 @@
 	let teamBoxEditInput: HTMLInputElement;
 	let editingScoreboard: 'clock' | null = null;
 	let gameClockEditValue = '00:00';
+	let gameClockEditDigits = '0000';
 	let gameClockEditInput: HTMLInputElement;
-	let gameClockReplacedSelection = false;
 	let scoreboardHistorySaved = false;
 	let editingDownGuideId: number | null = null;
 	let editingDownGuide: FieldGuide | undefined;
@@ -967,6 +968,7 @@
 	};
 	const finishLaserDrawing = () => {
 		if (activeLaserDrawing && activeLaserDrawing.points.length > 1) {
+			saveHistory();
 			laserDrawings = [...laserDrawings, { ...activeLaserDrawing, releasedAt: null }];
 		}
 		activeLaserDrawing = null;
@@ -974,6 +976,7 @@
 	};
 	const clearLaserDrawings = () => {
 		if (laserDrawingPointerId !== null && svg?.hasPointerCapture(laserDrawingPointerId)) svg.releasePointerCapture(laserDrawingPointerId);
+		if (laserDrawings.length > 0) saveHistory();
 		laserDrawings = [];
 		activeLaserDrawing = null;
 		laserDrawingPointerId = null;
@@ -1112,7 +1115,8 @@
 		})),
 		activePlayId: playEntries[activePlayIndex]?.id ?? playEntries[0].id,
 		nextPlayEntryId,
-		nextPlayNumber
+		nextPlayNumber,
+		laserDrawings: laserDrawings.map((drawing) => ({ ...drawing, points: drawing.points.map((point) => ({ ...point })) }))
 	});
 	const pushBuilderState = (stack: BuilderState[], state: BuilderState) => [...stack.slice(-29), state];
 	const saveHistory = () => {
@@ -1130,6 +1134,9 @@
 		playEntries = state.plays.map((play) => ({ ...play, scene: cloneScene(play.scene), settings: { ...play.settings } }));
 		nextPlayEntryId = state.nextPlayEntryId;
 		nextPlayNumber = state.nextPlayNumber;
+		laserDrawings = state.laserDrawings.map((drawing) => ({ ...drawing, points: drawing.points.map((point) => ({ ...point })) }));
+		activeLaserDrawing = null;
+		laserDrawingPointerId = null;
 		editingPlayId = null;
 		const index = Math.max(
 			0,
@@ -2090,6 +2097,7 @@
 	const updateGameClock = (seconds: number) => {
 		const nextSeconds = Math.max(0, Math.min(PLAY_BUILDER_GAME_CLOCK_MAX_SECONDS, Math.round(seconds)));
 		gameClockEditValue = formatPlayBuilderGameClock(nextSeconds);
+		gameClockEditDigits = gameClockEditValue.replace(/\D/g, '');
 		if (nextSeconds === fieldSettings.gameClockSeconds) return;
 		if (!scoreboardHistorySaved) saveHistory();
 		scoreboardHistorySaved = true;
@@ -2100,47 +2108,60 @@
 		if (!match) return null;
 		return Number(match[1]) * 60 + Number(match[2]);
 	};
-	const completedGameClockEditValue = () => {
-		const digits = gameClockEditValue.replace(/\D/g, '');
-		return gameClockReplacedSelection && digits.length >= 1 && digits.length <= 2
-			? `${digits.padEnd(2, '0')}:00`
-			: gameClockEditValue;
+	const formatGameClockInput = (digits: string) => {
+		const padded = digits.replace(/\D/g, '').slice(-4).padStart(4, '0');
+		return `${padded.slice(0, 2)}:${padded.slice(2)}`;
 	};
-	const trackGameClockReplacement = (event: InputEvent) => {
+	const focusGameClockInputEnd = () => {
+		void tick().then(() => gameClockEditInput?.setSelectionRange(gameClockEditValue.length, gameClockEditValue.length));
+	};
+	const handleGameClockInput = (event: InputEvent) => {
 		const input = event.currentTarget as HTMLInputElement;
-		if (event.inputType.startsWith('insert') && input.selectionStart === 0 && input.selectionEnd === input.value.length) {
-			gameClockReplacedSelection = true;
+		const replacesEntireValue = input.selectionStart === 0 && input.selectionEnd === input.value.length;
+		const insertedDigits = (event.data ?? '').replace(/\D/g, '');
+		if (event.inputType.startsWith('insert') && insertedDigits) {
+			event.preventDefault();
+			gameClockEditDigits = `${replacesEntireValue ? '' : gameClockEditDigits}${insertedDigits}`.slice(-4);
+			gameClockEditValue = formatGameClockInput(gameClockEditDigits);
+			focusGameClockInputEnd();
+			return;
+		}
+		if (event.inputType === 'deleteContentBackward' || event.inputType === 'deleteContentForward') {
+			event.preventDefault();
+			gameClockEditDigits = replacesEntireValue ? '' : gameClockEditDigits.slice(0, -1);
+			gameClockEditValue = formatGameClockInput(gameClockEditDigits);
+			focusGameClockInputEnd();
 		}
 	};
+	const normalizeGameClockInput = (event: Event) => {
+		const input = event.currentTarget as HTMLInputElement;
+		gameClockEditDigits = input.value.replace(/\D/g, '').slice(-4);
+		gameClockEditValue = formatGameClockInput(gameClockEditDigits);
+		input.value = gameClockEditValue;
+		focusGameClockInputEnd();
+	};
 	const stepGameClock = async (direction: -1 | 1) => {
-		const currentSeconds = parseGameClock(completedGameClockEditValue()) ?? fieldSettings.gameClockSeconds;
+		const currentSeconds = parseGameClock(gameClockEditValue) ?? fieldSettings.gameClockSeconds;
 		const nextSeconds = Math.max(0, Math.min(PLAY_BUILDER_GAME_CLOCK_MAX_SECONDS, currentSeconds + direction));
-		gameClockReplacedSelection = false;
 		gameClockEditValue = formatPlayBuilderGameClock(nextSeconds);
+		gameClockEditDigits = gameClockEditValue.replace(/\D/g, '');
 		await tick();
 		gameClockEditInput?.select();
 	};
-	const updateGameClockEditValue = (event: Event) => {
-		const input = event.currentTarget as HTMLInputElement;
-		let digits = input.value.replace(/\D/g, '').slice(0, 4);
-		if ((event as InputEvent).inputType === 'deleteContentBackward' && /^\d{2}$/.test(input.value)) digits = digits.slice(0, -1);
-		gameClockEditValue = digits.length < 2 ? digits : `${digits.slice(0, 2)}:${digits.slice(2)}`;
-		input.value = gameClockEditValue;
-		input.setSelectionRange(gameClockEditValue.length, gameClockEditValue.length);
-	};
 	const commitScoreboardEditor = () => {
 		if (editingScoreboard === 'clock') {
-			gameClockEditValue = completedGameClockEditValue();
 			const parsed = parseGameClock(gameClockEditValue);
-			if (parsed === null) gameClockEditValue = formatPlayBuilderGameClock(fieldSettings.gameClockSeconds);
+			if (parsed === null) {
+				gameClockEditValue = formatPlayBuilderGameClock(fieldSettings.gameClockSeconds);
+				gameClockEditDigits = gameClockEditValue.replace(/\D/g, '');
+			}
 			else updateGameClock(parsed);
 		}
 		editingScoreboard = null;
-		gameClockReplacedSelection = false;
 		scoreboardHistorySaved = false;
 	};
 	const cycleGameQuarter = (event: Event) => {
-		if (viewOnly) return;
+		if (viewOnly || tool === 'laser') return;
 		event.preventDefault();
 		event.stopPropagation();
 		if (editingScoreboard === 'clock') commitScoreboardEditor();
@@ -2289,7 +2310,7 @@
 		editingDownGuideId = guide.id;
 	};
 	const startEditingGameClock = async (event: Event) => {
-		if (viewOnly) return;
+		if (viewOnly || tool === 'laser') return;
 		event.preventDefault();
 		event.stopPropagation();
 		clearDeleteState();
@@ -2301,7 +2322,7 @@
 		editingTeamBoxIndex = null;
 		editingScoreboard = 'clock';
 		gameClockEditValue = formatPlayBuilderGameClock(fieldSettings.gameClockSeconds);
-		gameClockReplacedSelection = false;
+		gameClockEditDigits = gameClockEditValue.replace(/\D/g, '');
 		scoreboardHistorySaved = false;
 		await tick();
 		gameClockEditInput?.focus();
@@ -5095,8 +5116,8 @@
 												autocomplete="off"
 												enterkeyhint="done"
 												class="block h-full w-full border-0 bg-transparent p-0 text-center font-mono text-[12px] font-black tracking-[0.075em] text-[#facc15] outline-none"
-												on:beforeinput={trackGameClockReplacement}
-												on:input={updateGameClockEditValue}
+												on:beforeinput={handleGameClockInput}
+												on:input={normalizeGameClockInput}
 												on:blur={commitScoreboardEditor}
 												on:keydown|stopPropagation={(event) => {
 													if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
@@ -5108,8 +5129,8 @@
 													} else if (event.key === 'Escape') {
 														event.preventDefault();
 														gameClockEditValue = formatPlayBuilderGameClock(fieldSettings.gameClockSeconds);
+														gameClockEditDigits = gameClockEditValue.replace(/\D/g, '');
 														editingScoreboard = null;
-														gameClockReplacedSelection = false;
 														scoreboardHistorySaved = false;
 													}
 												}}
@@ -5132,14 +5153,15 @@
 										data-field-element
 										data-scoreboard-control={scoreboardItem.kind}
 										role="button"
-										tabindex="0"
+										tabindex={tool === 'laser' ? -1 : 0}
 										aria-label={scoreboardItem.label}
+										aria-disabled={tool === 'laser'}
 										x={scoreboardItem.x}
 										y={scoreboardTeamBoxY}
 										width={scoreboardWidth}
 										height="20"
 										fill="transparent"
-										pointer-events={scoreboardItem.kind === 'clock' && editingScoreboard === 'clock' ? 'none' : 'all'}
+										pointer-events={tool === 'laser' || (scoreboardItem.kind === 'clock' && editingScoreboard === 'clock') ? 'none' : 'all'}
 										on:pointerdown|stopPropagation
 										on:click|stopPropagation={(event) => (scoreboardItem.kind === 'quarter' ? cycleGameQuarter(event) : startEditingGameClock(event))}
 										on:keydown={(event) => {
@@ -5148,7 +5170,7 @@
 											if (scoreboardItem.kind === 'quarter') cycleGameQuarter(event);
 											else startEditingGameClock(event);
 										}}
-										class="cursor-pointer focus:outline-none"
+										class={tool === 'laser' ? 'focus:outline-none' : 'cursor-pointer focus:outline-none'}
 									/>
 								</g>
 							{/each}
