@@ -974,17 +974,6 @@
 		activeLaserDrawing = null;
 		laserDrawingPointerId = null;
 	};
-	const clearLaserDrawings = () => {
-		if (laserDrawingPointerId !== null && svg?.hasPointerCapture(laserDrawingPointerId)) svg.releasePointerCapture(laserDrawingPointerId);
-		if (laserDrawings.length > 0) saveHistory();
-		laserDrawings = [];
-		activeLaserDrawing = null;
-		laserDrawingPointerId = null;
-		laserTrail = [];
-		laserTrailClock = performance.now();
-		if (laserTrailFrame !== null) cancelAnimationFrame(laserTrailFrame);
-		laserTrailFrame = null;
-	};
 	const releaseLaserDrawings = () => {
 		if (laserDrawingPointerId !== null && svg?.hasPointerCapture(laserDrawingPointerId)) svg.releasePointerCapture(laserDrawingPointerId);
 		const drawings =
@@ -997,6 +986,10 @@
 		laserTrailClock = now;
 		laserDrawings = drawings.map((drawing) => ({ ...drawing, releasedAt: now }));
 		if (laserTrailFrame === null) laserTrailFrame = requestAnimationFrame(refreshLaserTrail);
+	};
+	const fadeLaserDrawings = () => {
+		if (laserDrawings.length > 0) saveHistory();
+		releaseLaserDrawings();
 	};
 	const laserDrawingPath = (points: Point[]) => points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
 	const laserTrailPath = (points: (Point & { createdAt: number })[], now: number) => {
@@ -1137,6 +1130,10 @@
 		laserDrawings = state.laserDrawings.map((drawing) => ({ ...drawing, points: drawing.points.map((point) => ({ ...point })) }));
 		activeLaserDrawing = null;
 		laserDrawingPointerId = null;
+		if (laserDrawings.some((drawing) => drawing.releasedAt !== null) && laserTrailFrame === null) {
+			laserTrailClock = performance.now();
+			laserTrailFrame = requestAnimationFrame(refreshLaserTrail);
+		}
 		editingPlayId = null;
 		const index = Math.max(
 			0,
@@ -2661,7 +2658,7 @@
 		if (isEditableTarget) return;
 		if (tool === 'laser' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'c') {
 			event.preventDefault();
-			clearLaserDrawings();
+			fadeLaserDrawings();
 			return;
 		}
 		if (!event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey && event.key.toLowerCase() === 'n') {
@@ -3460,6 +3457,26 @@
 		tool = 'team-a';
 		syncLayerDom();
 		completeTutorialAction('setup-default');
+	};
+	const flipFieldDirection = () => {
+		if (dismissEditorForAction() || suppressNextClick) return;
+		const flipPoint = (point: Point): Point => ({ x: fieldLeft + fieldRight - point.x, y: point.y });
+		saveHistory();
+		clearEditorState();
+		clearDeleteState();
+		clearPlacementSnap();
+		markers = markers.map((marker) => ({ ...marker, ...flipPoint(marker) }));
+		paths = paths.map((path) => ({ ...path, start: flipPoint(path.start), end: flipPoint(path.end) }));
+		guides = guides.map((guide) => ({ ...guide, x: fieldLeft + fieldRight - guide.x }));
+		freeStrokes = freeStrokes.map((stroke) => ({ ...stroke, points: stroke.points.map(flipPoint) }));
+		laserDrawings = laserDrawings.map((drawing) => ({ ...drawing, points: drawing.points.map(flipPoint) }));
+		activeFreeStroke = activeFreeStroke ? { ...activeFreeStroke, points: activeFreeStroke.points.map(flipPoint) } : null;
+		activeLaserDrawing = activeLaserDrawing ? { ...activeLaserDrawing, points: activeLaserDrawing.points.map(flipPoint) } : null;
+		laserTrail = laserTrail.map((point) => ({ ...point, ...flipPoint(point) }));
+		laserPointer = laserPointer ? flipPoint(laserPointer) : null;
+		drawing = null;
+		dragTarget = null;
+		syncLayerDom();
 	};
 	const runGuardedAction = (action: () => void) => {
 		if (dismissEditorForAction() || suppressNextClick) return;
@@ -4846,20 +4863,49 @@
 						{actionMessage}
 					</span>
 				{/if}
-				<HoverTooltip text="Default Setup" shortcutKeys={[primaryModifierKey, 'Shift', 'S']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
+				<div class="flex gap-1" aria-label="Field setup controls">
+					<HoverTooltip text="Flip Field Direction" minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
+						<button
+							type="button"
+							aria-label="Flip field direction"
+							on:click={flipFieldDirection}
+							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
+						>
+							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+								<path d="M4 7h11M15 4l3 3-3 3M20 17H9M9 14l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter" />
+							</svg>
+							<span class="text-[8px] leading-none font-semibold">Flip</span>
+						</button>
+					</HoverTooltip>
+					<HoverTooltip text="Default Setup" shortcutKeys={[primaryModifierKey, 'Shift', 'S']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
+						<button
+							data-tutorial="setup-button"
+							type="button"
+							aria-label="Set up default play"
+							on:click={setupDefaultScenario}
+							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
+						>
+							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+								<path d="M4 5h16v14H4zM8 5v14M13 5v14M18 5v14" fill="none" stroke="currentColor" stroke-width="1.6" />
+								<circle cx="10.5" cy="12" r="1.5" fill="currentColor" />
+								<path d="M10.5 12h4" stroke="currentColor" stroke-width="1.6" stroke-dasharray="1.5 1" />
+							</svg>
+							<span class="text-[8px] leading-none font-semibold">Setup</span>
+						</button>
+					</HoverTooltip>
+				</div>
+				<HoverTooltip text="Help" shortcutKeys={[primaryModifierKey, 'Shift', 'H']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
 					<button
-						data-tutorial="setup-button"
 						type="button"
-						aria-label="Set up default play"
-						on:click={setupDefaultScenario}
+						aria-label="Open play builder help"
+						on:click={openHelp}
 						class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
 					>
 						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-							<path d="M4 5h16v14H4zM8 5v14M13 5v14M18 5v14" fill="none" stroke="currentColor" stroke-width="1.6" />
-							<circle cx="10.5" cy="12" r="1.5" fill="currentColor" />
-							<path d="M10.5 12h4" stroke="currentColor" stroke-width="1.6" stroke-dasharray="1.5 1" />
+							<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+							<path d="M9.7 9a2.5 2.5 0 1 1 3.1 2.4c-.8.3-.8.9-.8 1.6M12 17h.01" fill="none" stroke="currentColor" stroke-width="2" />
 						</svg>
-						<span class="text-[8px] leading-none font-semibold">Setup</span>
+						<span class="text-[8px] leading-none font-semibold">Help</span>
 					</button>
 				</HoverTooltip>
 				<HoverTooltip text="Interactive Tutorial" minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
@@ -4882,7 +4928,7 @@
 					text="Field Settings"
 					shortcutKeys={[primaryModifierKey, alternateModifierKey, 'S']}
 					minWidthPx={0}
-					wrapperClass="ml-2 flex h-9 w-10 shrink-0"
+					wrapperClass="flex h-9 w-10 shrink-0"
 				>
 					<button
 						data-tutorial="settings-button"
@@ -4902,20 +4948,6 @@
 							<circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.7" />
 						</svg>
 						<span class="text-[8px] leading-none font-semibold">Settings</span>
-					</button>
-				</HoverTooltip>
-				<HoverTooltip text="Help" shortcutKeys={[primaryModifierKey, 'Shift', 'H']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-					<button
-						type="button"
-						aria-label="Open play builder help"
-						on:click={openHelp}
-						class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-					>
-						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-							<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
-							<path d="M9.7 9a2.5 2.5 0 1 1 3.1 2.4c-.8.3-.8.9-.8 1.6M12 17h.01" fill="none" stroke="currentColor" stroke-width="2" />
-						</svg>
-						<span class="text-[8px] leading-none font-semibold">Help</span>
 					</button>
 				</HoverTooltip>
 				<HoverTooltip text="Feedback" shortcutKeys={[primaryModifierKey, 'Shift', 'F']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
