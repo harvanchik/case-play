@@ -1,11 +1,9 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import Icon from '@iconify/svelte';
 	import { goto } from '$app/navigation';
 	import { updateFilterSearchParams } from '$lib/case-play-filter-state';
 	import CasePlayCard from '$lib/components/CasePlayCard.svelte';
-	import LandingPageAd from '$lib/components/LandingPageAd.svelte';
 	import PublicSiteFooter from '$lib/components/PublicSiteFooter.svelte';
 	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
 
@@ -16,7 +14,6 @@
 	let showCreateModal = false;
 	let showDifficultyDropdown = false;
 	let selectedDifficulties = data.initialFilters.difficulties;
-	let resultColumns = 1;
 	let navigationTimer: ReturnType<typeof setTimeout> | undefined;
 	const websiteStructuredData = JSON.stringify({
 		'@context': 'https://schema.org',
@@ -26,15 +23,6 @@
 		description: 'A searchable case play database and flag football play builder for referee education.',
 		author: { '@type': 'Person', name: 'Jake Harvanchik' }
 	}).replace(/</g, '\\u003c');
-
-	onMount(() => {
-		const updateResultColumns = () => {
-			resultColumns = window.matchMedia('(min-width: 1024px)').matches ? 3 : window.matchMedia('(min-width: 640px)').matches ? 2 : 1;
-		};
-		updateResultColumns();
-		window.addEventListener('resize', updateResultColumns);
-		return () => window.removeEventListener('resize', updateResultColumns);
-	});
 
 	const difficultyOptions = [
 		{ value: 1, label: 'Easy', color: 'bg-green-600' },
@@ -76,10 +64,6 @@
 	};
 
 	$: filteredCasePlays = data?.casePlays ?? [];
-
-	$: casePlayGroups = Array.from({ length: Math.ceil((filteredCasePlays?.length ?? 0) / (resultColumns * 2)) }, (_, index) =>
-		(filteredCasePlays ?? []).slice(index * resultColumns * 2, (index + 1) * resultColumns * 2)
-	);
 
 	/**
 	 * Returns the difficulty of the case play (i.e., Easy, Moderate, Hard)
@@ -266,13 +250,8 @@
 				<!-- END: Results Header -->
 
 				<div class="mt-1 grid max-h-[calc(100vh-16rem)] grid-cols-1 gap-4 overflow-y-auto border border-stone-400 p-2 sm:grid-cols-2 lg:grid-cols-3">
-					{#each casePlayGroups as group, groupIndex}
-						{#each group as casePlay}
-							<CasePlayCard {casePlay} href={`/c/${casePlay.id}${activeFilterQuery ? `?${activeFilterQuery}` : ''}`} />
-						{/each}
-						{#if groupIndex < casePlayGroups.length - 1 && groupIndex < 2}
-							<LandingPageAd />
-						{/if}
+					{#each filteredCasePlays as casePlay}
+						<CasePlayCard {casePlay} href={`/c/${casePlay.id}${activeFilterQuery ? `?${activeFilterQuery}` : ''}`} />
 					{/each}
 				</div>
 				{#if data.pagination.pageCount > 1}
