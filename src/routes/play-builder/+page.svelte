@@ -51,7 +51,7 @@
 	{@html `<script type="application/ld+json">${JSON.stringify(structuredData).replace(/</g, '\\u003c')}</script>`}
 </svelte:head>
 
-<PublicSiteNav compact />
+<PublicSiteNav />
 <main class="relative isolate min-h-[calc(100vh-2rem)] w-full overflow-x-hidden bg-stone-100 p-4">
 	<div aria-hidden="true" class="pointer-events-none fixed inset-0 z-0 bg-[url(/svg/graph.svg)]"></div>
 	<div aria-hidden="true" class="pointer-events-none fixed inset-0 z-0 bg-stone-100/[97%]"></div>

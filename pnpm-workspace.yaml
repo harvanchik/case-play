@@ -1,0 +1,7 @@
+engineStrict: true
+resolutionMode: highest
+minimumReleaseAge: 0
+nodeLinker: hoisted
+allowBuilds:
+  esbuild: true
+  svelte-preprocess: true

@@ -29,7 +29,7 @@
 	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<PublicSiteNav compact />
+<PublicSiteNav />
 <main class="min-h-screen bg-stone-100 p-4 text-stone-900">
 	<div class="mx-auto max-w-[1800px]">
 		<header class="mb-4 border-2 border-stone-900 bg-white p-4 shadow-md">

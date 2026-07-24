@@ -92,6 +92,7 @@
 
 <span
 	class={wrapperClass}
+	role="group"
 	onpointerenter={openAtPointer}
 	onpointermove={followPointer}
 	onpointerleave={() => (isOpen = false)}

@@ -5,7 +5,7 @@
 	import Icon from '@iconify/svelte';
 	import { HIGHLIGHT_PATTERNS } from '$lib/highlight-patterns';
 	import CasePlayCard from '$lib/components/CasePlayCard.svelte';
-	import FlagFootballPlayBuilder from '$lib/components/FlagFootballPlayBuilder.svelte';
+	import type FlagFootballPlayBuilder from '$lib/components/FlagFootballPlayBuilder.svelte';
 	import youtubeIcon from '$lib/svg/youtube.svg';
 	import PublicSiteFooter from '$lib/components/PublicSiteFooter.svelte';
 	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
@@ -19,6 +19,8 @@
 	// This avoids incorrectly flashing "tap" on desktop while JavaScript loads.
 	let answerUsesHover = true;
 	let isPlayBuilderOpen = false;
+	let PlayBuilderComponent: typeof FlagFootballPlayBuilder | null = null;
+	let playBuilderLoadPromise: Promise<void> | null = null;
 	let playBuilderButton: HTMLButtonElement;
 	let exportPromptSource: HTMLParagraphElement;
 	let playBuilderCloseButton: HTMLButtonElement;
@@ -131,7 +133,10 @@
 		previousBodyOverflow = document.body.style.overflow;
 		document.body.style.overflow = 'hidden';
 		isPlayBuilderOpen = true;
-		await tick();
+		playBuilderLoadPromise ??= import('$lib/components/FlagFootballPlayBuilder.svelte').then(({ default: component }) => {
+			PlayBuilderComponent = component;
+		});
+		await Promise.all([tick(), playBuilderLoadPromise]);
 		playBuilderCloseButton?.focus();
 	};
 	const closePlayBuilder = async () => {
@@ -171,7 +176,7 @@
 
 {#key data.casePlay?.id}
 <main use:highlightCasePlay class="min-h-screen overflow-hidden bg-stone-100/[97%]">
-	<PublicSiteNav compact />
+	<PublicSiteNav />
 	<div class="fixed -z-10 h-screen w-screen bg-[url(/svg/graph.svg)]"></div>
 
 	<a
@@ -317,11 +322,17 @@
 				</button>
 			</div>
 			<div class="play-builder min-h-0 overflow-y-auto">
-				{#key data.casePlay.id}
-					<DesktopPlayBuilderGate>
-						<FlagFootballPlayBuilder exportPrompt={data.casePlay?.prompt ?? null} {exportPromptSource} />
-					</DesktopPlayBuilderGate>
-				{/key}
+				{#if PlayBuilderComponent}
+					{#key data.casePlay.id}
+						<DesktopPlayBuilderGate>
+							<PlayBuilderComponent exportPrompt={data.casePlay?.prompt ?? null} {exportPromptSource} />
+						</DesktopPlayBuilderGate>
+					{/key}
+				{:else}
+					<div class="flex min-h-48 items-center justify-center border-2 border-stone-900 bg-white text-stone-600" aria-live="polite">
+						Loading play builder…
+					</div>
+				{/if}
 			</div>
 		</div>
 	</div>

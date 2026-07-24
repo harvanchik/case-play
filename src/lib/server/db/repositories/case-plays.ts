@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, like, or } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../index';
 import { authors, casePlays, rulebooks, sports } from '../schema';
@@ -21,6 +21,65 @@ export type CasePlayMutationInput = {
 };
 
 const resolveDb = (database?: Database) => database ?? getDb();
+
+const publicCasePlaySummary = {
+	id: casePlays.id,
+	title: casePlays.title,
+	prompt: casePlays.prompt,
+	difficulty: casePlays.difficulty,
+	film: casePlays.filmUrl
+};
+
+export type PublicCasePlayListOptions = {
+	searchTerm?: string;
+	difficulties?: number[];
+	limit: number;
+	offset: number;
+};
+
+export const listPublicCasePlays = async (options: PublicCasePlayListOptions, database?: Database) => {
+	const db = resolveDb(database);
+	const searchTerm = options.searchTerm?.trim() ?? '';
+	const conditions = [eq(casePlays.isHidden, false)];
+
+	if (options.difficulties?.length) {
+		conditions.push(inArray(casePlays.difficulty, options.difficulties));
+	}
+
+	if (searchTerm) {
+		const searchPattern = `%${searchTerm}%`;
+		const normalizedSearch = searchTerm.toLocaleLowerCase();
+		const matchingDifficultyValues = ([
+			[1, 'easy'],
+			[2, 'moderate'],
+			[3, 'hard']
+		] as const).filter(([, label]) => label.includes(normalizedSearch)).map(([value]) => value);
+		const searchConditions = [
+			like(casePlays.title, searchPattern),
+			like(casePlays.prompt, searchPattern),
+			like(casePlays.answer, searchPattern),
+			like(casePlays.ruleReference, searchPattern),
+			like(casePlays.edition, searchPattern)
+		];
+		if (matchingDifficultyValues.length) searchConditions.push(inArray(casePlays.difficulty, matchingDifficultyValues));
+		conditions.push(
+			or(...searchConditions)!
+		);
+	}
+
+	const where = and(...conditions);
+	const [items, totalResult] = await Promise.all([
+		db.select(publicCasePlaySummary).from(casePlays).where(where).orderBy(asc(casePlays.title)).limit(options.limit).offset(options.offset),
+		db.select({ total: count() }).from(casePlays).where(where)
+	]);
+
+	return { items, total: totalResult[0]?.total ?? 0 };
+};
+
+export const listPublicCasePlaySummaries = async (database?: Database) => {
+	const db = resolveDb(database);
+	return db.select(publicCasePlaySummary).from(casePlays).where(eq(casePlays.isHidden, false)).orderBy(asc(casePlays.title));
+};
 
 export const listCasePlays = async (database?: Database) => {
 	const db = resolveDb(database);
@@ -131,12 +190,49 @@ export const getCasePlayById = async (id: string, database?: Database) => {
 export const getPublicCasePlayById = async (id: string, database?: Database) => {
 	const db = resolveDb(database);
 	const result = await db
-		.select({ id: casePlays.id })
+		.select({
+			id: casePlays.id,
+			sourceKey: casePlays.sourceKey,
+			title: casePlays.title,
+			prompt: casePlays.prompt,
+			answer: casePlays.answer,
+			edition: casePlays.edition,
+			ruleReference: casePlays.ruleReference,
+			pageNumber: casePlays.pageNumber,
+			difficulty: casePlays.difficulty,
+			film: casePlays.filmUrl,
+			filmUrl: casePlays.filmUrl,
+			authorId: casePlays.authorId,
+			rulebookId: casePlays.rulebookId,
+			sportId: casePlays.sportId,
+			isHidden: casePlays.isHidden,
+			createdAt: casePlays.createdAt,
+			updatedAt: casePlays.updatedAt,
+			author: {
+				id: authors.id,
+				first_name: authors.firstName,
+				last_name: authors.lastName
+			},
+			rulebook: {
+				id: rulebooks.id,
+				title: rulebooks.title,
+				slug: rulebooks.slug,
+				nickname: rulebooks.nickname
+			},
+			sport: {
+				id: sports.id,
+				name: sports.name,
+				slug: sports.slug
+			}
+		})
 		.from(casePlays)
+		.leftJoin(authors, eq(casePlays.authorId, authors.id))
+		.leftJoin(rulebooks, eq(casePlays.rulebookId, rulebooks.id))
+		.leftJoin(sports, eq(casePlays.sportId, sports.id))
 		.where(and(eq(casePlays.id, id), eq(casePlays.isHidden, false)))
 		.limit(1);
 
-	return result[0] ? getCasePlayById(id, db) : null;
+	return result[0] ?? null;
 };
 
 const shouldHideCasePlay = async (input: CasePlayMutationInput, db: Database) => {

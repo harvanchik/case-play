@@ -60,6 +60,7 @@
 		| 'kick'
 		| 'line-of-scrimmage'
 		| 'line-to-gain';
+	type ActiveTool = Tool | 'select';
 	type SelectedTarget = { type: 'marker' | 'path' | 'guide'; id: number };
 	type DragTarget =
 		| { type: 'marker'; id: number; pointerStart: Point; elementStart: Point; moved: boolean; snapToMarkers?: boolean }
@@ -287,7 +288,7 @@
 	const loadedScene = playEntries[activePlayIndex].scene;
 	const loadedIds = [...loadedScene.markers, ...loadedScene.paths, ...loadedScene.guides, ...loadedScene.freeStrokes].map((item) => item.id);
 	let svg: SVGSVGElement;
-	let tool: Tool = 'team-a';
+	let tool: ActiveTool = 'team-a';
 	let markers: FieldMarker[] = loadedScene.markers;
 	let paths: FieldPath[] = loadedScene.paths;
 	let guides: FieldGuide[] = loadedScene.guides;
@@ -300,7 +301,18 @@
 	let actionInProgress: 'save' | 'png' | 'jpg' | 'webp' | 'pdf' | null = null;
 	let actionMessage = '';
 	let actionMessageTimer: ReturnType<typeof setTimeout> | null = null;
+	let canEditSavedPlay = savedPlayId === null;
+	let ownershipResolved = savedPlayId === null;
+	let saveActionLabel = '';
+	$: saveActionLabel = ownershipResolved ? (savedPlayId && !canEditSavedPlay ? 'Make Copy' : 'Save') : '';
+	let showShare = false;
+	let shareUrl = '';
+	let shareQrDataUrl = '';
+	let shareQrLoading = false;
+	let shareCloseButton: HTMLButtonElement;
+	let shareUrlInput: HTMLInputElement;
 	let copyConfirmed = false;
+	let qrCopyConfirmed = false;
 	let copyFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
 	let showHelp = false;
 	let helpCloseButton: HTMLButtonElement;
@@ -1356,9 +1368,9 @@
 		return result.id;
 	};
 	const savePlay = async (): Promise<boolean> => {
-		if (actionInProgress) return false;
+		if (actionInProgress || !ownershipResolved) return false;
 		actionInProgress = 'save';
-		showPendingActionMessage('Saving…');
+		showPendingActionMessage(canEditSavedPlay ? 'Saving…' : 'Making copy…');
 		try {
 			const editToken = savedPlayId ? sessionStorage.getItem(`play-builder-edit:${savedPlayId}`) : null;
 			if (savedPlayId && editToken) {
@@ -1368,6 +1380,7 @@
 					body: JSON.stringify({ document: currentSerializedDocument(), editToken })
 				});
 				if (response.ok) {
+					canEditSavedPlay = true;
 					savedSceneKey = JSON.stringify(currentSerializedDocument());
 					showActionMessage('Saved');
 					return true;
@@ -1378,9 +1391,11 @@
 				}
 			}
 			const id = await createSavedPlay();
+			canEditSavedPlay = true;
 			savedSceneKey = JSON.stringify(currentSerializedDocument());
-			showActionMessage('Saved');
-			sessionStorage.setItem('play-builder-action-message', JSON.stringify({ message: 'Saved', expiresAt: Date.now() + 10_000 }));
+			const confirmation = savedPlayId ? 'Copy created' : 'Saved';
+			showActionMessage(confirmation);
+			sessionStorage.setItem('play-builder-action-message', JSON.stringify({ message: confirmation, expiresAt: Date.now() + 10_000 }));
 			const playQuery = playEntries.length > 1 ? `?play=${activePlayIndex + 1}` : '';
 			await goto(`/play-builder/${id}${playQuery}`, { replaceState: true, keepFocus: true, noScroll: true });
 			return true;
@@ -1595,39 +1610,46 @@
 			actionInProgress = null;
 		}
 	};
-	const copyShareUrl = async () => {
+	const currentShareUrl = () => {
+		const url = new URL(window.location.href);
+		if (playEntries.length > 1) url.searchParams.set('play', String(activePlayIndex + 1));
+		else url.searchParams.delete('play');
+		return url.toString();
+	};
+	const copyText = async (text: string) => {
+		if (navigator.clipboard?.writeText) {
+			try {
+				await Promise.race([
+					navigator.clipboard.writeText(text),
+					new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Clipboard timed out.')), 1200))
+				]);
+				return true;
+			} catch {
+				// Fall through to the selection-based clipboard fallback.
+			}
+		}
+		const input = document.createElement('textarea');
+		input.value = text;
+		input.setAttribute('readonly', '');
+		input.style.position = 'fixed';
+		input.style.opacity = '0';
+		document.body.appendChild(input);
+		input.select();
+		const copied = document.execCommand('copy');
+		input.remove();
+		return copied;
+	};
+	const resetShareCopyFeedback = () => {
 		if (copyFeedbackTimer) {
 			clearTimeout(copyFeedbackTimer);
 			copyFeedbackTimer = null;
 		}
 		copyConfirmed = false;
-		const shareUrl = new URL(window.location.href);
-		if (playEntries.length > 1) shareUrl.searchParams.set('play', String(activePlayIndex + 1));
-		else shareUrl.searchParams.delete('play');
-		const url = shareUrl.toString();
-		let copied = false;
-		if (navigator.clipboard?.writeText) {
-			try {
-				await Promise.race([
-					navigator.clipboard.writeText(url),
-					new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Clipboard timed out.')), 1200))
-				]);
-				copied = true;
-			} catch {
-				copied = false;
-			}
-		}
-		if (!copied) {
-			const input = document.createElement('textarea');
-			input.value = url;
-			input.setAttribute('readonly', '');
-			input.style.position = 'fixed';
-			input.style.opacity = '0';
-			document.body.appendChild(input);
-			input.select();
-			copied = document.execCommand('copy');
-			input.remove();
-		}
+		qrCopyConfirmed = false;
+	};
+	const copyShareUrl = async () => {
+		resetShareCopyFeedback();
+		const copied = await copyText(shareUrl || currentShareUrl());
 		if (copied) {
 			copyConfirmed = true;
 			copyFeedbackTimer = setTimeout(() => {
@@ -1635,6 +1657,64 @@
 				copyFeedbackTimer = null;
 			}, 3_000);
 		} else showActionMessage('Unable to copy link');
+	};
+	const openShare = async () => {
+		if (!savedPlayId || dismissEditorForAction() || suppressNextClick) return;
+		showHelp = false;
+		showSettings = false;
+		showExportSettings = false;
+		showFeedback = false;
+		resetShareCopyFeedback();
+		shareUrl = currentShareUrl();
+		shareQrDataUrl = '';
+		shareQrLoading = true;
+		showShare = true;
+		await tick();
+		shareUrlInput?.focus();
+		shareUrlInput?.select();
+		try {
+			const { default: QRCode } = await import('qrcode');
+			shareQrDataUrl = await QRCode.toDataURL(shareUrl, {
+				width: 320,
+				margin: 2,
+				errorCorrectionLevel: 'M',
+				color: { dark: '#1c1917', light: '#ffffff' }
+			});
+		} catch {
+			showActionMessage('Unable to create QR code');
+		} finally {
+			shareQrLoading = false;
+		}
+	};
+	const copyShareQrCode = async () => {
+		if (!shareQrDataUrl || !navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+			showActionMessage('QR image copying is not supported by this browser');
+			return;
+		}
+		resetShareCopyFeedback();
+		try {
+			const blob = await (await fetch(shareQrDataUrl)).blob();
+			await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+			qrCopyConfirmed = true;
+			copyFeedbackTimer = setTimeout(() => {
+				qrCopyConfirmed = false;
+				copyFeedbackTimer = null;
+			}, 3_000);
+		} catch {
+			showActionMessage('Unable to copy QR image');
+		}
+	};
+	const downloadShareQrCode = async () => {
+		if (!shareQrDataUrl) return;
+		const blob = await (await fetch(shareQrDataUrl)).blob();
+		const objectUrl = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = objectUrl;
+		link.download = `caseplay-${savedPlayId ?? 'play'}-qr.png`;
+		document.body.appendChild(link);
+		link.click();
+		link.remove();
+		setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
 	};
 	const playerKinds: PlayerKind[] = ['team-a', 'team-k', 'team-b', 'team-r'];
 	const officialKinds: OfficialKind[] = ['official-r', 'official-l', 'official-b', 'official-f'];
@@ -1650,12 +1730,12 @@
 		'official-b': '/images/official-back-judge.webp',
 		'official-f': '/images/official-field-judge.webp'
 	};
-	const isMarkerTool = (value: Tool): value is MarkerKind =>
+	const isMarkerTool = (value: ActiveTool): value is MarkerKind =>
 		[...playerKinds, ...officialKinds, 'ball', 'flag', 'bean-bag', 'deflag', 'event'].includes(value as MarkerKind);
 	const isTeamMarker = (marker: FieldMarker): marker is FieldMarker & { kind: PlayerKind } => playerKinds.includes(marker.kind as PlayerKind);
-	const isOfficialKind = (kind: MarkerKind | Tool): kind is OfficialKind => officialKinds.includes(kind as OfficialKind);
+	const isOfficialKind = (kind: MarkerKind | ActiveTool): kind is OfficialKind => officialKinds.includes(kind as OfficialKind);
 	const isOfficialMarker = (marker: FieldMarker): marker is FieldMarker & { kind: OfficialKind } => isOfficialKind(marker.kind);
-	const isSidelineMarkerKind = (kind: MarkerKind | Tool) => playerKinds.includes(kind as PlayerKind) || isOfficialKind(kind);
+	const isSidelineMarkerKind = (kind: MarkerKind | ActiveTool) => playerKinds.includes(kind as PlayerKind) || isOfficialKind(kind);
 	const pointForActiveTool = (point: Point) =>
 		tool === 'laser' ? point : isSidelineMarkerKind(tool) ? clampSidelineMarkerPoint(point) : clampPoint(point);
 	const isPointInActiveToolArea = (point: Point) =>
@@ -1666,9 +1746,9 @@
 				: isPointOnField(point);
 	const isEditableMarker = (marker: FieldMarker) =>
 		isTeamMarker(marker) || isOfficialMarker(marker) || ['event', 'ball', 'flag', 'bean-bag', 'deflag'].includes(marker.kind);
-	const isPathTool = (value: Tool): value is Exclude<PathKind, 'line'> => ['run', 'pass', 'kick'].includes(value);
-	const isArrowPath = (value: Tool | PathKind): value is Exclude<PathKind, 'line'> => ['run', 'pass', 'kick'].includes(value);
-	const isGuideTool = (value: Tool): value is 'line-of-scrimmage' | 'line-to-gain' => ['line-of-scrimmage', 'line-to-gain'].includes(value);
+	const isPathTool = (value: ActiveTool): value is Exclude<PathKind, 'line'> => ['run', 'pass', 'kick'].includes(value);
+	const isArrowPath = (value: ActiveTool | PathKind): value is Exclude<PathKind, 'line'> => ['run', 'pass', 'kick'].includes(value);
+	const isGuideTool = (value: ActiveTool): value is 'line-of-scrimmage' | 'line-to-gain' => ['line-of-scrimmage', 'line-to-gain'].includes(value);
 	// Keep only a sub-pixel-scale safeguard so SVG arrow markers retain a direction.
 	const minimumArrowLength = () => 1;
 	const pointWithMinimumDistance = (anchor: Point, candidate: Point, fallback: Point): Point => {
@@ -2597,9 +2677,27 @@
 			}
 		}
 		if (showNewPrompt) {
+			const key = event.key.toLowerCase();
+			if (!event.altKey && !event.shiftKey && !event.ctrlKey && !event.metaKey && key === 'd' && actionInProgress !== 'save') {
+				event.preventDefault();
+				void openBlankBoard();
+				return;
+			}
+			if (!event.altKey && !event.shiftKey && (event.ctrlKey || event.metaKey) && key === 's' && actionInProgress !== 'save') {
+				event.preventDefault();
+				void saveFromNewPrompt();
+				return;
+			}
 			if (event.key === 'Escape' && actionInProgress !== 'save') {
 				event.preventDefault();
 				showNewPrompt = false;
+			}
+			return;
+		}
+		if (showShare) {
+			if (event.key === 'Escape') {
+				event.preventDefault();
+				showShare = false;
 			}
 			return;
 		}
@@ -2659,6 +2757,11 @@
 			return;
 		}
 		if (isEditableTarget) return;
+		if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'v') {
+			event.preventDefault();
+			selectTool('select');
+			return;
+		}
 		if (tool === 'laser' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'c') {
 			event.preventDefault();
 			fadeLaserDrawings();
@@ -2731,12 +2834,12 @@
 			const key = event.key.toLowerCase();
 			if (!event.shiftKey && key === 's') {
 				event.preventDefault();
-				if (actionInProgress === null) void savePlay();
+				if (actionInProgress === null && ownershipResolved) void savePlay();
 				return;
 			}
 			if (!event.shiftKey && key === 'c' && savedPlayId) {
 				event.preventDefault();
-				void copyShareUrl();
+				void openShare();
 				return;
 			}
 			if ((key === 'z' && event.shiftKey) || (key === 'y' && !event.shiftKey)) {
@@ -2905,8 +3008,8 @@
 		tutorialStep('[data-tutorial="history-actions"]', 'Undo and Redo', 'Undo reverses an action. Redo restores it.', undefined),
 		tutorialStep(
 			'[data-tutorial="file-actions"]',
-			'New, Save, and Copy',
-			'New starts over. Save creates a shareable URL, and Copy copies that URL.',
+			'New, Save, and Share',
+			'New starts over. Save creates a shareable URL, and Share opens link and QR-code options.',
 			undefined
 		),
 		tutorialStep('[data-tutorial="setup-button"]', 'Default Setup', 'Select <strong>Setup</strong> to place a starting scenario.', 'setup-default'),
@@ -3241,7 +3344,7 @@
 		tutorialActive = true;
 		tutorialDriver.drive();
 	};
-	const selectTool = (nextTool: Tool) => {
+	const selectTool = (nextTool: ActiveTool) => {
 		if (suppressNextClick) return;
 		if (tool === 'laser' && nextTool !== 'laser') releaseLaserDrawings();
 		if (hasActiveInlineEditor()) commitActiveEditor();
@@ -3250,7 +3353,7 @@
 		lastPlacementHoverPoint = null;
 		if (toolbarEditorTool !== null && toolbarEditorTool !== nextTool) toolbarEditorTool = null;
 		tool = nextTool;
-		completeTutorialAction(`tool:${nextTool}`);
+		if (nextTool !== 'select') completeTutorialAction(`tool:${nextTool}`);
 	};
 	const activateToolbarTool = (nextTool: Tool) => {
 		if (toolbarEditorTool === nextTool) {
@@ -4209,6 +4312,8 @@
 	};
 
 	onMount(() => {
+		canEditSavedPlay = savedPlayId === null || Boolean(sessionStorage.getItem(`play-builder-edit:${savedPlayId}`));
+		ownershipResolved = true;
 		restoreExportSettings();
 		exportSettingsHydrated = true;
 		restoreToolPreferences();
@@ -4596,7 +4701,7 @@
 		</div>
 
 		<div data-tutorial="interaction-area" class="play-builder-interaction relative flex min-w-0 flex-1 items-center">
-			<div class="absolute top-2 left-2 z-30 flex items-start gap-1.5" role="toolbar" aria-label="Play actions">
+			<div class="top-action-toolbar absolute top-2 left-2 z-30 flex items-start gap-1.5" role="toolbar" aria-label="Play actions">
 				<div data-tutorial="history-actions" class="flex gap-1.5">
 					<HoverTooltip text="Undo" shortcutKeys={[primaryModifierKey, 'Z']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
 						<button
@@ -4671,46 +4776,55 @@
 							<span class="text-[8px] leading-none font-semibold">New</span>
 						</button>
 					</HoverTooltip>
-					<HoverTooltip text="Save Play" shortcutKeys={[primaryModifierKey, 'S']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
+					<HoverTooltip text={saveActionLabel} shortcutKeys={[primaryModifierKey, 'S']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
 						<button
 							type="button"
-							aria-label="Save play"
-							disabled={tutorialActive || actionInProgress !== null}
+							aria-label={ownershipResolved
+								? saveActionLabel === 'Make Copy'
+									? 'Make a copy of this play builder'
+									: 'Save play'
+								: 'Determining save access'}
+							aria-busy={!ownershipResolved}
+							disabled={!ownershipResolved || tutorialActive || actionInProgress !== null}
 							on:click={savePlay}
 							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-wait disabled:opacity-50"
 						>
 							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
 								<path d="M4 3h13l3 3v15H4zM8 3v6h8V3M8 20v-7h8v7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
 							</svg>
-							<span class="text-[8px] leading-none font-semibold">Save</span>
+							<span
+								class="leading-none font-semibold whitespace-nowrap"
+								style:font-size={saveActionLabel === 'Make Copy' ? '7.25px' : '8px'}
+								style:margin-top={saveActionLabel === 'Make Copy' ? '0.04em' : undefined}
+							>{saveActionLabel || '\u00a0'}</span>
 						</button>
 					</HoverTooltip>
 					{#if savedPlayId}
-						<HoverTooltip text="Copy URL" shortcutKeys={[primaryModifierKey, 'C']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
+						<HoverTooltip text="Share" shortcutKeys={[primaryModifierKey, 'C']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
 							<button
 								type="button"
-								aria-label="Copy shareable URL"
+								aria-label="Share play builder"
 								disabled={tutorialActive}
-								on:click={copyShareUrl}
-								class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 transition-colors duration-500 hover:bg-white"
-								class:!bg-green-500={copyConfirmed}
-								class:!text-white={copyConfirmed}
+								on:click={openShare}
+								class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
 							>
 								<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-									<path
-										d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-									/>
+									<circle cx="18" cy="5" r="2.5" fill="none" stroke="currentColor" stroke-width="2" />
+									<circle cx="6" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="2" />
+									<circle cx="18" cy="19" r="2.5" fill="none" stroke="currentColor" stroke-width="2" />
+									<path d="m8.3 10.8 7.4-4.5M8.3 13.2l7.4 4.5" fill="none" stroke="currentColor" stroke-width="2" />
 								</svg>
-								<span class="text-[8px] leading-none font-semibold">{copyConfirmed ? 'Copied!' : 'Copy'}</span>
+								<span class="text-[8px] leading-none font-semibold">Share</span>
 							</button>
 						</HoverTooltip>
 					{/if}
 				</div>
 			</div>
-			<div data-tutorial="export-buttons" class="absolute top-2 right-2 z-30 flex gap-1.5" aria-label="Export controls">
+			<div
+				data-tutorial="export-buttons"
+				class="export-action-toolbar absolute top-2 right-2 z-30 flex gap-1.5"
+				aria-label="Export controls"
+			>
 				{#each [{ format: 'png' as const, label: 'PNG', ariaLabel: 'Export PNG image' }, { format: 'jpg' as const, label: 'JPG', ariaLabel: 'Export JPG image' }, { format: 'webp' as const, label: 'WebP', ariaLabel: 'Export WebP image' }] as exportOption}
 					<HoverTooltip text={`Export ${exportOption.label}`} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
 						<button
@@ -4768,7 +4882,7 @@
 
 			<div
 				data-tutorial="play-management"
-				class="absolute bottom-2 left-2 z-30"
+				class="play-management-toolbar absolute bottom-2 left-2 z-30"
 				class:h-9={editingPlayId === null}
 				class:h-40={editingPlayId !== null}
 				style="right: 70.5%;"
@@ -4857,7 +4971,7 @@
 					</div>
 				{/if}
 			</div>
-			<div class="absolute right-2 bottom-2 z-20 flex items-end gap-1.5" aria-label="Field controls">
+			<div class="bottom-action-toolbar absolute right-2 bottom-2 z-20 flex items-end gap-1.5" aria-label="Field controls">
 				{#if actionMessage}
 					<span
 						class="mr-1 max-w-48 border border-stone-600 bg-stone-950/90 px-2 py-1 text-[9px] leading-tight font-semibold text-white"
@@ -6749,6 +6863,113 @@
 	</div>
 {/snippet}
 
+{#if showShare}
+	<div class="fixed inset-0 z-[70] flex items-center justify-center p-4">
+		<button
+			type="button"
+			aria-label="Close share dialog"
+			on:click={() => (showShare = false)}
+			class="absolute inset-0 cursor-default bg-stone-950/75 backdrop-blur-[1px]"
+		></button>
+		<div
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="play-builder-share-title"
+			class="relative z-10 w-full max-w-md border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+		>
+			<header class="flex items-center justify-between border-b-2 border-stone-900 bg-stone-900 px-4 py-3 text-white">
+				<div>
+					<h2 id="play-builder-share-title" class="text-lg font-black tracking-tight">Share Play Builder</h2>
+					<p class="text-[11px] text-stone-300">Copy the link or share its QR code.</p>
+				</div>
+				<button
+					bind:this={shareCloseButton}
+					type="button"
+					aria-label="Close share dialog"
+					on:click={() => (showShare = false)}
+					class="flex h-8 w-8 cursor-pointer items-center justify-center bg-white text-xl font-black text-stone-900 hover:bg-stone-200"
+				>×</button>
+			</header>
+
+			<div class="space-y-5 p-4 sm:p-5">
+				<label class="block">
+					<span class="mb-1.5 block text-[11px] font-black tracking-wide uppercase">Shareable Link</span>
+					<span class="flex border-2 border-stone-900 bg-white focus-within:ring-2 focus-within:ring-yellow-400">
+						<input
+							bind:this={shareUrlInput}
+							value={shareUrl}
+							readonly
+							aria-label="Shareable play builder link"
+							on:focus={(event) => event.currentTarget.select()}
+							on:click={(event) => event.currentTarget.select()}
+							class="h-10 min-w-0 flex-1 select-text bg-white px-3 text-sm text-stone-800 outline-none"
+						/>
+						<button
+							type="button"
+							aria-label={copyConfirmed ? 'Link copied' : 'Copy shareable link'}
+							on:click={copyShareUrl}
+							class="flex h-10 w-11 shrink-0 cursor-pointer items-center justify-center border-l-2 border-stone-900 transition-colors hover:bg-stone-200"
+							class:bg-green-500={copyConfirmed}
+							class:text-white={copyConfirmed}
+						>
+							{#if copyConfirmed}
+								<svg viewBox="0 0 24 24" class="h-5 w-5" aria-hidden="true">
+									<path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="2.5" />
+								</svg>
+							{:else}
+								<svg viewBox="0 0 24 24" class="h-5 w-5" aria-hidden="true">
+									<rect x="8" y="8" width="11" height="12" fill="none" stroke="currentColor" stroke-width="2" />
+									<path d="M16 8V4H5v12h3" fill="none" stroke="currentColor" stroke-width="2" />
+								</svg>
+							{/if}
+						</button>
+					</span>
+				</label>
+
+				<section aria-labelledby="play-builder-qr-title">
+					<h3 id="play-builder-qr-title" class="mb-2 text-center text-[11px] font-black tracking-wide uppercase">QR Code</h3>
+					<div class="mx-auto flex aspect-square w-52 items-center justify-center border-2 border-stone-900 bg-white p-2 sm:w-56">
+						{#if shareQrLoading}
+							<span class="text-xs font-bold text-stone-500">Creating QR code…</span>
+						{:else if shareQrDataUrl}
+							<img src={shareQrDataUrl} alt="QR code for this shared play builder" class="h-full w-full object-contain" />
+						{:else}
+							<span class="text-center text-xs font-bold text-red-700">QR code unavailable</span>
+						{/if}
+					</div>
+					<div class="mt-3 grid grid-cols-2 gap-2">
+						<button
+							type="button"
+							disabled={!shareQrDataUrl}
+							on:click={copyShareQrCode}
+							class="flex h-10 cursor-pointer items-center justify-center gap-2 border-2 border-stone-900 bg-white px-3 text-xs font-black hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40"
+							class:!bg-green-500={qrCopyConfirmed}
+							class:!text-white={qrCopyConfirmed}
+						>
+							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+								<rect x="8" y="8" width="11" height="12" fill="none" stroke="currentColor" stroke-width="2" />
+								<path d="M16 8V4H5v12h3" fill="none" stroke="currentColor" stroke-width="2" />
+							</svg>
+							{qrCopyConfirmed ? 'Copied!' : 'Copy Image'}
+						</button>
+						<button
+							type="button"
+							disabled={!shareQrDataUrl}
+							on:click={downloadShareQrCode}
+							class="flex h-10 cursor-pointer items-center justify-center gap-2 bg-stone-900 px-3 text-xs font-black text-white hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-40"
+						>
+							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+								<path d="M12 3v12m-4-4 4 4 4-4M4 20h16" fill="none" stroke="currentColor" stroke-width="2" />
+							</svg>
+							Download PNG
+						</button>
+					</div>
+				</section>
+			</div>
+		</div>
+	</div>
+{/if}
+
 {#if showExportSettings}
 	<div class="fixed inset-0 z-50">
 		<button
@@ -6923,6 +7144,7 @@
 				<div class="mt-5 flex justify-end gap-2">
 					<button
 						type="button"
+						aria-keyshortcuts="D"
 						disabled={actionInProgress === 'save'}
 						on:click={openBlankBoard}
 						class="h-9 cursor-pointer border border-stone-500 bg-white px-4 text-xs font-black tracking-wide text-stone-800 uppercase hover:bg-stone-200 disabled:cursor-wait disabled:opacity-50"
@@ -6931,6 +7153,7 @@
 					</button>
 					<button
 						type="button"
+						aria-keyshortcuts="Control+S Meta+S"
 						disabled={actionInProgress === 'save'}
 						on:click={saveFromNewPrompt}
 						class="h-9 cursor-pointer bg-stone-900 px-4 text-xs font-black tracking-wide text-white uppercase hover:bg-stone-700 disabled:cursor-wait disabled:opacity-60"
@@ -7141,8 +7364,8 @@
 						<p>
 							<strong>Move:</strong> Drag any placed element. When an arrow tool is selected, dragging from a player starts the arrow from—and keeps
 							it attached to—that player. Moving an attached origin moves its player or football, and every attached arrow follows. Hold
-							<kbd>Shift</kbd>
-							while moving a free origin to snap and attach it to a nearby element.
+							<kbd>Shift</kbd> while moving a free origin to snap and attach it to a nearby element. Press <kbd>V</kbd> to deselect the active
+							tool and use the diagram strictly for grabbing and moving.
 						</p>
 						<p>
 							<strong>Edit:</strong> Double-click players, officials, footballs, event tags, penalty flags, flag belts, routes, arrows, and cross-field
@@ -7296,10 +7519,12 @@
 							<strong>New:</strong> Opens a blank play builder immediately when the collection is saved, or asks you to Save or Discard unsaved changes
 							first.
 						</p>
-						<p><strong>Save:</strong> Stores every play—including drawings—and changes the URL to the collection’s shareable address.</p>
 						<p>
-							<strong>Copy:</strong> Appears directly beside Save. After copying the shareable URL, the button turns green and reads “Copied!” for three
-							seconds.
+							<strong>Save / Make Copy:</strong> Save updates a play builder created in this browser. A shared URL shows Make Copy and saves your changes
+							under a new shareable address.
+						</p>
+						<p>
+							<strong>Share:</strong> Opens a selected shareable link plus a QR code that can be copied as an image or downloaded as a PNG.
 						</p>
 						<p>
 							<strong>Exports:</strong> PNG, JPG, and WebP export the selected play. PDF exports every play in tab order on its own page. Export Settings
@@ -7474,11 +7699,45 @@
 		}
 	}
 	@container (max-width: 900px) {
+		.top-action-toolbar {
+			transform: scale(0.72);
+			transform-origin: top left;
+		}
+		.export-action-toolbar {
+			transform: scale(0.72);
+			transform-origin: top right;
+		}
+		.bottom-action-toolbar {
+			transform: scale(0.72);
+			transform-origin: bottom right;
+		}
+		.play-management-toolbar {
+			transform: scale(0.72);
+			transform-origin: bottom left;
+		}
 		.down-marker-graphic {
 			transform: translateY(22px);
 		}
 		.los-marker-graphic {
 			transform: translateY(-22px);
+		}
+	}
+	@container (min-width: 901px) and (max-width: 1080px) {
+		.top-action-toolbar {
+			transform: scale(0.82);
+			transform-origin: top left;
+		}
+		.export-action-toolbar {
+			transform: scale(0.82);
+			transform-origin: top right;
+		}
+		.bottom-action-toolbar {
+			transform: scale(0.82);
+			transform-origin: bottom right;
+		}
+		.play-management-toolbar {
+			transform: scale(0.82);
+			transform-origin: bottom left;
 		}
 	}
 	.drawing-cursor,
