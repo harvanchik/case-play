@@ -507,6 +507,7 @@
 
 	const fieldMaxWidth = 960;
 	const fieldMaxHeight = 384;
+	const teamBoxExtraSetback = 12;
 	let fieldLeft = 20;
 	let fieldRight = 980;
 	let fieldTop = 50;
@@ -809,7 +810,9 @@
 	$: fieldPalette = fieldColorOptions.find((option) => option.id === fieldSettings.fieldColor) ?? fieldColorOptions[0];
 	$: currentFieldDefaults = { ...DEFAULT_PLAY_BUILDER_FIELD_SETTINGS, fieldType: fieldSettings.fieldType };
 	$: fieldSettingsAreDefault = JSON.stringify(fieldSettings) === JSON.stringify(currentFieldDefaults);
-	$: fieldFixtureScale = fieldLayout.teamBox ? (484 - 48) / (fieldLayout.widthYards + fieldLayout.teamBoxSetbackYards * 2) : Number.POSITIVE_INFINITY;
+	$: fieldFixtureScale = fieldLayout.teamBox
+		? (484 - 48 - teamBoxExtraSetback * 2) / (fieldLayout.widthYards + fieldLayout.teamBoxSetbackYards * 2)
+		: Number.POSITIVE_INFINITY;
 	$: fieldWidth = Math.min(
 		fieldMaxWidth,
 		fieldMaxHeight * (fieldLayout.totalYards / fieldLayout.widthYards),
@@ -4863,7 +4866,7 @@
 						{actionMessage}
 					</span>
 				{/if}
-				<div class="flex gap-1" aria-label="Field setup controls">
+				<div class="flex gap-1.5" aria-label="Field setup controls">
 					<HoverTooltip text="Flip Field Direction" minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
 						<button
 							type="button"
@@ -4893,7 +4896,34 @@
 							<span class="text-[8px] leading-none font-semibold">Setup</span>
 						</button>
 					</HoverTooltip>
+					<HoverTooltip
+						text="Field Settings"
+						shortcutKeys={[primaryModifierKey, alternateModifierKey, 'S']}
+						minWidthPx={0}
+						wrapperClass="flex h-9 w-10 shrink-0"
+					>
+						<button
+							data-tutorial="settings-button"
+							type="button"
+							aria-label="Open field settings"
+							on:click={openSettings}
+							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
+						>
+							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+								<path
+									d="M9.6 3h4.8l.7 2.2 2 .8 2.1-1 2.4 4.1-1.7 1.5.2 2.2 1.5 1.7-2.4 4.1-2.1-1-2 .8-.7 2.2H9.6l-.7-2.2-2-.8-2.1 1-2.4-4.1 1.7-1.7.2-2.2-1.7-1.5L4.8 5l2.1 1 2-.8z"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.7"
+									stroke-linejoin="miter"
+								/>
+								<circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.7" />
+							</svg>
+							<span class="text-[8px] leading-none font-semibold">Settings</span>
+						</button>
+					</HoverTooltip>
 				</div>
+				<div class="ml-2 flex gap-1.5" aria-label="Field support controls">
 				<HoverTooltip text="Help" shortcutKeys={[primaryModifierKey, 'Shift', 'H']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
 					<button
 						type="button"
@@ -4924,32 +4954,6 @@
 						<span class="text-[8px] leading-none font-semibold">Tutorial</span>
 					</button>
 				</HoverTooltip>
-				<HoverTooltip
-					text="Field Settings"
-					shortcutKeys={[primaryModifierKey, alternateModifierKey, 'S']}
-					minWidthPx={0}
-					wrapperClass="flex h-9 w-10 shrink-0"
-				>
-					<button
-						data-tutorial="settings-button"
-						type="button"
-						aria-label="Open field settings"
-						on:click={openSettings}
-						class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-					>
-						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-							<path
-								d="M9.6 3h4.8l.7 2.2 2 .8 2.1-1 2.4 4.1-1.7 1.5.2 2.2 1.5 1.7-2.4 4.1-2.1-1-2 .8-.7 2.2H9.6l-.7-2.2-2-.8-2.1 1-2.4-4.1 1.7-1.7.2-2.2-1.7-1.5L4.8 5l2.1 1 2-.8z"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="1.7"
-								stroke-linejoin="miter"
-							/>
-							<circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.7" />
-						</svg>
-						<span class="text-[8px] leading-none font-semibold">Settings</span>
-					</button>
-				</HoverTooltip>
 				<HoverTooltip text="Feedback" shortcutKeys={[primaryModifierKey, 'Shift', 'F']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
 					<button
 						type="button"
@@ -4964,6 +4968,7 @@
 						<span class="text-[8px] leading-none font-semibold">Feedback</span>
 					</button>
 				</HoverTooltip>
+				</div>
 			</div>
 			<div class="field-canvas relative my-auto w-full shrink-0">
 				<svg
@@ -5047,7 +5052,7 @@
 					{#key fieldSettings.fieldType}
 						{#if fieldSettings.showTeamBoxes && fieldLayout.teamBox}
 							{@const teamBox = fieldLayout.teamBox}
-							{@const teamBoxSetback = fieldLayout.teamBoxSetbackYards * (fieldWidth / fieldLayout.totalYards)}
+							{@const teamBoxSetback = fieldLayout.teamBoxSetbackYards * (fieldWidth / fieldLayout.totalYards) + teamBoxExtraSetback}
 							{#each [fieldTop - teamBoxSetback - 20, fieldBottom + teamBoxSetback] as teamBoxY, teamBoxIndex}
 								{@const teamBoxLabel = teamBoxIndex === 0 ? fieldSettings.teamBoxTopLabel : fieldSettings.teamBoxBottomLabel}
 								{@const teamBoxWidth = xForYards(teamBox[1]) - xForYards(teamBox[0])}
@@ -5112,7 +5117,7 @@
 
 						{#if fieldLayout.teamBox}
 							{@const scoreboardTeamBox = fieldLayout.teamBox}
-							{@const scoreboardTeamBoxY = fieldTop - fieldLayout.teamBoxSetbackYards * (fieldWidth / fieldLayout.totalYards) - 20}
+							{@const scoreboardTeamBoxY = fieldTop - fieldLayout.teamBoxSetbackYards * (fieldWidth / fieldLayout.totalYards) - teamBoxExtraSetback - 20}
 							{@const scoreboardWidth = 58}
 							{@const scoreboardGap = 10}
 							{@const quarterBoxX = xForYards(scoreboardTeamBox[0]) - scoreboardGap - scoreboardWidth}
