@@ -27,7 +27,7 @@
 
 <a
 	{href}
-	class="group flex cursor-pointer flex-col space-y-1 border border-stone-300 px-2 py-1 transition-colors duration-300 select-none hover:border-stone-500 hover:bg-white/45 hover:shadow-sm hover:backdrop-blur-sm sm:px-4 sm:py-2"
+	class={`group flex cursor-pointer flex-col space-y-1 overflow-hidden border border-stone-300 px-2 py-1 transition-colors duration-300 select-none hover:border-stone-500 hover:bg-white/45 hover:shadow-sm hover:backdrop-blur-sm sm:px-4 sm:py-2 ${compact ? 'h-[7.25rem] shrink-0' : ''}`}
 >
 	<div class="flex flex-row items-start justify-start">
 		<div
@@ -60,7 +60,7 @@
 		</div>
 	</div>
 	<div
-		class={`text-stone-600 ${compact ? 'line-clamp-4 text-sm leading-snug sm:text-base' : 'line-clamp-6 text-base leading-tight sm:line-clamp-5 sm:text-lg sm:leading-snug'}`}
+		class={`text-stone-600 ${compact ? 'line-clamp-2 text-sm leading-snug sm:text-base' : 'line-clamp-6 text-base leading-tight sm:line-clamp-5 sm:text-lg sm:leading-snug'}`}
 	>
 		{casePlay.prompt}
 	</div>

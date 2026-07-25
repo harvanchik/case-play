@@ -278,7 +278,7 @@
 			{#if data.similarCasePlays.length > 0}
 				<aside class="similar-case-plays min-w-0 xl:sticky xl:top-6 xl:self-start" aria-labelledby="similar-case-plays-title">
 					<h2 id="similar-case-plays-title" class="mb-3 border-b-2 border-stone-800 pb-1 text-2xl font-bold text-stone-800">Similar Case Plays</h2>
-					<div class="flex flex-col gap-3">
+					<div class="flex max-h-[27.625rem] flex-col gap-3 overflow-y-auto pr-1">
 						{#each data.similarCasePlays as similarCasePlay}
 							<CasePlayCard casePlay={similarCasePlay} href={`/c/${similarCasePlay.id}${data.detailQuery}`} compact />
 						{/each}
