@@ -62,6 +62,7 @@
 		| 'line-to-gain';
 	type ActiveTool = Tool | 'select';
 	type SelectedTarget = { type: 'marker' | 'path' | 'guide'; id: number };
+	type SelectionBounds = { left: number; top: number; right: number; bottom: number };
 	type DragTarget =
 		| { type: 'marker'; id: number; pointerStart: Point; elementStart: Point; moved: boolean; snapToMarkers?: boolean }
 		| { type: 'guide'; id: number; pointerStart: Point; xStart: number; moved: boolean; fromDownMarker?: boolean }
@@ -74,6 +75,16 @@
 				startMarkerId?: number;
 				mode: 'whole' | 'start' | 'end';
 				moved: boolean;
+		  }
+		| {
+				type: 'group';
+				pointerStart: Point;
+				targets: SelectedTarget[];
+				bounds: SelectionBounds;
+				markerStarts: { id: number; x: number; y: number }[];
+				pathStarts: { id: number; start: Point; end: Point; startMarkerId?: number }[];
+				guideStarts: { id: number; x: number }[];
+				moved: boolean;
 		  };
 	type Scene = PlayBuilderScene;
 	type ArrowKind = Extract<PathKind, 'run' | 'pass' | 'kick'>;
@@ -81,8 +92,9 @@
 	type ToolbarPresetTool = 'deflag' | 'bean-bag' | 'laser' | ArrowKind | 'line-of-scrimmage' | 'line-to-gain';
 	type FieldSide = 'a' | 'b';
 	type ExportBackground = 'transparent' | 'grass' | 'color';
-	type LaserDrawing = { points: Point[]; color: LaserColor; releasedAt: number | null };
+	type LaserDrawing = { points: Point[]; color: LaserColor; releasedAt: number | null; appearedAt?: number | null };
 	type ActiveLaserDrawing = { points: Point[]; color: LaserColor };
+	type StoredDraft = { document: SerializedPlayBuilderDocument; updatedAt: number };
 	const exportBackgroundOptions: { id: ExportBackground; label: string; description: string }[] = [
 		{ id: 'transparent', label: 'Transparent', description: 'Field is surrounded by a transparent background.' },
 		{ id: 'grass', label: 'Grassy', description: 'Field is surrounded by darker striped grass.' },
@@ -90,6 +102,8 @@
 	];
 	const exportSettingsStorageKey = 'caseplay-play-builder-export-settings-v1';
 	const toolPreferencesStorageKey = 'caseplay-play-builder-tool-preferences-v1';
+	const editTokensStorageKey = 'caseplay-play-builder-edit-tokens-v1';
+	const draftStoragePrefix = 'caseplay-play-builder-draft-v1:';
 	const laserFadeDuration = 500;
 
 	export let initialDocument: SerializedPlayBuilderDocument | null = null;
@@ -268,6 +282,7 @@
 		nextPlayEntryId: number;
 		nextPlayNumber: number;
 		laserDrawings: LaserDrawing[];
+		selectedTargets: SelectedTarget[];
 	};
 	let playEntries: PlayEntry[] = loadedDocument.plays.map((play, index) => ({
 		id: index + 1,
@@ -409,12 +424,15 @@
 	let guideEditColor: GuideColor = 'yellow';
 	let guideEditStyle: GuideStyle = 'solid';
 	let editorElement: Element;
+	let selectedTargets: SelectedTarget[] = [];
+	let selectedGroupBounds: SelectionBounds | null = null;
 	let deleteTarget: SelectedTarget | null = null;
 	let deletePosition: Point | null = null;
 	let deleteButtonElement: HTMLElement;
 	let deleteTargetTimer: ReturnType<typeof setTimeout> | null = null;
 	let hoverPoint: Point | null = null;
 	let pointerOnField = false;
+	let pointerInsideSelectedGroup = false;
 	let laserPointer: Point | null = null;
 	let laserTrail: (Point & { createdAt: number })[] = [];
 	let laserDrawings: LaserDrawing[] = [];
@@ -434,6 +452,10 @@
 	let currentSceneKey = JSON.stringify(encodePlayBuilderDocument(loadedDocument));
 	let savedSceneKey = currentSceneKey;
 	let hasUnsavedChanges = false;
+	let draftHydrated = false;
+	let draftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+	let pendingDraft: StoredDraft | null = null;
+	let showDraftRestore = false;
 	type TutorialAction =
 		| `tool:${Tool}`
 		| 'tool:official'
@@ -949,13 +971,25 @@
 			y: Math.max(0, Math.min(484, ((event.clientY - rect.top) / rect.height) * 484))
 		};
 	};
+	const laserDrawingVisibility = (drawing: LaserDrawing, now: number) => {
+		const fadeOut = drawing.releasedAt === null ? 1 : Math.min(1, Math.max(0, 1 - (now - drawing.releasedAt) / laserFadeDuration));
+		const fadeIn = drawing.appearedAt == null ? 1 : Math.min(1, Math.max(0, (now - drawing.appearedAt) / laserFadeDuration));
+		return Math.min(fadeOut, fadeIn);
+	};
+	const laserDrawingFingerprint = (drawing: Pick<LaserDrawing, 'color' | 'points'>) =>
+		`${drawing.color}:${drawing.points.map((point) => `${point.x.toFixed(3)},${point.y.toFixed(3)}`).join(';')}`;
+	const startLaserAnimationFrame = () => {
+		if (laserTrailFrame === null) laserTrailFrame = requestAnimationFrame(refreshLaserTrail);
+	};
 	const refreshLaserTrail = () => {
 		const now = performance.now();
 		laserTrailClock = now;
 		laserTrail = laserTrail.filter((point) => now - point.createdAt < laserFadeDuration);
-		laserDrawings = laserDrawings.filter((drawing) => drawing.releasedAt === null || now - drawing.releasedAt < laserFadeDuration);
-		const hasFadingDrawing = laserDrawings.some((drawing) => drawing.releasedAt !== null);
-		laserTrailFrame = laserTrail.length || hasFadingDrawing ? requestAnimationFrame(refreshLaserTrail) : null;
+		laserDrawings = laserDrawings
+			.filter((drawing) => drawing.releasedAt === null || now - drawing.releasedAt < laserFadeDuration)
+			.map((drawing) => (drawing.appearedAt != null && now - drawing.appearedAt >= laserFadeDuration ? { ...drawing, appearedAt: null } : drawing));
+		const hasAnimatingDrawing = laserDrawings.some((drawing) => drawing.releasedAt !== null || drawing.appearedAt != null);
+		laserTrailFrame = laserTrail.length || hasAnimatingDrawing ? requestAnimationFrame(refreshLaserTrail) : null;
 	};
 	const updateLaserPointer = (point: Point) => {
 		const now = performance.now();
@@ -967,7 +1001,7 @@
 		laserTrailClock = now;
 		const laserLayer = svg?.querySelector<SVGGElement>('[data-laser-pointer-layer]');
 		if (laserLayer?.nextSibling) svg.appendChild(laserLayer);
-		if (laserTrailFrame === null) laserTrailFrame = requestAnimationFrame(refreshLaserTrail);
+		startLaserAnimationFrame();
 	};
 	const beginLaserDrawing = (event: PointerEvent, point: Point) => {
 		updateLaserPointer(point);
@@ -984,7 +1018,7 @@
 	const finishLaserDrawing = () => {
 		if (activeLaserDrawing && activeLaserDrawing.points.length > 1) {
 			saveHistory();
-			laserDrawings = [...laserDrawings, { ...activeLaserDrawing, releasedAt: null }];
+			laserDrawings = [...laserDrawings, { ...activeLaserDrawing, releasedAt: null, appearedAt: null }];
 		}
 		activeLaserDrawing = null;
 		laserDrawingPointerId = null;
@@ -992,15 +1026,24 @@
 	const releaseLaserDrawings = () => {
 		if (laserDrawingPointerId !== null && svg?.hasPointerCapture(laserDrawingPointerId)) svg.releasePointerCapture(laserDrawingPointerId);
 		const drawings =
-			activeLaserDrawing && activeLaserDrawing.points.length > 1 ? [...laserDrawings, { ...activeLaserDrawing, releasedAt: null }] : laserDrawings;
+			activeLaserDrawing && activeLaserDrawing.points.length > 1
+				? [...laserDrawings, { ...activeLaserDrawing, releasedAt: null, appearedAt: null }]
+				: laserDrawings;
 		activeLaserDrawing = null;
 		laserDrawingPointerId = null;
 		laserPointer = null;
 		if (drawings.length === 0) return;
 		const now = performance.now();
 		laserTrailClock = now;
-		laserDrawings = drawings.map((drawing) => ({ ...drawing, releasedAt: now }));
-		if (laserTrailFrame === null) laserTrailFrame = requestAnimationFrame(refreshLaserTrail);
+		laserDrawings = drawings.map((drawing) => {
+			const visibility = laserDrawingVisibility(drawing, now);
+			return {
+				...drawing,
+				appearedAt: null,
+				releasedAt: now - (1 - visibility) * laserFadeDuration
+			};
+		});
+		startLaserAnimationFrame();
 	};
 	const fadeLaserDrawings = () => {
 		if (laserDrawings.length > 0) saveHistory();
@@ -1082,13 +1125,19 @@
 		toolbarGuideYardage = '';
 		toolbarGuideHistorySaved = false;
 	};
-	const clearDeleteState = () => {
+	const hideDeleteButton = () => {
 		if (deleteTargetTimer) {
 			clearTimeout(deleteTargetTimer);
 			deleteTargetTimer = null;
 		}
 		deleteTarget = null;
 		deletePosition = null;
+	};
+	const clearDeleteState = () => {
+		hideDeleteButton();
+		selectedTargets = [];
+		selectedGroupBounds = null;
+		pointerInsideSelectedGroup = false;
 	};
 	const applyScene = (scene: Scene) => {
 		clearEditorState();
@@ -1124,7 +1173,15 @@
 		activePlayId: playEntries[activePlayIndex]?.id ?? playEntries[0].id,
 		nextPlayEntryId,
 		nextPlayNumber,
-		laserDrawings: laserDrawings.map((drawing) => ({ ...drawing, points: drawing.points.map((point) => ({ ...point })) }))
+		laserDrawings: laserDrawings
+			.filter((drawing) => drawing.releasedAt === null)
+			.map((drawing) => ({
+				...drawing,
+				releasedAt: null,
+				appearedAt: null,
+				points: drawing.points.map((point) => ({ ...point }))
+			})),
+		selectedTargets: selectedTargets.map((target) => ({ ...target }))
 	});
 	const pushBuilderState = (stack: BuilderState[], state: BuilderState) => [...stack.slice(-29), state];
 	const saveHistory = () => {
@@ -1142,13 +1199,36 @@
 		playEntries = state.plays.map((play) => ({ ...play, scene: cloneScene(play.scene), settings: { ...play.settings } }));
 		nextPlayEntryId = state.nextPlayEntryId;
 		nextPlayNumber = state.nextPlayNumber;
-		laserDrawings = state.laserDrawings.map((drawing) => ({ ...drawing, points: drawing.points.map((point) => ({ ...point })) }));
+		const now = performance.now();
+		const availableCurrentDrawings = laserDrawings.map((drawing) => ({ drawing, matched: false }));
+		const nextDrawings = state.laserDrawings.map((drawing) => {
+			const fingerprint = laserDrawingFingerprint(drawing);
+			const current = availableCurrentDrawings.find((candidate) => !candidate.matched && laserDrawingFingerprint(candidate.drawing) === fingerprint);
+			if (current) current.matched = true;
+			const visibility = current ? laserDrawingVisibility(current.drawing, now) : 0;
+			return {
+				...drawing,
+				releasedAt: null,
+				appearedAt: visibility >= 1 ? null : now - visibility * laserFadeDuration,
+				points: drawing.points.map((point) => ({ ...point }))
+			};
+		});
+		const removedDrawings = availableCurrentDrawings
+			.filter((candidate) => !candidate.matched && laserDrawingVisibility(candidate.drawing, now) > 0)
+			.map(({ drawing }) => {
+				const visibility = laserDrawingVisibility(drawing, now);
+				return {
+					...drawing,
+					appearedAt: null,
+					releasedAt: now - (1 - visibility) * laserFadeDuration,
+					points: drawing.points.map((point) => ({ ...point }))
+				};
+			});
+		laserDrawings = [...nextDrawings, ...removedDrawings];
 		activeLaserDrawing = null;
 		laserDrawingPointerId = null;
-		if (laserDrawings.some((drawing) => drawing.releasedAt !== null) && laserTrailFrame === null) {
-			laserTrailClock = performance.now();
-			laserTrailFrame = requestAnimationFrame(refreshLaserTrail);
-		}
+		laserTrailClock = now;
+		if (laserDrawings.some((drawing) => drawing.releasedAt !== null || drawing.appearedAt != null)) startLaserAnimationFrame();
 		editingPlayId = null;
 		const index = Math.max(
 			0,
@@ -1159,6 +1239,8 @@
 		fieldSettings = { ...playEntries[index].settings };
 		nextId = maxSceneId(playEntries[index].scene) + 1;
 		applyScene(playEntries[index].scene);
+		selectedTargets = (state.selectedTargets ?? []).filter(targetExists);
+		refreshSelectionUi();
 		void tick().then(() => {
 			playStripElement
 				?.querySelector<HTMLElement>(`[data-play-id="${playEntries[index].id}"]`)
@@ -1340,6 +1422,68 @@
 				settings: index === activePlayIndex ? fieldSettings : play.settings
 			}))
 		});
+	const localDraftKey = () => `${draftStoragePrefix}${savedPlayId ?? 'new'}`;
+	const clearLocalDraft = () => {
+		if (draftSaveTimer) {
+			clearTimeout(draftSaveTimer);
+			draftSaveTimer = null;
+		}
+		try {
+			localStorage.removeItem(localDraftKey());
+		} catch {
+			// Draft cleanup is best-effort when browser storage is unavailable.
+		}
+	};
+	const scheduleLocalDraft = (_sceneKey: string, unsaved: boolean) => {
+		if (!draftHydrated || viewOnly) return;
+		if (draftSaveTimer) clearTimeout(draftSaveTimer);
+		draftSaveTimer = null;
+		if (!unsaved) {
+			clearLocalDraft();
+			return;
+		}
+		draftSaveTimer = setTimeout(() => {
+			draftSaveTimer = null;
+			try {
+				const draft: StoredDraft = { document: currentSerializedDocument(), updatedAt: Date.now() };
+				localStorage.setItem(localDraftKey(), JSON.stringify(draft));
+			} catch {
+				// Keep editing normally if the browser cannot persist a local draft.
+			}
+		}, 500);
+	};
+	const applyDraftDocument = (document: SerializedPlayBuilderDocument) => {
+		const decoded = decodePlayBuilderDocument(document);
+		playEntries = decoded.plays.map((play, index) => ({
+			id: index + 1,
+			name: play.name,
+			scene: cloneScene(play.scene),
+			settings: { ...play.settings }
+		}));
+		activePlayIndex = decoded.activePlayIndex;
+		nextPlayEntryId = playEntries.length + 1;
+		nextPlayNumber = nextDefaultPlayNumber();
+		history = [];
+		future = [];
+		fieldSettings = { ...playEntries[activePlayIndex].settings };
+		nextId = maxSceneId(playEntries[activePlayIndex].scene) + 1;
+		applyScene(playEntries[activePlayIndex].scene);
+	};
+	const restorePendingDraft = () => {
+		if (!pendingDraft) return;
+		applyDraftDocument(pendingDraft.document);
+		pendingDraft = null;
+		showDraftRestore = false;
+		draftHydrated = true;
+		showActionMessage('Draft restored');
+	};
+	const discardPendingDraft = () => {
+		clearLocalDraft();
+		pendingDraft = null;
+		showDraftRestore = false;
+		draftHydrated = true;
+	};
+	$: if (draftHydrated) scheduleLocalDraft(currentSceneKey, hasUnsavedChanges);
 	const clearActionMessageTimer = () => {
 		if (actionMessageTimer !== null) clearTimeout(actionMessageTimer);
 		actionMessageTimer = null;
@@ -1356,6 +1500,34 @@
 		clearActionMessageTimer();
 		actionMessage = message;
 	};
+	const storedEditTokens = () => {
+		try {
+			const raw = localStorage.getItem(editTokensStorageKey);
+			if (!raw) return {} as Record<string, string>;
+			const parsed = JSON.parse(raw) as Record<string, unknown>;
+			return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+		} catch {
+			return {} as Record<string, string>;
+		}
+	};
+	const storeEditToken = (playId: string, editToken: string) => {
+		sessionStorage.setItem(`play-builder-edit:${playId}`, editToken);
+		try {
+			localStorage.setItem(editTokensStorageKey, JSON.stringify({ ...storedEditTokens(), [playId]: editToken }));
+		} catch {
+			// Session ownership remains available when durable browser storage is unavailable.
+		}
+	};
+	const editTokenForPlay = (playId: string) => {
+		const durableToken = storedEditTokens()[playId];
+		if (durableToken) {
+			sessionStorage.setItem(`play-builder-edit:${playId}`, durableToken);
+			return durableToken;
+		}
+		const sessionToken = sessionStorage.getItem(`play-builder-edit:${playId}`);
+		if (sessionToken) storeEditToken(playId, sessionToken);
+		return sessionToken;
+	};
 	const createSavedPlay = async () => {
 		const response = await fetch('/api/play-builders', {
 			method: 'POST',
@@ -1364,15 +1536,15 @@
 		});
 		const result = (await response.json()) as { id?: string; editToken?: string; message?: string };
 		if (!response.ok || !result.id || !result.editToken) throw new Error(result.message || 'Unable to save play.');
-		sessionStorage.setItem(`play-builder-edit:${result.id}`, result.editToken);
+		storeEditToken(result.id, result.editToken);
 		return result.id;
 	};
 	const savePlay = async (): Promise<boolean> => {
-		if (actionInProgress || !ownershipResolved) return false;
+		if (actionInProgress || !ownershipResolved || !hasUnsavedChanges) return false;
 		actionInProgress = 'save';
 		showPendingActionMessage(canEditSavedPlay ? 'Saving…' : 'Making copy…');
 		try {
-			const editToken = savedPlayId ? sessionStorage.getItem(`play-builder-edit:${savedPlayId}`) : null;
+			const editToken = savedPlayId ? editTokenForPlay(savedPlayId) : null;
 			if (savedPlayId && editToken) {
 				const response = await fetch(`/api/play-builders/${savedPlayId}`, {
 					method: 'PUT',
@@ -1382,6 +1554,7 @@
 				if (response.ok) {
 					canEditSavedPlay = true;
 					savedSceneKey = JSON.stringify(currentSerializedDocument());
+					clearLocalDraft();
 					showActionMessage('Saved');
 					return true;
 				}
@@ -1393,6 +1566,7 @@
 			const id = await createSavedPlay();
 			canEditSavedPlay = true;
 			savedSceneKey = JSON.stringify(currentSerializedDocument());
+			clearLocalDraft();
 			const confirmation = savedPlayId ? 'Copy created' : 'Saved';
 			showActionMessage(confirmation);
 			sessionStorage.setItem('play-builder-action-message', JSON.stringify({ message: confirmation, expiresAt: Date.now() + 10_000 }));
@@ -2056,30 +2230,109 @@
 		const marker = path.startMarkerId === undefined ? undefined : markers.find((item) => item.id === path.startMarkerId);
 		return marker ? { x: marker.x, y: marker.y } : path.start;
 	};
-	const scheduleDeleteTargetAtPointer = (target: SelectedTarget, event: PointerEvent) => {
-		if (viewOnly) return;
-		const marker = target.type === 'marker' ? markers.find((item) => item.id === target.id) : undefined;
-		const usesSidelineArea = marker ? isSidelineMarkerKind(marker.kind) : false;
-		const point = usesSidelineArea ? clampSidelineMarkerPoint(canvasPointFromEvent(event)) : pointFromEvent(event);
-		const verticalBounds = usesSidelineArea ? sidelineMarkerBounds() : { top: fieldTop, bottom: fieldBottom };
-		clearDeleteState();
-		deleteTargetTimer = setTimeout(() => {
-			deleteTargetTimer = null;
-			deleteTarget = target;
-			deletePosition = {
-				x: Math.max(fieldLeft + 8, Math.min(fieldRight - 42, point.x + 18)),
-				y: Math.max(verticalBounds.top + 18, Math.min(verticalBounds.bottom - 8, point.y - 18))
+	const sameTarget = (left: SelectedTarget, right: SelectedTarget) => left.type === right.type && left.id === right.id;
+	const targetExists = (target: SelectedTarget) =>
+		target.type === 'marker'
+			? markers.some((item) => item.id === target.id)
+			: target.type === 'path'
+				? paths.some((item) => item.id === target.id)
+				: guides.some((item) => item.id === target.id);
+	const targetBounds = (target: SelectedTarget): SelectionBounds | null => {
+		if (target.type === 'marker') {
+			const marker = markers.find((item) => item.id === target.id);
+			if (!marker) return null;
+			const halfWidth = isOfficialMarker(marker)
+				? officialSize / 2
+				: isTeamMarker(marker)
+					? playerRadius + markerHitPadding
+					: marker.kind === 'ball'
+						? footballSize / 2
+						: marker.kind === 'event'
+							? eventTagWidth / 2
+							: marker.kind === 'deflag'
+								? deflagSize / 2
+								: marker.kind === 'bean-bag'
+									? beanBagSize / 2
+									: foulFlagSize / 2;
+			const halfHeight = marker.kind === 'event' ? eventTagHeight / 2 : halfWidth;
+			return { left: marker.x - halfWidth, top: marker.y - halfHeight, right: marker.x + halfWidth, bottom: marker.y + halfHeight };
+		}
+		if (target.type === 'path') {
+			const path = paths.find((item) => item.id === target.id);
+			if (!path) return null;
+			const start = pathStart(path);
+			return {
+				left: Math.min(start.x, path.end.x) - 8,
+				top: Math.min(start.y, path.end.y) - (path.kind === 'pass' || path.kind === 'kick' ? 48 : 8),
+				right: Math.max(start.x, path.end.x) + 8,
+				bottom: Math.max(start.y, path.end.y) + 8
 			};
-		}, 220);
+		}
+		const guide = guides.find((item) => item.id === target.id);
+		return guide ? { left: guide.x - 5, top: fieldTop, right: guide.x + 5, bottom: fieldBottom } : null;
+	};
+	const refreshSelectionUi = () => {
+		selectedTargets = selectedTargets.filter(targetExists);
+		const bounds = selectedTargets.map(targetBounds).filter((value): value is SelectionBounds => value !== null);
+		if (bounds.length === 0) {
+			hideDeleteButton();
+			selectedGroupBounds = null;
+			return;
+		}
+		selectedGroupBounds = {
+			left: Math.min(...bounds.map((item) => item.left)),
+			top: Math.min(...bounds.map((item) => item.top)),
+			right: Math.max(...bounds.map((item) => item.right)),
+			bottom: Math.max(...bounds.map((item) => item.bottom))
+		};
+		deleteTarget = selectedTargets.at(-1) ?? null;
+		deletePosition = {
+			x: Math.max(8, Math.min(958, selectedGroupBounds.right + 10)),
+			y: Math.max(18, Math.min(476, selectedGroupBounds.top))
+		};
+	};
+	const isPointInSelectedGroup = (point: Point) =>
+		selectedTargets.length > 1 &&
+		selectedGroupBounds !== null &&
+		point.x >= selectedGroupBounds.left - 6 &&
+		point.x <= selectedGroupBounds.right + 6 &&
+		point.y >= selectedGroupBounds.top - 6 &&
+		point.y <= selectedGroupBounds.bottom + 6;
+	const selectTarget = (target: SelectedTarget, additive: boolean) => {
+		const selected = selectedTargets.some((item) => sameTarget(item, target));
+		if (additive) selectedTargets = selected ? selectedTargets.filter((item) => !sameTarget(item, target)) : [...selectedTargets, target];
+		else if (!selected) selectedTargets = [target];
+		refreshSelectionUi();
+		return selectedTargets.some((item) => sameTarget(item, target));
+	};
+	const beginGroupDrag = (event: PointerEvent) => {
+		if (!selectedGroupBounds) return;
+		dragTarget = {
+			type: 'group',
+			pointerStart: canvasPointFromEvent(event),
+			targets: selectedTargets.map((target) => ({ ...target })),
+			bounds: { ...selectedGroupBounds },
+			markerStarts: markers
+				.filter((marker) => selectedTargets.some((target) => target.type === 'marker' && target.id === marker.id))
+				.map(({ id, x, y }) => ({ id, x, y })),
+			pathStarts: paths
+				.filter((path) => selectedTargets.some((target) => target.type === 'path' && target.id === path.id))
+				.map((path) => ({ id: path.id, start: { ...pathStart(path) }, end: { ...path.end }, startMarkerId: path.startMarkerId })),
+			guideStarts: guides
+				.filter((guide) => selectedTargets.some((target) => target.type === 'guide' && target.id === guide.id))
+				.map(({ id, x }) => ({ id, x })),
+			moved: false
+		};
 	};
 	const deleteHoveredElement = () => {
 		if (viewOnly) {
 			clearDeleteState();
 			return;
 		}
-		if (!deleteTarget) return;
+		const targets = selectedTargets.length > 0 ? [...selectedTargets] : deleteTarget ? [deleteTarget] : [];
+		if (targets.length === 0) return;
 		saveHistory();
-		removeElementTarget(deleteTarget);
+		for (const target of targets) removeElementTarget(target);
 		clearDeleteState();
 		completeTutorialAction('delete-element');
 	};
@@ -2234,8 +2487,7 @@
 			if (parsed === null) {
 				gameClockEditValue = formatPlayBuilderGameClock(fieldSettings.gameClockSeconds);
 				gameClockEditDigits = gameClockEditValue.replace(/\D/g, '');
-			}
-			else updateGameClock(parsed);
+			} else updateGameClock(parsed);
 		}
 		editingScoreboard = null;
 		scoreboardHistorySaved = false;
@@ -2655,6 +2907,10 @@
 		if (viewOnly) return;
 		const target = event.target as HTMLElement | null;
 		const isEditableTarget = target?.matches('input, textarea, select, [contenteditable="true"]') ?? false;
+		if (showDraftRestore) {
+			if (event.key === 'Escape') event.preventDefault();
+			return;
+		}
 		if (tutorialActive) {
 			if (event.key === 'Escape') {
 				event.preventDefault();
@@ -2861,7 +3117,14 @@
 			clear();
 			return;
 		}
-		if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key === 'Delete' && deleteTarget) {
+		if (
+			!event.shiftKey &&
+			!event.ctrlKey &&
+			!event.metaKey &&
+			!event.altKey &&
+			event.key === 'Delete' &&
+			(selectedTargets.length > 0 || deleteTarget)
+		) {
 			event.preventDefault();
 			deleteHoveredElement();
 			return;
@@ -2888,7 +3151,9 @@
 		if (viewOnly) return;
 		const target = event.target as Node;
 		if (editingPlayId !== null && !playMenuElement?.contains(target)) editingPlayId = null;
-		if (deleteTarget && !deleteButtonElement?.contains(target)) clearDeleteState();
+		const clickedFieldElement = target instanceof Element && Boolean(target.closest('[data-field-element]'));
+		const clickedBuilderCanvas = target instanceof Element && Boolean(target.closest('svg[role="application"]'));
+		if (selectedTargets.length > 0 && !deleteButtonElement?.contains(target) && !clickedFieldElement && !clickedBuilderCanvas) clearDeleteState();
 		if (
 			toolbarEditorTool !== null &&
 			!toolbarEditorElement?.contains(target) &&
@@ -3460,6 +3725,7 @@
 	};
 	const openBlankBoard = async () => {
 		showNewPrompt = false;
+		clearLocalDraft();
 		const isAlreadyNewBoard = window.location.pathname.replace(/\/$/, '') === '/play-builder' && savedPlayId === null;
 		if (isAlreadyNewBoard) {
 			resetToBlankBoard();
@@ -3596,7 +3862,8 @@
 		}
 		if (event.key !== 'Delete' && event.key !== 'Backspace') return;
 		event.preventDefault();
-		deleteTarget = { type: 'marker', id: marker.id };
+		selectedTargets = [{ type: 'marker', id: marker.id }];
+		refreshSelectionUi();
 		deleteHoveredElement();
 	};
 	const handleGuideKeydown = (event: KeyboardEvent, guide: FieldGuide) => {
@@ -3607,7 +3874,8 @@
 		}
 		if (event.key !== 'Delete' && event.key !== 'Backspace') return;
 		event.preventDefault();
-		deleteTarget = { type: 'guide', id: guide.id };
+		selectedTargets = [{ type: 'guide', id: guide.id }];
+		refreshSelectionUi();
 		deleteHoveredElement();
 	};
 	const handlePathKeydown = (event: KeyboardEvent, path: FieldPath) => {
@@ -3618,7 +3886,8 @@
 		}
 		if (event.key !== 'Delete' && event.key !== 'Backspace') return;
 		event.preventDefault();
-		deleteTarget = { type: 'path', id: path.id };
+		selectedTargets = [{ type: 'path', id: path.id }];
+		refreshSelectionUi();
 		deleteHoveredElement();
 	};
 	const distanceToSegment = (point: Point, start: Point, end: Point) => {
@@ -3678,6 +3947,32 @@
 	};
 	const beginStylusEraser = (event: PointerEvent) => {
 		if (viewOnly) return;
+		if (event.button === 0 && selectedTargets.length > 1 && selectedGroupBounds && !isStylusEraserEvent(event)) {
+			const point = canvasPointFromEvent(event);
+			const insideSelection = isPointInSelectedGroup(point);
+			const target = event.target;
+			const clickedFieldElement = target instanceof Element && Boolean(target.closest('[data-field-element]'));
+			if (event.shiftKey && clickedFieldElement) return;
+			if (insideSelection) {
+				event.preventDefault();
+				event.stopPropagation();
+				pointerInsideSelectedGroup = true;
+				hoverPoint = null;
+				clearPlacementSnap();
+				lastPlacementHoverPoint = null;
+				beginGroupDrag(event);
+				return;
+			}
+			if (clickedFieldElement) return;
+			event.preventDefault();
+			event.stopPropagation();
+			clearDeleteState();
+			clearPlacementSnap();
+			lastPlacementHoverPoint = null;
+			hoverPoint = null;
+			hoveringElement = false;
+			return;
+		}
 		if (!isStylusEraserEvent(event)) return;
 		event.preventDefault();
 		event.stopPropagation();
@@ -3846,7 +4141,12 @@
 			svg.setPointerCapture(event.pointerId);
 			return;
 		}
-		scheduleDeleteTargetAtPointer({ type: 'marker', id: marker.id }, event);
+		const selected = selectTarget({ type: 'marker', id: marker.id }, event.shiftKey);
+		if (!selected) return;
+		if (selectedTargets.length > 1) {
+			beginGroupDrag(event);
+			return;
+		}
 		dragTarget = {
 			type: 'marker',
 			id: marker.id,
@@ -3873,12 +4173,16 @@
 			beginFreeDrawing(event);
 			return;
 		}
-		scheduleDeleteTargetAtPointer({ type: 'path', id: path.id }, event);
 		const start = pathStart(path);
 		if (mode === 'start' && path.startMarkerId !== undefined) {
 			const attachedMarker = markers.find((marker) => marker.id === path.startMarkerId);
 			if (attachedMarker) {
-				scheduleDeleteTargetAtPointer({ type: 'marker', id: attachedMarker.id }, event);
+				const selected = selectTarget({ type: 'marker', id: attachedMarker.id }, event.shiftKey);
+				if (!selected) return;
+				if (selectedTargets.length > 1) {
+					beginGroupDrag(event);
+					return;
+				}
 				dragTarget = {
 					type: 'marker',
 					id: attachedMarker.id,
@@ -3889,6 +4193,12 @@
 				};
 				return;
 			}
+		}
+		const selected = selectTarget({ type: 'path', id: path.id }, event.shiftKey);
+		if (!selected) return;
+		if (mode === 'whole' && selectedTargets.length > 1) {
+			beginGroupDrag(event);
+			return;
 		}
 		dragTarget = {
 			type: 'path',
@@ -3931,7 +4241,14 @@
 			beginFreeDrawing(event);
 			return;
 		}
-		if (!fromDownMarker) scheduleDeleteTargetAtPointer({ type: 'guide', id: guide.id }, event);
+		if (!fromDownMarker) {
+			const selected = selectTarget({ type: 'guide', id: guide.id }, event.shiftKey);
+			if (!selected) return;
+			if (selectedTargets.length > 1) {
+				beginGroupDrag(event);
+				return;
+			}
+		}
 		dragTarget = { type: 'guide', id: guide.id, pointerStart: pointFromEvent(event), xStart: guide.x, moved: false, fromDownMarker };
 	};
 	const continuePointer = (event: PointerEvent) => {
@@ -3951,8 +4268,10 @@
 			return;
 		}
 		const canvasPoint = canvasPointFromEvent(event);
+		pointerInsideSelectedGroup = isPointInSelectedGroup(canvasPoint);
 		pointerOnField = isPointInActiveToolArea(canvasPoint);
 		const point = pointForActiveTool(canvasPoint);
+		const groupSelectionActive = selectedTargets.length > 1;
 		if (tool === 'laser') {
 			if (pointerOnField) {
 				updateLaserPointer(point);
@@ -3969,7 +4288,7 @@
 			lastPlacementHoverPoint = null;
 			return;
 		}
-		hoverPoint = point;
+		hoverPoint = groupSelectionActive ? null : point;
 		const hoveredFieldElement = (event.target as Element).closest?.('[data-field-element]');
 		const canSnapThroughHoveredElement =
 			(isGuideTool(tool) && hoveredFieldElement?.getAttribute('data-field-kind') === 'ball') ||
@@ -3985,9 +4304,9 @@
 		hoveringElement = Boolean(hoveredFieldElement) && !canSnapThroughHoveredElement && !canPlaceEventThroughHoveredElement;
 		const placementPointerMoved =
 			!lastPlacementHoverPoint || Math.hypot(point.x - lastPlacementHoverPoint.x, point.y - lastPlacementHoverPoint.y) > 0.1;
-		if (drawing || activeFreeStroke || (dragTarget && placementPointerMoved)) clearPlacementSnap();
+		if (groupSelectionActive || drawing || activeFreeStroke || (dragTarget && placementPointerMoved)) clearPlacementSnap();
 		else if (!dragTarget && placementPointerMoved) schedulePlacementSnap(point, event.shiftKey);
-		lastPlacementHoverPoint = point;
+		lastPlacementHoverPoint = groupSelectionActive ? null : point;
 		if (activeFreeStroke) {
 			const strokePoint =
 				activeFreeDrawShape === 'straight' && shouldSnapStraightDrawing(event)
@@ -4008,14 +4327,48 @@
 			drawing = { ...drawing, end: drawingPathEnd(drawing, point), hasDragged: drawing.hasDragged || pointerDistance >= 4 };
 		}
 		if (!dragTarget) return;
-		const rawDx = point.x - dragTarget.pointerStart.x;
-		const rawDy = point.y - dragTarget.pointerStart.y;
+		const dragPoint = dragTarget.type === 'group' ? canvasPoint : point;
+		const rawDx = dragPoint.x - dragTarget.pointerStart.x;
+		const rawDy = dragPoint.y - dragTarget.pointerStart.y;
 		if (!dragTarget.moved && Math.hypot(rawDx, rawDy) < 4) return;
 		if (!dragTarget.moved) {
 			saveHistory();
-			clearDeleteState();
+			hideDeleteButton();
 			dragTarget = { ...dragTarget, moved: true } as DragTarget;
 			if (!svg.hasPointerCapture(event.pointerId)) svg.setPointerCapture(event.pointerId);
+		}
+		if (dragTarget.type === 'group') {
+			const target = dragTarget;
+			const dx = Math.max(-target.bounds.left, Math.min(1000 - target.bounds.right, rawDx));
+			const dy = Math.max(-target.bounds.top, Math.min(484 - target.bounds.bottom, rawDy));
+			const selectedMarkerIds = new Set(target.markerStarts.map((item) => item.id));
+			const selectedPathIds = new Set(target.pathStarts.map((item) => item.id));
+			markers = markers.map((marker) => {
+				const start = target.markerStarts.find((item) => item.id === marker.id);
+				return start ? { ...marker, x: start.x + dx, y: start.y + dy } : marker;
+			});
+			paths = paths.map((path) => {
+				const start = target.pathStarts.find((item) => item.id === path.id);
+				if (start) {
+					return {
+						...path,
+						start: { x: start.start.x + dx, y: start.start.y + dy },
+						end: { x: start.end.x + dx, y: start.end.y + dy },
+						startMarkerId: start.startMarkerId && selectedMarkerIds.has(start.startMarkerId) ? start.startMarkerId : undefined
+					};
+				}
+				if (path.startMarkerId !== undefined && selectedMarkerIds.has(path.startMarkerId) && !selectedPathIds.has(path.id)) {
+					const marker = markers.find((item) => item.id === path.startMarkerId);
+					return marker ? { ...path, start: { x: marker.x, y: marker.y } } : path;
+				}
+				return path;
+			});
+			guides = guides.map((guide) => {
+				const start = target.guideStarts.find((item) => item.id === guide.id);
+				return start ? { ...guide, x: start.x + dx } : guide;
+			});
+			refreshSelectionUi();
+			return;
 		}
 		if (dragTarget.type === 'marker') {
 			const target = dragTarget;
@@ -4126,7 +4479,10 @@
 			return;
 		}
 		const draggedDownMarker = dragTarget?.type === 'guide' && dragTarget.fromDownMarker && dragTarget.moved;
-		const droppedTarget: SelectedTarget | null = dragTarget?.moved ? { type: dragTarget.type, id: dragTarget.id } : null;
+		let droppedTargets: SelectedTarget[] = [];
+		if (dragTarget?.moved) {
+			droppedTargets = dragTarget.type === 'group' ? dragTarget.targets : [{ type: dragTarget.type, id: dragTarget.id }];
+		}
 		if (drawing && (!drawing.hasDragged || Math.hypot(drawing.end.x - drawing.start.x, drawing.end.y - drawing.start.y) >= minimumArrowLength())) {
 			saveHistory();
 			const pathId = nextId++;
@@ -4153,8 +4509,9 @@
 			suppressDownMarkerClick = true;
 			setTimeout(() => (suppressDownMarkerClick = false), 0);
 		}
-		if (droppedTarget) {
-			raiseLayer(droppedTarget.type, droppedTarget.id);
+		if (droppedTargets.length > 0) {
+			for (const droppedTarget of droppedTargets) raiseLayer(droppedTarget.type, droppedTarget.id);
+			refreshSelectionUi();
 			completeTutorialAction('move-element');
 		}
 		if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
@@ -4173,7 +4530,12 @@
 		clearPlacementSnap();
 		clearDeleteState();
 	};
-	const isDragging = (type: DragTarget['type'], id: number) => dragTarget?.type === type && dragTarget.id === id && dragTarget.moved;
+	const isDragging = (type: SelectedTarget['type'], id: number) =>
+		dragTarget?.type === type
+			? dragTarget.id === id && dragTarget.moved
+			: dragTarget?.type === 'group' && dragTarget.moved
+				? dragTarget.targets.some((target) => target.type === type && target.id === id)
+				: false;
 	const defaultPathColor = (kind: PathKind) => guideColor(isArrowKind(kind) ? arrowPlacementColor(kind) : 'yellow');
 	const defaultPathStyle = (kind: PathKind): GuideStyle => (isArrowKind(kind) ? arrowPlacementStyles[kind] : 'solid');
 	const pathMarker = (kind: PathKind) => (isArrowPath(kind) ? 'url(#builder-path-arrow)' : undefined);
@@ -4312,8 +4674,32 @@
 	};
 
 	onMount(() => {
-		canEditSavedPlay = savedPlayId === null || Boolean(sessionStorage.getItem(`play-builder-edit:${savedPlayId}`));
+		canEditSavedPlay = savedPlayId === null || Boolean(editTokenForPlay(savedPlayId));
 		ownershipResolved = true;
+		if (!viewOnly) {
+			try {
+				const rawDraft = localStorage.getItem(localDraftKey());
+				if (rawDraft) {
+					const stored = JSON.parse(rawDraft) as { document?: unknown; updatedAt?: unknown };
+					const decoded = decodePlayBuilderDocument(stored.document as SerializedPlayBuilderDocument);
+					const normalizedDocument = encodePlayBuilderDocument(decoded);
+					if (JSON.stringify(normalizedDocument) !== currentSceneKey) {
+						pendingDraft = {
+							document: normalizedDocument,
+							updatedAt: typeof stored.updatedAt === 'number' ? stored.updatedAt : Date.now()
+						};
+						showDraftRestore = true;
+					} else localStorage.removeItem(localDraftKey());
+				}
+			} catch {
+				try {
+					localStorage.removeItem(localDraftKey());
+				} catch {
+					// Ignore unavailable browser storage.
+				}
+			}
+		}
+		draftHydrated = !showDraftRestore;
 		restoreExportSettings();
 		exportSettingsHydrated = true;
 		restoreToolPreferences();
@@ -4341,6 +4727,7 @@
 			tutorialDriver?.destroy();
 			clearPlacementSnap();
 			clearActionMessageTimer();
+			if (draftSaveTimer) clearTimeout(draftSaveTimer);
 			if (copyFeedbackTimer) clearTimeout(copyFeedbackTimer);
 			if (deleteTargetTimer) clearTimeout(deleteTargetTimer);
 			if (laserTrailFrame !== null) cancelAnimationFrame(laserTrailFrame);
@@ -4701,7 +5088,12 @@
 		</div>
 
 		<div data-tutorial="interaction-area" class="play-builder-interaction relative flex min-w-0 flex-1 items-center">
-			<div class="top-action-toolbar absolute top-2 left-2 z-30 flex items-start gap-1.5" role="toolbar" aria-label="Play actions">
+			<div
+				class="top-action-toolbar absolute left-2 z-30 flex items-start gap-1.5"
+				style="top: calc(50% - 23.8cqw);"
+				role="toolbar"
+				aria-label="Play actions"
+			>
 				<div data-tutorial="history-actions" class="flex gap-1.5">
 					<HoverTooltip text="Undo" shortcutKeys={[primaryModifierKey, 'Z']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
 						<button
@@ -4768,7 +5160,7 @@
 							disabled={(tutorialActive && activeTutorialSteps[tutorialStepIndex]?.data?.waitFor !== 'tutorial-new-play') ||
 								actionInProgress !== null}
 							on:click={requestNewBoard}
-							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-wait disabled:opacity-50"
+							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
 								<path d="M5 3h10l4 4v14H5zM15 3v5h4M12 11v7M8.5 14.5h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
@@ -4785,9 +5177,10 @@
 									: 'Save play'
 								: 'Determining save access'}
 							aria-busy={!ownershipResolved}
-							disabled={!ownershipResolved || tutorialActive || actionInProgress !== null}
+							disabled={!ownershipResolved || !hasUnsavedChanges || tutorialActive || actionInProgress !== null}
 							on:click={savePlay}
-							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-wait disabled:opacity-50"
+							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+							class:!cursor-wait={actionInProgress === 'save'}
 						>
 							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
 								<path d="M4 3h13l3 3v15H4zM8 3v6h8V3M8 20v-7h8v7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
@@ -4795,8 +5188,8 @@
 							<span
 								class="leading-none font-semibold whitespace-nowrap"
 								style:font-size={saveActionLabel === 'Make Copy' ? '7.25px' : '8px'}
-								style:margin-top={saveActionLabel === 'Make Copy' ? '0.04em' : undefined}
-							>{saveActionLabel || '\u00a0'}</span>
+								style:margin-top={saveActionLabel === 'Make Copy' ? '0.04em' : undefined}>{saveActionLabel || '\u00a0'}</span
+							>
 						</button>
 					</HoverTooltip>
 					{#if savedPlayId}
@@ -4822,7 +5215,8 @@
 			</div>
 			<div
 				data-tutorial="export-buttons"
-				class="export-action-toolbar absolute top-2 right-2 z-30 flex gap-1.5"
+				class="export-action-toolbar absolute right-2 z-30 flex gap-1.5"
+				style="top: calc(50% - 23.8cqw);"
 				aria-label="Export controls"
 			>
 				{#each [{ format: 'png' as const, label: 'PNG', ariaLabel: 'Export PNG image' }, { format: 'jpg' as const, label: 'JPG', ariaLabel: 'Export JPG image' }, { format: 'webp' as const, label: 'WebP', ariaLabel: 'Export WebP image' }] as exportOption}
@@ -4832,7 +5226,7 @@
 							aria-label={exportOption.ariaLabel}
 							disabled={tutorialActive || actionInProgress !== null}
 							on:click={() => exportImage(exportOption.format)}
-							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-wait disabled:opacity-50"
+							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
 								<rect x="3" y="4" width="18" height="16" fill="none" stroke="currentColor" stroke-width="2" />
@@ -4849,7 +5243,7 @@
 						aria-label="Export PDF"
 						disabled={tutorialActive || actionInProgress !== null}
 						on:click={() => exportImage('pdf')}
-						class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-wait disabled:opacity-50"
+						class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
 					>
 						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
 							<path d="M6 2h8l4 4v16H6zM14 2v5h4" fill="none" stroke="currentColor" stroke-width="2" />
@@ -4870,7 +5264,7 @@
 						aria-expanded={showExportSettings}
 						disabled={tutorialActive || actionInProgress !== null}
 						on:click={openExportSettings}
-						class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-wait disabled:opacity-50"
+						class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
 					>
 						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
 							<path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" fill="none" stroke="currentColor" stroke-width="2" />
@@ -4882,10 +5276,10 @@
 
 			<div
 				data-tutorial="play-management"
-				class="play-management-toolbar absolute bottom-2 left-2 z-30"
+				class="play-management-toolbar absolute left-2 z-30"
 				class:h-9={editingPlayId === null}
 				class:h-40={editingPlayId !== null}
-				style="right: 70.5%;"
+				style="right: 70.5%; bottom: calc(50% - 23.8cqw);"
 				aria-label="Plays in this play builder"
 			>
 				<div bind:this={playStripElement} class="play-tabs-scroll absolute right-0 bottom-0 left-0 overflow-x-auto overflow-y-hidden">
@@ -4971,7 +5365,11 @@
 					</div>
 				{/if}
 			</div>
-			<div class="bottom-action-toolbar absolute right-2 bottom-2 z-20 flex items-end gap-1.5" aria-label="Field controls">
+			<div
+				class="bottom-action-toolbar absolute right-2 z-20 flex items-end gap-1.5"
+				style="bottom: calc(50% - 23.8cqw);"
+				aria-label="Field controls"
+			>
 				{#if actionMessage}
 					<span
 						class="mr-1 max-w-48 border border-stone-600 bg-stone-950/90 px-2 py-1 text-[9px] leading-tight font-semibold text-white"
@@ -4989,7 +5387,14 @@
 							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
 						>
 							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-								<path d="M4 7h11M15 4l3 3-3 3M20 17H9M9 14l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter" />
+								<path
+									d="M4 7h11M15 4l3 3-3 3M20 17H9M9 14l-3 3 3 3"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.8"
+									stroke-linecap="square"
+									stroke-linejoin="miter"
+								/>
 							</svg>
 							<span class="text-[8px] leading-none font-semibold">Flip</span>
 						</button>
@@ -5038,50 +5443,50 @@
 					</HoverTooltip>
 				</div>
 				<div class="ml-2 flex gap-1.5" aria-label="Field support controls">
-				<HoverTooltip text="Help" shortcutKeys={[primaryModifierKey, 'Shift', 'H']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-					<button
-						type="button"
-						aria-label="Open play builder help"
-						on:click={openHelp}
-						class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-					>
-						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-							<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
-							<path d="M9.7 9a2.5 2.5 0 1 1 3.1 2.4c-.8.3-.8.9-.8 1.6M12 17h.01" fill="none" stroke="currentColor" stroke-width="2" />
-						</svg>
-						<span class="text-[8px] leading-none font-semibold">Help</span>
-					</button>
-				</HoverTooltip>
-				<HoverTooltip text="Interactive Tutorial" minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-					<button
-						type="button"
-						data-tutorial="tutorial-button"
-						aria-label="Start interactive play builder tutorial"
-						on:click={startTutorial}
-						class="tutorial-launch flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-						class:tutorial-launch-bouncing={tutorialButtonBouncing}
-					>
-						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-							<path d="M4 5h16v11H9l-4 3v-3H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="miter" />
-							<path d="m9 8 6 3-6 3z" fill="currentColor" />
-						</svg>
-						<span class="text-[8px] leading-none font-semibold">Tutorial</span>
-					</button>
-				</HoverTooltip>
-				<HoverTooltip text="Feedback" shortcutKeys={[primaryModifierKey, 'Shift', 'F']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-					<button
-						type="button"
-						aria-label="Give feedback"
-						on:click={openFeedback}
-						class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-					>
-						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-							<path d="M4 5h16v12H9l-5 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
-							<path d="M8 9h8M8 13h5" stroke="currentColor" stroke-width="2" />
-						</svg>
-						<span class="text-[8px] leading-none font-semibold">Feedback</span>
-					</button>
-				</HoverTooltip>
+					<HoverTooltip text="Help" shortcutKeys={[primaryModifierKey, 'Shift', 'H']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
+						<button
+							type="button"
+							aria-label="Open play builder help"
+							on:click={openHelp}
+							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
+						>
+							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+								<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+								<path d="M9.7 9a2.5 2.5 0 1 1 3.1 2.4c-.8.3-.8.9-.8 1.6M12 17h.01" fill="none" stroke="currentColor" stroke-width="2" />
+							</svg>
+							<span class="text-[8px] leading-none font-semibold">Help</span>
+						</button>
+					</HoverTooltip>
+					<HoverTooltip text="Interactive Tutorial" minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
+						<button
+							type="button"
+							data-tutorial="tutorial-button"
+							aria-label="Start interactive play builder tutorial"
+							on:click={startTutorial}
+							class="tutorial-launch flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
+							class:tutorial-launch-bouncing={tutorialButtonBouncing}
+						>
+							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+								<path d="M4 5h16v11H9l-4 3v-3H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="miter" />
+								<path d="m9 8 6 3-6 3z" fill="currentColor" />
+							</svg>
+							<span class="text-[8px] leading-none font-semibold">Tutorial</span>
+						</button>
+					</HoverTooltip>
+					<HoverTooltip text="Feedback" shortcutKeys={[primaryModifierKey, 'Shift', 'F']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
+						<button
+							type="button"
+							aria-label="Give feedback"
+							on:click={openFeedback}
+							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
+						>
+							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+								<path d="M4 5h16v12H9l-5 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
+								<path d="M8 9h8M8 13h5" stroke="currentColor" stroke-width="2" />
+							</svg>
+							<span class="text-[8px] leading-none font-semibold">Feedback</span>
+						</button>
+					</HoverTooltip>
 				</div>
 			</div>
 			<div class="field-canvas relative my-auto w-full shrink-0">
@@ -5091,7 +5496,15 @@
 					viewBox="0 0 1000 484"
 					font-family="ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"
 					class="block h-auto w-full select-none"
-					class:cursor-none={!dragTarget?.moved && tool !== 'free-draw' && !isGuideTool(tool) && !isPathTool(tool) && pointerOnField}
+					class:cursor-none={!dragTarget?.moved &&
+						tool !== 'select' &&
+						tool !== 'free-draw' &&
+						!isGuideTool(tool) &&
+						!isPathTool(tool) &&
+						pointerOnField}
+					class:cursor-grab={!dragTarget?.moved && tool === 'select' && (selectedTargets.length < 2 || pointerInsideSelectedGroup)}
+					class:group-selection-outside={selectedTargets.length > 1 && !pointerInsideSelectedGroup}
+					class:group-selection-inside={selectedTargets.length > 1 && pointerInsideSelectedGroup && !dragTarget?.moved}
 					class:laser-cursor={tool === 'laser' && pointerOnField}
 					class:cursor-crosshair={!dragTarget?.moved && (isGuideTool(tool) || isPathTool(tool)) && pointerOnField}
 					class:drawing-cursor={tool === 'free-draw' && freeDrawMode === 'draw'}
@@ -5109,16 +5522,20 @@
 					on:pointerenter={(event) => {
 						hoveringElement = false;
 						const canvasPoint = canvasPointFromEvent(event);
+						pointerInsideSelectedGroup = isPointInSelectedGroup(canvasPoint);
 						pointerOnField = isPointInActiveToolArea(canvasPoint);
 						const point = pointForActiveTool(canvasPoint);
-						hoverPoint = pointerOnField || tool === 'free-draw' ? point : null;
+						const groupSelectionActive = selectedTargets.length > 1;
+						hoverPoint = !groupSelectionActive && (pointerOnField || tool === 'free-draw') ? point : null;
 						if (tool === 'laser' && pointerOnField) updateLaserPointer(point);
-						lastPlacementHoverPoint = pointerOnField ? point : null;
-						if (pointerOnField) schedulePlacementSnap(point, event.shiftKey);
+						lastPlacementHoverPoint = !groupSelectionActive && pointerOnField ? point : null;
+						if (!groupSelectionActive && pointerOnField) schedulePlacementSnap(point, event.shiftKey);
+						else clearPlacementSnap();
 					}}
 					on:pointerleave={() => {
 						hoverPoint = null;
 						pointerOnField = false;
+						pointerInsideSelectedGroup = false;
 						hoveringElement = false;
 						laserPointer = null;
 						clearPlacementSnap();
@@ -5231,7 +5648,8 @@
 
 						{#if fieldLayout.teamBox}
 							{@const scoreboardTeamBox = fieldLayout.teamBox}
-							{@const scoreboardTeamBoxY = fieldTop - fieldLayout.teamBoxSetbackYards * (fieldWidth / fieldLayout.totalYards) - teamBoxExtraSetback - 20}
+							{@const scoreboardTeamBoxY =
+								fieldTop - fieldLayout.teamBoxSetbackYards * (fieldWidth / fieldLayout.totalYards) - teamBoxExtraSetback - 20}
 							{@const scoreboardWidth = 58}
 							{@const scoreboardGap = 10}
 							{@const quarterBoxX = xForYards(scoreboardTeamBox[0]) - scoreboardGap - scoreboardWidth}
@@ -6377,14 +6795,30 @@
 						{/if}
 					</g>
 
+					{#if selectedTargets.length > 1 && selectedGroupBounds}
+						<rect
+							data-selection-wireframe
+							x={selectedGroupBounds.left - 6}
+							y={selectedGroupBounds.top - 6}
+							width={selectedGroupBounds.right - selectedGroupBounds.left + 12}
+							height={selectedGroupBounds.bottom - selectedGroupBounds.top + 12}
+							rx="3"
+							fill="none"
+							stroke="#ffffff"
+							stroke-width="1.5"
+							stroke-dasharray="7 5"
+							vector-effect="non-scaling-stroke"
+							pointer-events="none"
+						/>
+					{/if}
+
 					{#if tool === 'laser' || laserTrail.length > 0 || laserDrawings.length > 0 || (activeLaserDrawing?.points.length ?? 0) > 1}
 						<g data-laser-pointer-layer pointer-events="none">
 							{#each laserDrawings as drawing}
-								{@const drawingFreshness =
-									drawing.releasedAt === null ? 1 : Math.min(1, Math.max(0, 1 - (laserTrailClock - drawing.releasedAt) / laserFadeDuration))}
+								{@const drawingFreshness = laserDrawingVisibility(drawing, laserTrailClock)}
 								<g
 									data-laser-drawing
-									data-laser-drawing-state={drawing.releasedAt === null ? 'persistent' : 'fading'}
+									data-laser-drawing-state={drawing.releasedAt !== null ? 'fading-out' : drawing.appearedAt != null ? 'fading-in' : 'persistent'}
 									opacity={Math.pow(drawingFreshness, 1.25)}
 								>
 									<path
@@ -6737,8 +7171,8 @@
 					<button
 						bind:this={deleteButtonElement}
 						type="button"
-						title="Delete element"
-						aria-label="Delete element"
+						title={selectedTargets.length > 1 ? 'Delete selected elements' : 'Delete element'}
+						aria-label={selectedTargets.length > 1 ? 'Delete selected elements' : 'Delete element'}
 						on:pointerdown|preventDefault|stopPropagation={deleteHoveredElement}
 						class="element-delete-button absolute z-20 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white"
 						style:left={`${deletePosition.x / 10}%`}
@@ -6796,6 +7230,12 @@
 			style:top={`${100 - selection.lightness}%`}
 		></span>
 	</div>
+{/snippet}
+
+{#snippet modalCloseIcon()}
+	<svg viewBox="0 0 24 24" class="block h-4 w-4" aria-hidden="true">
+		<path d="M6 6 18 18M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" />
+	</svg>
 {/snippet}
 
 {#snippet helpToolCard(item: ToolOption)}
@@ -6863,6 +7303,44 @@
 	</div>
 {/snippet}
 
+{#if showDraftRestore && pendingDraft}
+	<div class="fixed inset-0 z-[80] flex items-center justify-center p-4">
+		<div class="absolute inset-0 bg-stone-950/75 backdrop-blur-[1px]"></div>
+		<div
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="restore-draft-title"
+			class="relative z-10 w-full max-w-md border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+		>
+			<header class="border-b-2 border-stone-900 bg-stone-900 px-5 py-3 text-white">
+				<h2 id="restore-draft-title" class="text-lg font-black tracking-tight">Restore Unsaved Draft?</h2>
+			</header>
+			<div class="p-5">
+				<p class="text-sm leading-relaxed text-stone-700">
+					You have unsaved work from {new Date(pendingDraft.updatedAt).toLocaleString()}. Discard this draft or continue building from where you last
+					left off.
+				</p>
+				<div class="mt-5 flex justify-end gap-2">
+					<button
+						type="button"
+						on:click={discardPendingDraft}
+						class="h-10 cursor-pointer border-2 border-stone-900 bg-white px-4 text-xs font-black tracking-wide uppercase hover:bg-stone-200"
+					>
+						Discard Draft
+					</button>
+					<button
+						type="button"
+						on:click={restorePendingDraft}
+						class="h-10 cursor-pointer bg-stone-900 px-4 text-xs font-black tracking-wide text-white uppercase hover:bg-stone-700"
+					>
+						Restore Draft
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
 {#if showShare}
 	<div class="fixed inset-0 z-[70] flex items-center justify-center p-4">
 		<button
@@ -6880,21 +7358,22 @@
 			<header class="flex items-center justify-between border-b-2 border-stone-900 bg-stone-900 px-4 py-3 text-white">
 				<div>
 					<h2 id="play-builder-share-title" class="text-lg font-black tracking-tight">Share Play Builder</h2>
-					<p class="text-[11px] text-stone-300">Copy the link or share its QR code.</p>
 				</div>
 				<button
 					bind:this={shareCloseButton}
 					type="button"
 					aria-label="Close share dialog"
 					on:click={() => (showShare = false)}
-					class="flex h-8 w-8 cursor-pointer items-center justify-center bg-white text-xl font-black text-stone-900 hover:bg-stone-200"
-				>×</button>
+					class="flex h-8 w-8 cursor-pointer items-center justify-center bg-white p-0 text-stone-900 hover:bg-stone-200"
+				>
+					{@render modalCloseIcon()}
+				</button>
 			</header>
 
 			<div class="space-y-5 p-4 sm:p-5">
 				<label class="block">
 					<span class="mb-1.5 block text-[11px] font-black tracking-wide uppercase">Shareable Link</span>
-					<span class="flex border-2 border-stone-900 bg-white focus-within:ring-2 focus-within:ring-yellow-400">
+					<span class="flex border-2 border-stone-900 bg-white focus-within:ring-2 focus-within:ring-green-500">
 						<input
 							bind:this={shareUrlInput}
 							value={shareUrl}
@@ -6902,15 +7381,15 @@
 							aria-label="Shareable play builder link"
 							on:focus={(event) => event.currentTarget.select()}
 							on:click={(event) => event.currentTarget.select()}
-							class="h-10 min-w-0 flex-1 select-text bg-white px-3 text-sm text-stone-800 outline-none"
+							class="h-10 min-w-0 flex-1 bg-white px-3 text-sm text-stone-800 outline-none select-text selection:bg-green-500 selection:text-white"
 						/>
 						<button
 							type="button"
 							aria-label={copyConfirmed ? 'Link copied' : 'Copy shareable link'}
 							on:click={copyShareUrl}
 							class="flex h-10 w-11 shrink-0 cursor-pointer items-center justify-center border-l-2 border-stone-900 transition-colors hover:bg-stone-200"
-							class:bg-green-500={copyConfirmed}
-							class:text-white={copyConfirmed}
+							class:!bg-green-500={copyConfirmed}
+							class:!text-white={copyConfirmed}
 						>
 							{#if copyConfirmed}
 								<svg viewBox="0 0 24 24" class="h-5 w-5" aria-hidden="true">
@@ -6926,8 +7405,7 @@
 					</span>
 				</label>
 
-				<section aria-labelledby="play-builder-qr-title">
-					<h3 id="play-builder-qr-title" class="mb-2 text-center text-[11px] font-black tracking-wide uppercase">QR Code</h3>
+				<section aria-label="QR code">
 					<div class="mx-auto flex aspect-square w-52 items-center justify-center border-2 border-stone-900 bg-white p-2 sm:w-56">
 						{#if shareQrLoading}
 							<span class="text-xs font-bold text-stone-500">Creating QR code…</span>
@@ -6988,16 +7466,17 @@
 		>
 			<header class="flex items-center justify-between border-b-2 border-stone-900 bg-stone-900 px-3 py-2 text-white">
 				<div>
-					<h2 id="play-builder-export-settings-title" class="text-sm font-black tracking-wide uppercase">Export Settings</h2>
-					<p class="text-[10px] text-stone-300">Applies to every export format.</p>
+					<h2 id="play-builder-export-settings-title" class="text-sm font-black tracking-wide">Export Settings</h2>
 				</div>
 				<button
 					bind:this={exportSettingsCloseButton}
 					type="button"
 					aria-label="Close export settings"
 					on:click={() => (showExportSettings = false)}
-					class="flex h-7 w-7 cursor-pointer items-center justify-center bg-white text-lg font-black text-stone-900 hover:bg-stone-200">×</button
+					class="flex h-7 w-7 cursor-pointer items-center justify-center bg-white p-0 text-stone-900 hover:bg-stone-200"
 				>
+					{@render modalCloseIcon()}
+				</button>
 			</header>
 
 			<div class="space-y-4 p-3">
@@ -7116,7 +7595,7 @@
 			aria-label="Continue editing current play"
 			disabled={actionInProgress === 'save'}
 			on:click={() => (showNewPrompt = false)}
-			class="absolute inset-0 cursor-default bg-stone-950/70 backdrop-blur-[1px] disabled:cursor-wait"
+			class="absolute inset-0 cursor-default bg-stone-950/70 backdrop-blur-[1px] disabled:cursor-not-allowed"
 		></button>
 		<div
 			role="dialog"
@@ -7133,9 +7612,10 @@
 					aria-label="Continue editing current play"
 					disabled={actionInProgress === 'save'}
 					on:click={() => (showNewPrompt = false)}
-					class="flex h-7 w-7 cursor-pointer items-center justify-center bg-white text-lg font-black text-stone-900 hover:bg-stone-200 disabled:cursor-wait disabled:opacity-50"
-					>×</button
+					class="flex h-7 w-7 cursor-pointer items-center justify-center bg-white p-0 text-stone-900 hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-50"
 				>
+					{@render modalCloseIcon()}
+				</button>
 			</header>
 			<div class="p-4">
 				<p id="new-play-description" class="text-sm leading-relaxed text-stone-600">
@@ -7147,7 +7627,7 @@
 						aria-keyshortcuts="D"
 						disabled={actionInProgress === 'save'}
 						on:click={openBlankBoard}
-						class="h-9 cursor-pointer border border-stone-500 bg-white px-4 text-xs font-black tracking-wide text-stone-800 uppercase hover:bg-stone-200 disabled:cursor-wait disabled:opacity-50"
+						class="h-9 cursor-pointer border border-stone-500 bg-white px-4 text-xs font-black tracking-wide text-stone-800 uppercase hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-50"
 					>
 						Discard
 					</button>
@@ -7156,7 +7636,7 @@
 						aria-keyshortcuts="Control+S Meta+S"
 						disabled={actionInProgress === 'save'}
 						on:click={saveFromNewPrompt}
-						class="h-9 cursor-pointer bg-stone-900 px-4 text-xs font-black tracking-wide text-white uppercase hover:bg-stone-700 disabled:cursor-wait disabled:opacity-60"
+						class="h-9 cursor-pointer bg-stone-900 px-4 text-xs font-black tracking-wide text-white uppercase hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-60"
 					>
 						{actionInProgress === 'save' ? 'Saving…' : 'Save'}
 					</button>
@@ -7199,8 +7679,10 @@
 						type="button"
 						aria-label="Close settings"
 						on:click={() => (showSettings = false)}
-						class="flex h-9 w-9 cursor-pointer items-center justify-center bg-white text-xl font-black text-stone-900 hover:bg-stone-200">×</button
+						class="flex h-9 w-9 cursor-pointer items-center justify-center bg-white p-0 text-stone-900 hover:bg-stone-200"
 					>
+						{@render modalCloseIcon()}
+					</button>
 				</div>
 			</header>
 
@@ -7303,22 +7785,23 @@
 			<header class="flex items-center justify-between border-b-2 border-stone-900 bg-stone-900 px-5 py-3 text-white">
 				<div>
 					<h2 id="play-builder-feedback-title" class="text-xl font-black tracking-tight">Feedback</h2>
-					<p class="text-xs text-stone-300">Help improve the play builder.</p>
 				</div>
 				<button
 					bind:this={feedbackCloseButton}
 					type="button"
 					aria-label="Close feedback"
 					on:click={() => (showFeedback = false)}
-					class="flex h-9 w-9 cursor-pointer items-center justify-center bg-white text-xl font-black text-stone-900 hover:bg-stone-200">×</button
+					class="flex h-9 w-9 cursor-pointer items-center justify-center bg-white p-0 text-stone-900 hover:bg-stone-200"
 				>
+					{@render modalCloseIcon()}
+				</button>
 			</header>
 			<div class="space-y-4 p-5 text-sm leading-relaxed">
 				<p>Found a problem or have an idea? Send your feedback to <strong>feedback@caseplay.org</strong>.</p>
 				<a
 					href="mailto:feedback@caseplay.org"
 					class="inline-flex h-9 cursor-pointer items-center border-2 border-stone-900 bg-stone-900 px-4 text-xs font-black tracking-wide text-white uppercase hover:bg-stone-700"
-					>Email Feedback</a
+					>Send Email</a
 				>
 			</div>
 		</div>
@@ -7342,15 +7825,16 @@
 			<header class="sticky top-0 z-10 flex items-center justify-between border-b-2 border-stone-900 bg-stone-900 px-5 py-3 text-white">
 				<div>
 					<h2 id="play-builder-help-title" class="text-xl font-black tracking-tight sm:text-2xl">Play Builder Guide</h2>
-					<p class="text-xs text-stone-300">Everything you need to diagram a NIRSA flag football play.</p>
 				</div>
 				<button
 					bind:this={helpCloseButton}
 					type="button"
 					aria-label="Close help"
 					on:click={() => (showHelp = false)}
-					class="flex h-9 w-9 cursor-pointer items-center justify-center bg-white text-xl font-black text-stone-900 hover:bg-stone-200">×</button
+					class="flex h-9 w-9 cursor-pointer items-center justify-center bg-white p-0 text-stone-900 hover:bg-stone-200"
 				>
+					{@render modalCloseIcon()}
+				</button>
 			</header>
 
 			<div class="space-y-7 p-5 sm:p-7">
@@ -7364,8 +7848,8 @@
 						<p>
 							<strong>Move:</strong> Drag any placed element. When an arrow tool is selected, dragging from a player starts the arrow from—and keeps
 							it attached to—that player. Moving an attached origin moves its player or football, and every attached arrow follows. Hold
-							<kbd>Shift</kbd> while moving a free origin to snap and attach it to a nearby element. Press <kbd>V</kbd> to deselect the active
-							tool and use the diagram strictly for grabbing and moving.
+							<kbd>Shift</kbd> while moving a free origin to snap and attach it to a nearby element. Press <kbd>V</kbd> to deselect the active tool and
+							use the diagram strictly for grabbing and moving.
 						</p>
 						<p>
 							<strong>Edit:</strong> Double-click players, officials, footballs, event tags, penalty flags, flag belts, routes, arrows, and cross-field
@@ -7757,6 +8241,14 @@
 	.laser-cursor,
 	.laser-cursor * {
 		cursor: none !important;
+	}
+	.group-selection-outside {
+		cursor: default !important;
+	}
+	.group-selection-outside [data-field-element],
+	.group-selection-inside,
+	.group-selection-inside [data-field-element] {
+		cursor: grab !important;
 	}
 	@media (max-height: 850px) {
 		.draw-options-panel {
