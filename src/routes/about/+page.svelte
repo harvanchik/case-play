@@ -20,26 +20,26 @@
 	<article class="mx-auto my-8 max-w-3xl border-2 border-stone-900 bg-white p-6 shadow-lg sm:p-10">
 		<h1 class="text-3xl font-bold">About CasePlay.org</h1>
 		<p class="mt-5 leading-7">
-			CasePlay.org is an independent, educational case play database and flag football diagramming tool operated by Jake Harvanchik. It is designed to
-			help intramural officials, clinicians, students, and officiating crews practice rules knowledge and discuss difficult play situations.
+			CasePlay.org is an independent, educational case play database and flag football diagramming tool created and operated by Jake Harvanchik. It is
+			designed to help intramural officials, clinicians, students, and officiating crews practice rules knowledge and discuss play situations.
 		</p>
 
-		<h2 class="mt-7 text-xl font-bold">How the site helps officials</h2>
+		<h2 class="mt-7 text-xl font-bold">How the Site Helps Officials</h2>
 		<p class="mt-2 leading-7">
 			The database makes case plays searchable and connects each scenario with related situations. The flag football play builder lets users create,
 			annotate, export, save, and share flag football diagrams for training and discussion.
 		</p>
 
-		<h2 class="mt-7 text-xl font-bold">Sources and editorial approach</h2>
+		<h2 class="mt-7 text-xl font-bold">Sources and Editorial Approach</h2>
 		<p class="mt-2 leading-7">
 			Case play pages identify their credited author, rulebook, edition, rule reference, and page number whenever that information is available.
-			Source metadata is presented so readers can verify interpretations against the controlling publication. Corrections and updated interpretations
-			are welcome through the contact information below.
+			Readers should always verify interpretations against the referenced publication. Corrections and updated interpretations are welcome through the
+			contact information below.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Independence</h2>
 		<p class="mt-2 leading-7">
-			CasePlay.org is independently operated and is not affiliated with, sponsored by, or endorsed by NIRSA or Special Olympics North America.
+			CasePlay.org is independently operated and is not affiliated with, sponsored by, or endorsed by NIRSA or Special Olympics North America (SONA).
 			Organization names and rulebook references identify the sources discussed on the site.
 		</p>
 

@@ -3,7 +3,7 @@
 	export let context: 'database' | 'play-builder' | 'general' = 'general';
 </script>
 
-<footer class="w-full py-3 text-center text-stone-600">
+<footer data-public-site-footer class="w-full py-3 text-center text-stone-600">
 	{#if context === 'database'}
 		<p class="text-sm">This database was created in 2023 by Jake Harvanchik to help train intramural officials.</p>
 	{:else if context === 'play-builder'}
@@ -13,7 +13,7 @@
 		<span>&copy; {new Date().getFullYear()} CasePlay.org</span>
 		<a href="/about" class="font-semibold hover:underline">About</a>
 		<a href="/contact" class="font-semibold hover:underline">Contact</a>
-		<a href="mailto:create@caseplay.org" class="font-semibold hover:underline">Contribute</a>
+		<a href="/contact" class="font-semibold hover:underline">Contribute</a>
 		<a href="/privacy" class="font-semibold hover:underline">Privacy</a>
 		<button type="button" class="cursor-pointer font-semibold hover:underline" on:click={openConsentChoices}>Use of Cookies</button>
 	</div>

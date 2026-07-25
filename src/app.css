@@ -127,6 +127,39 @@
 	}
 }
 
+@layer base {
+	:root {
+		--public-site-nav-height: 37px;
+	}
+
+	html,
+	body {
+		height: 100%;
+		overflow: hidden;
+	}
+}
+
+@layer components {
+	:is(main:has([data-public-site-nav]), [data-public-site-nav] + main) {
+		display: flex;
+		flex-direction: column;
+		height: calc(100dvh - var(--public-site-nav-height));
+		min-height: 0 !important;
+		margin-top: var(--public-site-nav-height);
+		overflow-x: hidden;
+		overflow-y: auto !important;
+	}
+
+	:is(main:has([data-public-site-nav]), [data-public-site-nav] + main) > :not([data-public-site-footer]) {
+		flex-shrink: 0;
+	}
+
+	:is(main:has([data-public-site-nav]), [data-public-site-nav] + main) > [data-public-site-footer] {
+		flex-shrink: 0;
+		margin-top: auto;
+	}
+}
+
 @layer components {
 	spoiler {
 		@apply block w-full cursor-default space-y-3 bg-stone-900 p-4 text-stone-900 shadow-lg select-none;
