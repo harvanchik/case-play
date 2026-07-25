@@ -16,6 +16,7 @@ type ConsentRecord = {
 
 type ConsentWindow = Window & {
 	dataLayer?: unknown[];
+	gtag?: (...args: unknown[]) => void;
 	__caseplayConsentModeDefaulted?: boolean;
 	adsbygoogle?: Record<string, unknown>[];
 };
@@ -25,9 +26,13 @@ let analyticsLoadPromise: Promise<void> | null = null;
 let lastTrackedPage = '';
 let sessionConsent: ConsentChoice | null = null;
 
-const gtag = (...args: unknown[]) => {
+const gtag = function (...args: unknown[]) {
 	const consentWindow = window as ConsentWindow;
-	(consentWindow.dataLayer ??= []).push(args);
+	if (typeof consentWindow.gtag === 'function') {
+		consentWindow.gtag(...args);
+		return;
+	}
+	(consentWindow.dataLayer ??= []).push(arguments);
 };
 
 export const hasGlobalPrivacyControl = () =>
