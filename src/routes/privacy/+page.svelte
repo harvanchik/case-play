@@ -17,32 +17,35 @@
 	<article class="mx-auto max-w-3xl border-2 border-stone-900 bg-white p-6 sm:p-10">
 		<a href="/" class="font-semibold underline">&larr; CasePlay.org</a>
 		<h1 class="mt-5 text-3xl font-bold">Privacy Policy</h1>
-		<p class="mt-2 text-sm text-stone-500">Last updated July 18, 2026</p>
+		<p class="mt-2 text-sm text-stone-500">Last updated July 24, 2026</p>
 
 		<p class="mt-6 leading-7">CasePlay.org is an educational service operated by Jake Harvanchik. It is not directed to children under 13.</p>
 
 		<h2 class="mt-7 text-xl font-bold">Information</h2>
 		<p class="mt-2 leading-7">
-			CasePlay.org processes play diagrams you save and standard technical records needed to deliver, secure, and troubleshoot the site. Saved plays have
-			shareable URLs. Service providers may process IP address, browser, request, error, and security information. Records are kept only as reasonably
-			needed for these purposes or legal obligations.
+			CasePlay.org processes play diagrams you save and standard technical records needed to deliver, secure, and troubleshoot the site. Saved plays
+			have shareable URLs. Service providers may process IP address, browser, request, error, and security information. Records are kept only as
+			reasonably needed for these purposes or legal obligations.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Advertising</h2>
 		<p class="mt-2 leading-7">
 			Google AdSense ads help fund the domain, hosting, and database. Google Privacy &amp; Messaging, a Google-certified consent management platform,
-			presents additional advertising choices where required. AdSense does not load until you choose <strong>Accept All Cookies</strong>. Depending on your
-			location and choices, Google and approved partners may then use cookies and activity data for personalized advertising and measurement. See the
+			presents additional advertising choices where required. AdSense does not load until you choose <strong>Accept All Cookies</strong>. Depending on
+			your location and choices, Google and approved partners may then use cookies and activity data for personalized advertising and measurement. See
+			the
 			<a class="font-semibold underline" href="/cookie-policy">Cookie Policy</a> and
 			<a class="font-semibold underline" href="https://policies.google.com/privacy" rel="noreferrer" target="_blank">Google Privacy Policy</a>.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Analytics</h2>
 		<p class="mt-2 leading-7">
-			Google Analytics loads only after you choose <strong>Accept All Cookies</strong>. It records aggregate usage such as pages visited, visit duration,
-			approximate region, referring source, and device or browser type. It does not load after <strong>Reject All Cookies</strong> or when Global Privacy Control
-			is enabled. CasePlay.org disables Google signals and advertising-personalization signals for Analytics and does not send saved play content or player
-			labels to Analytics. The Analytics choice is separate from advertising consent.
+			If you choose <strong>Analytics Only</strong> or <strong>Accept All Cookies</strong>, Google Analytics records aggregate usage such as pages
+			visited, visit duration, approximate region, referring source, and device or browser type. For United States visitors who have not enabled
+			Global Privacy Control, CasePlay.org may use Google Advanced Consent Mode after optional storage is declined. In that mode, Google receives
+			cookieless measurement signals for basic measurement and modeling; Analytics storage remains denied. For other or unknown regions, the Google
+			Analytics tag remains blocked until analytics consent is given. CasePlay.org disables Google signals and advertising-personalization signals and
+			does not send saved play content or player labels to Analytics.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Sharing and your rights</h2>

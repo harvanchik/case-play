@@ -1,10 +1,18 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { CONSENT_EVENT, loadGoogleAnalytics, trackGoogleAnalyticsPageView, type ConsentChoice } from '$lib/privacy/consent';
+	import {
+		CONSENT_EVENT,
+		hasAnalyticsConsent,
+		loadGoogleAnalytics,
+		trackGoogleAnalyticsPageView,
+		type AnalyticsConsentMode,
+		type ConsentChoice
+	} from '$lib/privacy/consent';
 
+	export let mode: AnalyticsConsentMode = 'basic';
 	const track = (url: URL) => {
-		void trackGoogleAnalyticsPageView(url).catch(() => undefined);
+		void trackGoogleAnalyticsPageView(url, mode).catch(() => undefined);
 	};
 
 	afterNavigate(({ to }) => {
@@ -12,12 +20,15 @@
 	});
 
 	onMount(() => {
-		void loadGoogleAnalytics()
+		void loadGoogleAnalytics(mode)
 			.then(() => track(new URL(window.location.href)))
 			.catch(() => undefined);
 
 		const consentChanged = (event: Event) => {
-			if ((event as CustomEvent<ConsentChoice>).detail === 'all') track(new URL(window.location.href));
+			const choice = (event as CustomEvent<ConsentChoice>).detail;
+			if (choice === 'analytics' || choice === 'all' || (mode === 'advanced' && !hasAnalyticsConsent())) {
+				track(new URL(window.location.href));
+			}
 		};
 		window.addEventListener(CONSENT_EVENT, consentChanged);
 		return () => window.removeEventListener(CONSENT_EVENT, consentChanged);

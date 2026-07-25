@@ -37,9 +37,12 @@
 
 		<h2 class="mt-7 text-xl font-bold">Analytics cookies</h2>
 		<p class="mt-2 leading-7">
-			Google Analytics is optional and loads only after <strong>Accept All Cookies</strong>. It may set <code>_ga</code> cookies for up to one year to
-			distinguish visits and provide aggregate traffic and engagement reports. It does not load after <strong>Reject All Cookies</strong> or when Global
-			Privacy Control is enabled. Opting out removes Google tracking cookies accessible to CasePlay.org and stops future Analytics collection.
+			If you choose <strong>Analytics Only</strong> or <strong>Accept All Cookies</strong>, Google Analytics may set <code>_ga</code> cookies for up to
+			one year to distinguish visits and provide aggregate traffic and engagement reports. For United States visitors who have not enabled Global Privacy
+			Control, Google Advanced Consent Mode may send cookieless measurement signals when analytics consent has not been given; Analytics and advertising
+			storage remain denied, and Google may use those signals for aggregated and modeled reporting. For other or unknown regions, the Analytics tag remains
+			blocked until analytics consent is given. Withdrawing consent removes Google tracking cookies accessible to CasePlay.org. Global Privacy Control blocks
+			optional Google Analytics and advertising collection.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Change your choice</h2>

@@ -1,11 +1,12 @@
-<script>
-	import { page } from '$app/stores';
+<script lang="ts">
+	import type { LayoutData } from './$types';
 	import '../app.css';
 	import CookieConsent from '$lib/components/CookieConsent.svelte';
 	import GoogleAnalytics from '$lib/components/GoogleAnalytics.svelte';
 
-	$: canonicalPage = $page.url.searchParams.get('page');
-	$: canonicalUrl = `https://caseplay.org${$page.url.pathname}${canonicalPage && Number(canonicalPage) > 1 ? `?page=${encodeURIComponent(canonicalPage)}` : ''}`;
+	export let data: LayoutData;
+	$: canonicalUrl = data?.canonicalUrl ?? 'https://caseplay.org/';
+	$: analyticsConsentMode = data?.analyticsConsentMode ?? 'basic';
 </script>
 
 <svelte:head>
@@ -16,5 +17,5 @@
 </svelte:head>
 
 <slot />
-<CookieConsent />
-<GoogleAnalytics />
+<CookieConsent analyticsMode={analyticsConsentMode} />
+<GoogleAnalytics mode={analyticsConsentMode} />

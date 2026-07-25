@@ -1,4 +1,5 @@
-export type ConsentChoice = 'essential' | 'all';
+export type ConsentChoice = 'essential' | 'analytics' | 'all';
+export type AnalyticsConsentMode = 'basic' | 'advanced';
 
 export const CONSENT_STORAGE_KEY = 'caseplay_cookie_consent_v1';
 export const CONSENT_EVENT = 'caseplay:consent-changed';
@@ -42,13 +43,17 @@ export const readConsent = (): ConsentChoice | null => {
 	if (typeof window === 'undefined') return null;
 	try {
 		const stored = window.localStorage.getItem(CONSENT_STORAGE_KEY);
-		if (stored === 'all' || stored === 'essential') {
+		if (stored === 'all' || stored === 'analytics' || stored === 'essential') {
 			writeConsentRecord(stored);
 			return stored;
 		}
 		if (!stored) return sessionConsent;
 		const record = JSON.parse(stored) as Partial<ConsentRecord>;
-		if ((record.choice !== 'all' && record.choice !== 'essential') || typeof record.expiresAt !== 'number' || record.expiresAt <= Date.now()) {
+		if (
+			(record.choice !== 'all' && record.choice !== 'analytics' && record.choice !== 'essential') ||
+			typeof record.expiresAt !== 'number' ||
+			record.expiresAt <= Date.now()
+		) {
 			window.localStorage.removeItem(CONSENT_STORAGE_KEY);
 			sessionConsent = null;
 			return null;
@@ -65,12 +70,11 @@ const writeConsentRecord = (choice: ConsentChoice) => {
 };
 
 const consentState = (choice: ConsentChoice) => {
-	const state = choice === 'all' ? 'granted' : 'denied';
 	return {
-		analytics_storage: state,
-		ad_storage: state,
-		ad_user_data: state,
-		ad_personalization: state
+		analytics_storage: choice === 'all' || choice === 'analytics' ? 'granted' : 'denied',
+		ad_storage: choice === 'all' ? 'granted' : 'denied',
+		ad_user_data: choice === 'all' ? 'granted' : 'denied',
+		ad_personalization: choice === 'all' ? 'granted' : 'denied'
 	};
 };
 
@@ -84,7 +88,8 @@ export const initializeConsentMode = () => {
 		consentWindow.__caseplayConsentModeDefaulted = true;
 	}
 
-	const effectiveChoice: ConsentChoice = readConsent() === 'all' && !hasGlobalPrivacyControl() ? 'all' : 'essential';
+	const storedChoice = readConsent();
+	const effectiveChoice: ConsentChoice = storedChoice && !hasGlobalPrivacyControl() ? storedChoice : 'essential';
 	gtag('consent', 'update', consentState(effectiveChoice));
 	gtag('set', 'ads_data_redaction', effectiveChoice !== 'all');
 	if (effectiveChoice === 'essential') clearGoogleTrackingCookies();
@@ -159,10 +164,15 @@ export const openConsentChoices = () => {
 };
 
 export const canLoadAdvertising = () => readConsent() === 'all' && !hasGlobalPrivacyControl();
-export const canLoadAnalytics = () => readConsent() === 'all' && !hasGlobalPrivacyControl();
+export const hasAnalyticsConsent = () => {
+	const choice = readConsent();
+	return (choice === 'analytics' || choice === 'all') && !hasGlobalPrivacyControl();
+};
+export const canLoadAnalytics = (mode: AnalyticsConsentMode = 'basic') =>
+	!hasGlobalPrivacyControl() && (hasAnalyticsConsent() || mode === 'advanced');
 
-export const loadGoogleAnalytics = () => {
-	if (typeof window === 'undefined' || !canLoadAnalytics()) return Promise.resolve();
+export const loadGoogleAnalytics = (mode: AnalyticsConsentMode = 'basic') => {
+	if (typeof window === 'undefined' || !canLoadAnalytics(mode)) return Promise.resolve();
 	if (analyticsLoadPromise) return analyticsLoadPromise;
 
 	gtag('js', new Date());
@@ -203,17 +213,20 @@ export const loadGoogleAnalytics = () => {
 	return analyticsLoadPromise;
 };
 
-export const trackGoogleAnalyticsPageView = async (url: URL) => {
-	if (!canLoadAnalytics()) return;
+export const trackGoogleAnalyticsPageView = async (url: URL, mode: AnalyticsConsentMode = 'basic') => {
+	if (!canLoadAnalytics(mode)) return;
 	const pageKey = `${url.pathname}${url.search}${url.hash}`;
 	if (pageKey === lastTrackedPage) return;
-	await loadGoogleAnalytics();
-	if (!canLoadAnalytics() || pageKey === lastTrackedPage) return;
+	await loadGoogleAnalytics(mode);
+	if (!canLoadAnalytics(mode) || pageKey === lastTrackedPage) return;
 	lastTrackedPage = pageKey;
+	const analyticsAllowed = hasAnalyticsConsent();
+	const pageLocation = analyticsAllowed ? url.href : `${url.origin}${url.pathname}`;
 	gtag('event', 'page_view', {
 		page_title: document.title,
-		page_location: url.href,
-		page_path: `${url.pathname}${url.search}`
+		page_location: pageLocation,
+		page_path: analyticsAllowed ? `${url.pathname}${url.search}` : url.pathname,
+		page_referrer: analyticsAllowed ? document.referrer : ''
 	});
 };
 
