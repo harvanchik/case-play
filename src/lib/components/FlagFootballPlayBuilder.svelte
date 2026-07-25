@@ -63,6 +63,15 @@
 	type ActiveTool = Tool | 'select';
 	type SelectedTarget = { type: 'marker' | 'path' | 'guide'; id: number };
 	type SelectionBounds = { left: number; top: number; right: number; bottom: number };
+	type MarqueeSelection = { pointerId: number; start: Point; current: Point };
+	type ElementClipboard = {
+		markers: FieldMarker[];
+		paths: FieldPath[];
+		guides: FieldGuide[];
+		layerOrder: LayerRef[];
+		bounds: SelectionBounds;
+		pasteCount: number;
+	};
 	type DragTarget =
 		| { type: 'marker'; id: number; pointerStart: Point; elementStart: Point; moved: boolean; snapToMarkers?: boolean }
 		| { type: 'guide'; id: number; pointerStart: Point; xStart: number; moved: boolean; fromDownMarker?: boolean }
@@ -126,10 +135,10 @@
 	const toolRows: ToolOption[][] = [
 		[
 			{ id: 'team-a', label: 'Team A', symbol: 'A', shortcut: 'a', shortcutKeys: ['A'] },
-			{ id: 'team-k', label: 'Team K', symbol: 'K', shortcut: 'k', shortcutKeys: ['K'] }
+			{ id: 'team-b', label: 'Team B', symbol: 'B', shortcut: 'b', shortcutKeys: ['B'] }
 		],
 		[
-			{ id: 'team-b', label: 'Team B', symbol: 'B', shortcut: 'b', shortcutKeys: ['B'] },
+			{ id: 'team-k', label: 'Team K', symbol: 'K', shortcut: 'k', shortcutKeys: ['K'] },
 			{ id: 'team-r', label: 'Team R', symbol: 'R', shortcut: 'r', shortcutKeys: ['R'] }
 		],
 		[
@@ -334,6 +343,9 @@
 	let showFeedback = false;
 	let feedbackCloseButton: HTMLButtonElement;
 	let builderRoot: HTMLElement;
+	let diagramModalCenterX = 0;
+	let diagramModalCenterY = 0;
+	let diagramModalMaxHeight = 0;
 	let tutorialDriver: Driver | null = null;
 	let tutorialActive = false;
 	let tutorialStepIndex = 0;
@@ -426,6 +438,8 @@
 	let editorElement: Element;
 	let selectedTargets: SelectedTarget[] = [];
 	let selectedGroupBounds: SelectionBounds | null = null;
+	let marqueeSelection: MarqueeSelection | null = null;
+	let elementClipboard: ElementClipboard | null = null;
 	let deleteTarget: SelectedTarget | null = null;
 	let deletePosition: Point | null = null;
 	let deleteButtonElement: HTMLElement;
@@ -1844,6 +1858,7 @@
 		shareQrLoading = true;
 		showShare = true;
 		await tick();
+		updateDiagramModalPosition();
 		shareUrlInput?.focus();
 		shareUrlInput?.select();
 		try {
@@ -2118,8 +2133,6 @@
 			const element = svg.querySelector<SVGGElement>(`[data-layer-type="marker"][data-layer-id="${layer.id}"]`);
 			if (element) svg.appendChild(element);
 		}
-		const fixtureLayer = svg.querySelector<SVGGElement>('[data-field-fixtures-layer]');
-		if (fixtureLayer) svg.appendChild(fixtureLayer);
 		for (const layer of layerOrder.filter((item) => item.type === 'marker' && footballMarkerIds.has(item.id))) {
 			const element = svg.querySelector<SVGGElement>(`[data-layer-type="marker"][data-layer-id="${layer.id}"]`);
 			if (element) svg.appendChild(element);
@@ -2304,6 +2317,171 @@
 		else if (!selected) selectedTargets = [target];
 		refreshSelectionUi();
 		return selectedTargets.some((item) => sameTarget(item, target));
+	};
+	const targetKey = (target: SelectedTarget) => `${target.type}:${target.id}`;
+	const orderedTargets = (targets: SelectedTarget[]) => {
+		const requested = new Map(targets.map((target) => [targetKey(target), target]));
+		const ordered = layerOrder
+			.map((layer) => requested.get(targetKey(layer)))
+			.filter((target): target is SelectedTarget => target !== undefined);
+		const included = new Set(ordered.map(targetKey));
+		return [...ordered, ...targets.filter((target) => !included.has(targetKey(target)))];
+	};
+	const allElementTargets = () =>
+		orderedTargets([
+			...markers.map(({ id }) => ({ type: 'marker' as const, id })),
+			...paths.map(({ id }) => ({ type: 'path' as const, id })),
+			...guides.map(({ id }) => ({ type: 'guide' as const, id }))
+		]);
+	const normalizedSelectionBounds = (start: Point, end: Point): SelectionBounds => ({
+		left: Math.min(start.x, end.x),
+		top: Math.min(start.y, end.y),
+		right: Math.max(start.x, end.x),
+		bottom: Math.max(start.y, end.y)
+	});
+	const targetMatchesMarquee = (target: SelectedTarget, bounds: SelectionBounds) => {
+		if (target.type === 'marker') {
+			const marker = markers.find((item) => item.id === target.id);
+			return Boolean(
+				marker && marker.x >= bounds.left && marker.x <= bounds.right && marker.y >= bounds.top && marker.y <= bounds.bottom
+			);
+		}
+		if (target.type === 'guide') {
+			const guide = guides.find((item) => item.id === target.id);
+			return Boolean(guide && guide.x >= bounds.left && guide.x <= bounds.right && bounds.bottom >= fieldTop && bounds.top <= fieldBottom);
+		}
+		const targetBox = targetBounds(target);
+		return Boolean(
+			targetBox &&
+				targetBox.right >= bounds.left &&
+				targetBox.left <= bounds.right &&
+				targetBox.bottom >= bounds.top &&
+				targetBox.top <= bounds.bottom
+		);
+	};
+	const beginMarqueeSelection = (event: PointerEvent) => {
+		const start = canvasPointFromEvent(event);
+		clearDeleteState();
+		clearPlacementSnap();
+		hoverPoint = null;
+		marqueeSelection = { pointerId: event.pointerId, start, current: start };
+		svg.setPointerCapture(event.pointerId);
+	};
+	const finishMarqueeSelection = () => {
+		if (!marqueeSelection) return;
+		const bounds = normalizedSelectionBounds(marqueeSelection.start, marqueeSelection.current);
+		const dragged = bounds.right - bounds.left >= 4 || bounds.bottom - bounds.top >= 4;
+		selectedTargets = dragged ? allElementTargets().filter((target) => targetMatchesMarquee(target, bounds)) : [];
+		marqueeSelection = null;
+		refreshSelectionUi();
+	};
+	const translateSelectedTargets = (requestedDx: number, requestedDy: number) => {
+		if (selectedTargets.length === 0 || !selectedGroupBounds) return false;
+		const canMoveVertically = selectedTargets.some((target) => target.type !== 'guide');
+		const dx = Math.max(-selectedGroupBounds.left, Math.min(1000 - selectedGroupBounds.right, requestedDx));
+		const dy = canMoveVertically
+			? Math.max(-selectedGroupBounds.top, Math.min(484 - selectedGroupBounds.bottom, requestedDy))
+			: 0;
+		if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) return false;
+		saveHistory();
+		const selectedMarkerIds = new Set(selectedTargets.filter((target) => target.type === 'marker').map((target) => target.id));
+		const selectedPathIds = new Set(selectedTargets.filter((target) => target.type === 'path').map((target) => target.id));
+		const selectedGuideIds = new Set(selectedTargets.filter((target) => target.type === 'guide').map((target) => target.id));
+		const selectedPathStarts = new Map(
+			paths.filter((path) => selectedPathIds.has(path.id)).map((path) => [path.id, { ...pathStart(path) }])
+		);
+		markers = markers.map((marker) => (selectedMarkerIds.has(marker.id) ? { ...marker, x: marker.x + dx, y: marker.y + dy } : marker));
+		paths = paths.map((path) => {
+			if (selectedPathIds.has(path.id)) {
+				const start = selectedPathStarts.get(path.id) ?? path.start;
+				return {
+					...path,
+					start: { x: start.x + dx, y: start.y + dy },
+					end: { x: path.end.x + dx, y: path.end.y + dy },
+					startMarkerId: path.startMarkerId !== undefined && selectedMarkerIds.has(path.startMarkerId) ? path.startMarkerId : undefined
+				};
+			}
+			if (path.startMarkerId !== undefined && selectedMarkerIds.has(path.startMarkerId)) {
+				const marker = markers.find((item) => item.id === path.startMarkerId);
+				return marker ? { ...path, start: { x: marker.x, y: marker.y } } : path;
+			}
+			return path;
+		});
+		guides = guides.map((guide) => (selectedGuideIds.has(guide.id) ? { ...guide, x: guide.x + dx } : guide));
+		refreshSelectionUi();
+		completeTutorialAction('move-element');
+		return true;
+	};
+	const copySelectedElements = () => {
+		if (selectedTargets.length === 0 || !selectedGroupBounds) return false;
+		const selected = orderedTargets(selectedTargets);
+		const selectedKeys = new Set(selected.map(targetKey));
+		elementClipboard = {
+			markers: markers.filter((marker) => selectedKeys.has(targetKey({ type: 'marker', id: marker.id }))).map((marker) => ({ ...marker })),
+			paths: paths
+				.filter((path) => selectedKeys.has(targetKey({ type: 'path', id: path.id })))
+				.map((path) => ({ ...path, start: { ...pathStart(path) }, end: { ...path.end } })),
+			guides: guides.filter((guide) => selectedKeys.has(targetKey({ type: 'guide', id: guide.id }))).map((guide) => ({ ...guide })),
+			layerOrder: selected.map((target) => ({ ...target })),
+			bounds: { ...selectedGroupBounds },
+			pasteCount: 0
+		};
+		showActionMessage(`${selected.length === 1 ? 'Element' : `${selected.length} elements`} copied`);
+		return true;
+	};
+	const pasteOffset = (minimum: number, maximum: number, desired: number) => {
+		if (desired <= maximum) return desired;
+		if (-desired >= minimum) return -desired;
+		return Math.max(minimum, Math.min(maximum, 0));
+	};
+	const pasteElements = () => {
+		if (!elementClipboard) return false;
+		const desiredOffset = 14 * (elementClipboard.pasteCount + 1);
+		const dx = pasteOffset(-elementClipboard.bounds.left, 1000 - elementClipboard.bounds.right, desiredOffset);
+		const dy = pasteOffset(-elementClipboard.bounds.top, 484 - elementClipboard.bounds.bottom, desiredOffset);
+		const idMap = new Map<string, number>();
+		for (const marker of elementClipboard.markers) idMap.set(targetKey({ type: 'marker', id: marker.id }), nextId++);
+		for (const path of elementClipboard.paths) idMap.set(targetKey({ type: 'path', id: path.id }), nextId++);
+		for (const guide of elementClipboard.guides) idMap.set(targetKey({ type: 'guide', id: guide.id }), nextId++);
+		const pastedMarkers = elementClipboard.markers.map((marker) => ({
+			...marker,
+			id: idMap.get(targetKey({ type: 'marker', id: marker.id }))!,
+			x: marker.x + dx,
+			y: marker.y + dy
+		}));
+		const pastedPaths = elementClipboard.paths.map((path) => ({
+			...path,
+			id: idMap.get(targetKey({ type: 'path', id: path.id }))!,
+			start: { x: path.start.x + dx, y: path.start.y + dy },
+			end: { x: path.end.x + dx, y: path.end.y + dy },
+			startMarkerId:
+				path.startMarkerId === undefined ? undefined : idMap.get(targetKey({ type: 'marker', id: path.startMarkerId }))
+		}));
+		const pastedGuides = elementClipboard.guides.map((guide) => ({
+			...guide,
+			id: idMap.get(targetKey({ type: 'guide', id: guide.id }))!,
+			kind: 'custom' as const,
+			x: guide.x + dx,
+			down: undefined
+		}));
+		const pastedLayerOrder = elementClipboard.layerOrder
+			.map((layer) => {
+				const id = idMap.get(targetKey(layer));
+				return id === undefined ? null : { type: layer.type, id };
+			})
+			.filter((layer): layer is LayerRef => layer !== null);
+		if (pastedLayerOrder.length === 0) return false;
+		saveHistory();
+		markers = [...markers, ...pastedMarkers];
+		paths = [...paths, ...pastedPaths];
+		guides = [...guides, ...pastedGuides];
+		layerOrder = [...layerOrder, ...pastedLayerOrder];
+		selectedTargets = pastedLayerOrder.map((target) => ({ ...target }));
+		elementClipboard = { ...elementClipboard, pasteCount: elementClipboard.pasteCount + 1 };
+		refreshSelectionUi();
+		syncLayerDom();
+		showActionMessage(`${pastedLayerOrder.length === 1 ? 'Element' : `${pastedLayerOrder.length} elements`} pasted`);
+		return true;
 	};
 	const beginGroupDrag = (event: PointerEvent) => {
 		if (!selectedGroupBounds) return;
@@ -2907,6 +3085,29 @@
 		if (viewOnly) return;
 		const target = event.target as HTMLElement | null;
 		const isEditableTarget = target?.matches('input, textarea, select, [contenteditable="true"]') ?? false;
+		const isShareShortcut =
+			(event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'l';
+		if (isShareShortcut) {
+			event.preventDefault();
+			const interfaceIsBusy =
+				showDraftRestore ||
+				tutorialActive ||
+				showNewPrompt ||
+				showShare ||
+				showExportSettings ||
+				showSettings ||
+				showHelp ||
+				showFeedback ||
+				editingPlayId !== null ||
+				hasActiveInlineEditor() ||
+				toolbarEditorTool !== null ||
+				isEditableTarget;
+			if (!interfaceIsBusy) {
+				if (savedPlayId) void openShare();
+				else showActionMessage('Save the play builder before sharing');
+			}
+			return;
+		}
 		if (showDraftRestore) {
 			if (event.key === 'Escape') event.preventDefault();
 			return;
@@ -2924,7 +3125,7 @@
 			}
 			const key = event.key.toLowerCase();
 			const isBlockedBuilderShortcut =
-				((event.ctrlKey || event.metaKey) && ['s', 'c', 'z', 'y'].includes(key)) ||
+				((event.ctrlKey || event.metaKey) && ['s', 'c', 'v', 'l', 'z', 'y'].includes(key)) ||
 				(!event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey && key === 'n') ||
 				(!event.ctrlKey && !event.metaKey && event.altKey && !event.shiftKey && key === 'n');
 			if (!isEditableTarget && isBlockedBuilderShortcut) {
@@ -3093,9 +3294,14 @@
 				if (actionInProgress === null && ownershipResolved) void savePlay();
 				return;
 			}
-			if (!event.shiftKey && key === 'c' && savedPlayId) {
+			if (!event.shiftKey && key === 'c') {
 				event.preventDefault();
-				void openShare();
+				if (!copySelectedElements()) showActionMessage('Select an element or group to copy');
+				return;
+			}
+			if (!event.shiftKey && key === 'v') {
+				event.preventDefault();
+				if (!pasteElements()) showActionMessage('Copy an element or group before pasting');
 				return;
 			}
 			if ((key === 'z' && event.shiftKey) || (key === 'y' && !event.shiftKey)) {
@@ -3110,6 +3316,20 @@
 				undo();
 				return;
 			}
+		}
+		if (
+			!event.ctrlKey &&
+			!event.metaKey &&
+			!event.altKey &&
+			selectedTargets.length > 0 &&
+			['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
+		) {
+			event.preventDefault();
+			const distance = event.shiftKey ? 10 : 2;
+			const dx = event.key === 'ArrowLeft' ? -distance : event.key === 'ArrowRight' ? distance : 0;
+			const dy = event.key === 'ArrowUp' ? -distance : event.key === 'ArrowDown' ? distance : 0;
+			translateSelectedTargets(dx, dy);
+			return;
 		}
 		if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key === 'Delete') {
 			if (markers.length === 0 && paths.length === 0 && guides.length === 0 && freeStrokes.length === 0) return;
@@ -3627,12 +3847,26 @@
 		}
 		selectTool(nextTool);
 	};
+	const updateDiagramModalPosition = () => {
+		if (typeof window === 'undefined' || !builderRoot) return;
+		const bounds = builderRoot.getBoundingClientRect();
+		const visibleLeft = Math.max(0, bounds.left);
+		const visibleRight = Math.min(window.innerWidth, bounds.right);
+		const visibleTop = Math.max(0, bounds.top);
+		const visibleBottom = Math.min(window.innerHeight, bounds.bottom);
+		const hasVisibleWidth = visibleRight > visibleLeft;
+		const hasVisibleHeight = visibleBottom > visibleTop;
+		diagramModalCenterX = hasVisibleWidth ? (visibleLeft + visibleRight) / 2 : window.innerWidth / 2;
+		diagramModalCenterY = hasVisibleHeight ? (visibleTop + visibleBottom) / 2 : window.innerHeight / 2;
+		diagramModalMaxHeight = Math.max(160, (hasVisibleHeight ? visibleBottom - visibleTop : window.innerHeight) - 32);
+	};
 	const openHelp = async () => {
 		if (dismissEditorForAction() || suppressNextClick) return;
 		showExportSettings = false;
 		showFeedback = false;
 		showHelp = true;
 		await tick();
+		updateDiagramModalPosition();
 		helpCloseButton?.focus();
 	};
 	const openFeedback = async () => {
@@ -3642,6 +3876,7 @@
 		showHelp = false;
 		showFeedback = true;
 		await tick();
+		updateDiagramModalPosition();
 		feedbackCloseButton?.focus();
 	};
 	const openSettings = async () => {
@@ -3650,6 +3885,7 @@
 		showFeedback = false;
 		showSettings = true;
 		await tick();
+		updateDiagramModalPosition();
 		settingsCloseButton?.focus();
 		completeTutorialAction('settings-open');
 	};
@@ -3752,6 +3988,7 @@
 		}
 		showNewPrompt = true;
 		await tick();
+		updateDiagramModalPosition();
 		newPromptCloseButton?.focus();
 	};
 	const saveFromNewPrompt = async () => {
@@ -3964,6 +4201,7 @@
 				return;
 			}
 			if (clickedFieldElement) return;
+			if (tool === 'select') return;
 			event.preventDefault();
 			event.stopPropagation();
 			clearDeleteState();
@@ -4057,6 +4295,10 @@
 		if (viewOnly) return;
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
+		if (tool === 'select') {
+			beginMarqueeSelection(event);
+			return;
+		}
 		clearDeleteState();
 		if (tool === 'laser') {
 			const canvasPoint = canvasPointFromEvent(event);
@@ -4268,6 +4510,10 @@
 			return;
 		}
 		const canvasPoint = canvasPointFromEvent(event);
+		if (marqueeSelection?.pointerId === event.pointerId) {
+			marqueeSelection = { ...marqueeSelection, current: canvasPoint };
+			return;
+		}
 		pointerInsideSelectedGroup = isPointInSelectedGroup(canvasPoint);
 		pointerOnField = isPointInActiveToolArea(canvasPoint);
 		const point = pointForActiveTool(canvasPoint);
@@ -4430,6 +4676,12 @@
 	};
 	const endPointer = (event: PointerEvent) => {
 		if (viewOnly) return;
+		if (marqueeSelection?.pointerId === event.pointerId) {
+			marqueeSelection = { ...marqueeSelection, current: canvasPointFromEvent(event) };
+			finishMarqueeSelection();
+			if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+			return;
+		}
 		if (tool === 'laser') {
 			if (laserDrawingPointerId === event.pointerId) finishLaserDrawing();
 			if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
@@ -4523,6 +4775,7 @@
 		laserDrawingPointerId = null;
 		activeFreeDrawShape = freeDrawShape;
 		dragTarget = null;
+		marqueeSelection = null;
 		erasingFreeStrokes = false;
 		stylusEraserActive = false;
 		eraseHistorySaved = false;
@@ -4722,6 +4975,11 @@
 		}
 		document.addEventListener('pointerdown', handleWindowPointerDown, true);
 		document.addEventListener('click', handleWindowClick, true);
+		window.addEventListener('resize', updateDiagramModalPosition);
+		window.addEventListener('scroll', updateDiagramModalPosition, true);
+		const builderResizeObserver = new ResizeObserver(updateDiagramModalPosition);
+		builderResizeObserver.observe(builderRoot);
+		updateDiagramModalPosition();
 		syncLayerDom();
 		return () => {
 			tutorialDriver?.destroy();
@@ -4733,11 +4991,14 @@
 			if (laserTrailFrame !== null) cancelAnimationFrame(laserTrailFrame);
 			document.removeEventListener('pointerdown', handleWindowPointerDown, true);
 			document.removeEventListener('click', handleWindowClick, true);
+			window.removeEventListener('resize', updateDiagramModalPosition);
+			window.removeEventListener('scroll', updateDiagramModalPosition, true);
+			builderResizeObserver.disconnect();
 		};
 	});
 </script>
 
-<svelte:window on:keydown={handleGlobalKeydown} on:beforeunload={handleBeforeUnload} />
+<svelte:window on:keydown|capture={handleGlobalKeydown} on:beforeunload={handleBeforeUnload} />
 
 <section
 	bind:this={builderRoot}
@@ -5193,10 +5454,11 @@
 						</button>
 					</HoverTooltip>
 					{#if savedPlayId}
-						<HoverTooltip text="Share" shortcutKeys={[primaryModifierKey, 'C']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
+						<HoverTooltip text="Share" shortcutKeys={[primaryModifierKey, 'L']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
 							<button
 								type="button"
 								aria-label="Share play builder"
+								aria-keyshortcuts="Control+L Meta+L"
 								disabled={tutorialActive}
 								on:click={openShare}
 								class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
@@ -5502,11 +5764,15 @@
 						!isGuideTool(tool) &&
 						!isPathTool(tool) &&
 						pointerOnField}
-					class:cursor-grab={!dragTarget?.moved && tool === 'select' && (selectedTargets.length < 2 || pointerInsideSelectedGroup)}
+					class:cursor-grab={!dragTarget?.moved &&
+						!marqueeSelection &&
+						tool === 'select' &&
+						(selectedTargets.length < 2 || pointerInsideSelectedGroup)}
 					class:group-selection-outside={selectedTargets.length > 1 && !pointerInsideSelectedGroup}
 					class:group-selection-inside={selectedTargets.length > 1 && pointerInsideSelectedGroup && !dragTarget?.moved}
 					class:laser-cursor={tool === 'laser' && pointerOnField}
-					class:cursor-crosshair={!dragTarget?.moved && (isGuideTool(tool) || isPathTool(tool)) && pointerOnField}
+					class:cursor-crosshair={!dragTarget?.moved &&
+						(Boolean(marqueeSelection) || ((isGuideTool(tool) || isPathTool(tool)) && pointerOnField))}
 					class:drawing-cursor={tool === 'free-draw' && freeDrawMode === 'draw'}
 					class:erasing-cursor={tool === 'free-draw' && freeDrawMode === 'erase'}
 					class:!cursor-grabbing={dragTarget?.moved}
@@ -5993,6 +6259,46 @@
 						</g>
 					{/key}
 
+					<!-- Pylons are field fixtures, so every interactive diagram element renders above them. -->
+					<g data-field-fixtures-layer pointer-events="none">
+						{#key fieldSettings.fieldType}
+							{#if fieldSettings.showPylons}
+								{#each fieldLayout.endZonePylonYards as yards}
+									{#each [fieldTop, fieldBottom] as pylonY}
+										<rect
+											data-field-fixture="pylon"
+											x={xForYards(yards) - 3.5}
+											y={pylonY - 3.5}
+											width="7"
+											height="7"
+											fill="#f97316"
+											stroke="#fff"
+											stroke-width="1.5"
+											pointer-events="none"
+										/>
+									{/each}
+								{/each}
+								{#if fieldSettings.showHashes}
+									{#each fieldLayout.endLinePylonFractions as yFraction}
+										{#each [fieldLeft - 7, fieldRight + 7] as pylonX}
+											<rect
+												data-field-fixture="pylon"
+												x={pylonX - 3.5}
+												y={fieldTop + fieldHeight * yFraction - 3.5}
+												width="7"
+												height="7"
+												fill="#f97316"
+												stroke="#fff"
+												stroke-width="1.5"
+												pointer-events="none"
+											/>
+										{/each}
+									{/each}
+								{/if}
+							{/if}
+						{/key}
+					</g>
+
 					{#if hoverPoint && !hoveringElement && !drawing && !dragTarget}
 						{#if isGuideTool(tool)}
 							{@const rawGuidePreviewX = placementSnapX ?? hoverPoint.x}
@@ -6194,46 +6500,6 @@
 								>
 							{/each}
 						{/if}
-					</g>
-
-					<!-- Keep fixtures in one layer so z-ordering never detaches them from Svelte's visibility blocks. -->
-					<g data-field-fixtures-layer pointer-events="none">
-						{#key fieldSettings.fieldType}
-							{#if fieldSettings.showPylons}
-								{#each fieldLayout.endZonePylonYards as yards}
-									{#each [fieldTop, fieldBottom] as pylonY}
-										<rect
-											data-field-fixture="pylon"
-											x={xForYards(yards) - 3.5}
-											y={pylonY - 3.5}
-											width="7"
-											height="7"
-											fill="#f97316"
-											stroke="#fff"
-											stroke-width="1.5"
-											pointer-events="none"
-										/>
-									{/each}
-								{/each}
-								{#if fieldSettings.showHashes}
-									{#each fieldLayout.endLinePylonFractions as yFraction}
-										{#each [fieldLeft - 7, fieldRight + 7] as pylonX}
-											<rect
-												data-field-fixture="pylon"
-												x={pylonX - 3.5}
-												y={fieldTop + fieldHeight * yFraction - 3.5}
-												width="7"
-												height="7"
-												fill="#f97316"
-												stroke="#fff"
-												stroke-width="1.5"
-												pointer-events="none"
-											/>
-										{/each}
-									{/each}
-								{/if}
-							{/if}
-						{/key}
 					</g>
 
 					{#each paths as path}
@@ -6795,6 +7061,23 @@
 						{/if}
 					</g>
 
+					{#if marqueeSelection}
+						{@const marqueeBounds = normalizedSelectionBounds(marqueeSelection.start, marqueeSelection.current)}
+						<rect
+							data-marquee-selection
+							x={marqueeBounds.left}
+							y={marqueeBounds.top}
+							width={marqueeBounds.right - marqueeBounds.left}
+							height={marqueeBounds.bottom - marqueeBounds.top}
+							fill="rgba(255,255,255,0.14)"
+							stroke="#ffffff"
+							stroke-width="1.5"
+							stroke-dasharray="7 5"
+							vector-effect="non-scaling-stroke"
+							pointer-events="none"
+						/>
+					{/if}
+
 					{#if selectedTargets.length > 1 && selectedGroupBounds}
 						<rect
 							data-selection-wireframe
@@ -7310,7 +7593,10 @@
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="restore-draft-title"
-			class="relative z-10 w-full max-w-md border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			class="fixed z-10 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			style:left={`${diagramModalCenterX}px`}
+			style:top={`${diagramModalCenterY}px`}
+			style:max-height={`${diagramModalMaxHeight}px`}
 		>
 			<header class="border-b-2 border-stone-900 bg-stone-900 px-5 py-3 text-white">
 				<h2 id="restore-draft-title" class="text-lg font-black tracking-tight">Restore Unsaved Draft?</h2>
@@ -7353,7 +7639,10 @@
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="play-builder-share-title"
-			class="relative z-10 w-full max-w-md border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			class="fixed z-10 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			style:left={`${diagramModalCenterX}px`}
+			style:top={`${diagramModalCenterY}px`}
+			style:max-height={`${diagramModalMaxHeight}px`}
 		>
 			<header class="flex items-center justify-between border-b-2 border-stone-900 bg-stone-900 px-4 py-3 text-white">
 				<div>
@@ -7602,7 +7891,10 @@
 			aria-modal="true"
 			aria-labelledby="new-play-title"
 			aria-describedby="new-play-description"
-			class="relative z-10 w-full max-w-sm border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			class="fixed z-10 w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			style:left={`${diagramModalCenterX}px`}
+			style:top={`${diagramModalCenterY}px`}
+			style:max-height={`${diagramModalMaxHeight}px`}
 		>
 			<header class="flex items-center justify-between border-b-2 border-stone-900 bg-stone-900 px-4 py-2.5 text-white">
 				<h2 id="new-play-title" class="text-lg font-black tracking-tight">Start a New Play?</h2>
@@ -7658,7 +7950,10 @@
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="play-builder-settings-title"
-			class="relative z-10 max-h-[90vh] w-full max-w-4xl overflow-y-auto border-2 border-stone-950 bg-white/80 text-stone-800 shadow-2xl backdrop-blur-[1px]"
+			class="fixed z-10 w-[calc(100vw-2rem)] max-w-4xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-white/80 text-stone-800 shadow-2xl backdrop-blur-[1px]"
+			style:left={`${diagramModalCenterX}px`}
+			style:top={`${diagramModalCenterY}px`}
+			style:max-height={`${diagramModalMaxHeight}px`}
 		>
 			<header class="sticky top-0 z-10 flex items-center justify-between border-b-2 border-stone-900 bg-stone-900 px-5 py-3 text-white">
 				<div>
@@ -7780,7 +8075,10 @@
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="play-builder-feedback-title"
-			class="relative z-10 w-full max-w-md border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			class="fixed z-10 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			style:left={`${diagramModalCenterX}px`}
+			style:top={`${diagramModalCenterY}px`}
+			style:max-height={`${diagramModalMaxHeight}px`}
 		>
 			<header class="flex items-center justify-between border-b-2 border-stone-900 bg-stone-900 px-5 py-3 text-white">
 				<div>
@@ -7820,7 +8118,10 @@
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="play-builder-help-title"
-			class="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			class="fixed z-10 w-[calc(100vw-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			style:left={`${diagramModalCenterX}px`}
+			style:top={`${diagramModalCenterY}px`}
+			style:max-height={`${diagramModalMaxHeight}px`}
 		>
 			<header class="sticky top-0 z-10 flex items-center justify-between border-b-2 border-stone-900 bg-stone-900 px-5 py-3 text-white">
 				<div>
@@ -7850,6 +8151,15 @@
 							it attached to—that player. Moving an attached origin moves its player or football, and every attached arrow follows. Hold
 							<kbd>Shift</kbd> while moving a free origin to snap and attach it to a nearby element. Press <kbd>V</kbd> to deselect the active tool and
 							use the diagram strictly for grabbing and moving.
+						</p>
+						<p>
+							<strong>Select and nudge:</strong> Click an element, then use the arrow keys for precise movement. Hold <kbd>Shift</kbd> with an arrow key
+							to move farther. Shift-click adds or removes individual elements from a group. In neutral <kbd>V</kbd> mode, drag across empty field space
+							to box-select everything inside the marquee.
+						</p>
+						<p>
+							<strong>Copy and paste:</strong> Copy the selected element or group with <kbd>{primaryModifierKey}</kbd> + <kbd>C</kbd>, then paste an
+							offset copy with <kbd>{primaryModifierKey}</kbd> + <kbd>V</kbd>. Pasted elements remain selected so they can be moved immediately.
 						</p>
 						<p>
 							<strong>Edit:</strong> Double-click players, officials, footballs, event tags, penalty flags, flag belts, routes, arrows, and cross-field
@@ -8008,7 +8318,8 @@
 							under a new shareable address.
 						</p>
 						<p>
-							<strong>Share:</strong> Opens a selected shareable link plus a QR code that can be copied as an image or downloaded as a PNG.
+							<strong>Share:</strong> Press <kbd>{primaryModifierKey}</kbd> + <kbd>L</kbd> to open the selected shareable link plus a QR code that can
+							be copied as an image or downloaded as a PNG.
 						</p>
 						<p>
 							<strong>Exports:</strong> PNG, JPG, and WebP export the selected play. PDF exports every play in tab order on its own page. Export Settings

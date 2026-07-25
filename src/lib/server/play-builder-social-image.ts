@@ -502,7 +502,7 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 		${noRunZoneLabels}
 		${settings.showEndZoneText ? layout.endZoneCenters.map((yard, index) => `<text x="${xForYards(yard)}" y="${fieldTop + fieldHeight / 2}" transform="rotate(${index === 0 ? -90 : 90} ${xForYards(yard)} ${fieldTop + fieldHeight / 2})" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,.72)" font-size="26" font-weight="900" letter-spacing="4">END ZONE</text>`).join('') : ''}
 		<text x="${fieldLeft + fieldWidth / 2}" y="${fieldTop + fieldHeight / 2}" transform="rotate(${fieldAngle} ${fieldLeft + fieldWidth / 2} ${fieldTop + fieldHeight / 2})" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,.1)" font-size="52" font-weight="900" letter-spacing="7">CASEPLAY.ORG</text>
-		${guideElements}${xMarks}${renderLayers()}${pylons}${indicators}${freeDrawings}
+		${pylons}${guideElements}${xMarks}${renderLayers()}${indicators}${freeDrawings}
 	</svg>`;
 };
 

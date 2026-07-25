@@ -53,7 +53,7 @@
 
 <aside
 	class="play-builder-ad relative w-full flex-col items-stretch overflow-hidden border-2 border-stone-900 bg-white {orientation === 'vertical'
-		? 'hidden h-[calc(100vh-2rem)] min-h-[520px] max-w-[300px] lg:flex'
+		? 'hidden h-full min-h-0 max-h-full max-w-[300px] lg:flex'
 		: 'flex h-[clamp(90px,18vw,180px)] lg:hidden'}"
 	aria-label="Advertisement"
 >

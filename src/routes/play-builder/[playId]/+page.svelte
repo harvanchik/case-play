@@ -42,7 +42,7 @@
 			</div>
 		</div>
 		<div
-			class="relative z-10 grid w-full grid-cols-1 items-stretch gap-4 lg:absolute lg:inset-4 lg:w-auto lg:grid-cols-[minmax(0,1fr)_clamp(180px,18vw,300px)]"
+			class="relative z-10 grid w-full grid-cols-1 items-stretch gap-4 lg:absolute lg:inset-x-4 lg:top-6 lg:bottom-4 lg:w-auto lg:grid-cols-[minmax(0,1fr)_clamp(180px,18vw,300px)]"
 			style="min-height: calc(100vh - 4rem);"
 		>
 			<div class="flex min-w-0 items-center justify-start">
