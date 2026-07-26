@@ -43,7 +43,7 @@
 			Organization names and rulebook references identify the sources discussed on the site.
 		</p>
 
-		<h2 class="mt-7 text-xl font-bold">Contributions and corrections</h2>
+		<h2 class="mt-7 text-xl font-bold">Contributions and Corrections</h2>
 		<p class="mt-2 leading-7">
 			To suggest a case play, email <a class="font-semibold underline" href="mailto:create@caseplay.org">create@caseplay.org</a>. For feedback on
 			features or corrections, email
