@@ -81,8 +81,13 @@
 		positionPanel();
 	};
 	const openAtFocus = (event: FocusEvent) => {
+		// Pointer-triggered tooltips already have the precise cursor position. Clicking
+		// a wrapped control can also emit focusin, but that must not replace those
+		// coordinates with the wrapper's focus position.
+		if (isOpen) return;
 		window.dispatchEvent(new CustomEvent('case-play-tooltip-open', { detail: tooltipId }));
-		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		const focusTarget = event.target instanceof Element ? event.target : (event.currentTarget as Element);
+		const rect = focusTarget.getBoundingClientRect();
 		cursorX = placement === 'above' ? rect.left + rect.width / 2 : rect.right;
 		cursorY = placement === 'above' ? rect.top : rect.top + rect.height / 2;
 		isOpen = true;
