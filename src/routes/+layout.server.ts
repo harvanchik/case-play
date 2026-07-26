@@ -35,12 +35,39 @@ const GOOGLE_CMP_COUNTRIES = new Set([
 	'SK'
 ]);
 
+const GOOGLE_CMP_US_STATES = new Set([
+	'CA',
+	'CO',
+	'CT',
+	'DE',
+	'FL',
+	'IA',
+	'IN',
+	'KY',
+	'MD',
+	'MN',
+	'MT',
+	'NE',
+	'NH',
+	'NJ',
+	'OR',
+	'RI',
+	'TN',
+	'TX',
+	'UT',
+	'VA'
+]);
+
 export const load: LayoutServerLoad = ({ request, url }) => {
 	const canonicalPage = url.searchParams.get('page');
 	const canonicalUrl = `https://caseplay.org${url.pathname}${
 		canonicalPage && Number(canonicalPage) > 1 ? `?page=${encodeURIComponent(canonicalPage)}` : ''
 	}`;
 	const country = request.headers.get('x-vercel-ip-country')?.toUpperCase() ?? null;
+	const countryRegion = request.headers.get('x-vercel-ip-country-region')?.toUpperCase() ?? null;
+	const googleCmpRequired =
+		(country ? GOOGLE_CMP_COUNTRIES.has(country) : false) ||
+		(country === 'US' && countryRegion ? GOOGLE_CMP_US_STATES.has(countryRegion) : false);
 
-	return { canonicalUrl, googleCmpRequired: country ? GOOGLE_CMP_COUNTRIES.has(country) : false };
+	return { canonicalUrl, googleCmpRequired };
 };

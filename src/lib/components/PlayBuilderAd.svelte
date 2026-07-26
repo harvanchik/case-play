@@ -5,7 +5,8 @@
 		CONSENT_EVENT,
 		canLoadAdvertising,
 		loadAdSense,
-		requestAd
+		requestAd,
+		shouldRestrictAdDataProcessing
 	} from '$lib/privacy/consent';
 
 	const adSlot = '5024456887';
@@ -14,6 +15,7 @@
 	let initialized = false;
 	let initializing = false;
 	let layoutMatches = false;
+	let restrictDataProcessing = false;
 
 	const initializeAd = async () => {
 		if (!layoutMatches || initialized || initializing || !canLoadAdvertising()) return;
@@ -31,6 +33,7 @@
 	};
 
 	onMount(() => {
+		restrictDataProcessing = shouldRestrictAdDataProcessing();
 		const desktopLayout = window.matchMedia('(min-width: 1024px)');
 		const updateLayoutMatch = () => {
 			layoutMatches = orientation === 'vertical' ? desktopLayout.matches : !desktopLayout.matches;
@@ -38,7 +41,10 @@
 		};
 		updateLayoutMatch();
 		desktopLayout.addEventListener('change', updateLayoutMatch);
-		const consentChanged = () => initializeAd();
+		const consentChanged = () => {
+			restrictDataProcessing = shouldRestrictAdDataProcessing();
+			initializeAd();
+		};
 		window.addEventListener(CONSENT_EVENT, consentChanged);
 		return () => {
 			desktopLayout.removeEventListener('change', updateLayoutMatch);
@@ -61,5 +67,6 @@
 		data-ad-slot={adSlot}
 		data-ad-format={orientation}
 		data-full-width-responsive="true"
+		data-restrict-data-processing={restrictDataProcessing ? '1' : '0'}
 	></ins>
 </aside>

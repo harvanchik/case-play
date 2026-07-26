@@ -5,7 +5,8 @@
 		CONSENT_EVENT,
 		canLoadAdvertising,
 		loadAdSense,
-		requestAd
+		requestAd,
+		shouldRestrictAdDataProcessing
 	} from '$lib/privacy/consent';
 
 	const adSlot = '5024456887';
@@ -14,6 +15,7 @@
 	let initializing = false;
 	let inViewport = false;
 	let adContainer: HTMLElement;
+	let restrictDataProcessing = false;
 
 	const initializeAd = async () => {
 		if (!inViewport || initialized || initializing || !canLoadAdvertising()) return;
@@ -31,6 +33,7 @@
 	};
 
 	onMount(() => {
+		restrictDataProcessing = shouldRestrictAdDataProcessing();
 		const observer = new IntersectionObserver(
 			(entries) => {
 				if (!entries.some((entry) => entry.isIntersecting)) return;
@@ -41,7 +44,10 @@
 			{ rootMargin: '200px 0px' }
 		);
 		observer.observe(adContainer);
-		const consentChanged = () => initializeAd();
+		const consentChanged = () => {
+			restrictDataProcessing = shouldRestrictAdDataProcessing();
+			initializeAd();
+		};
 		window.addEventListener(CONSENT_EVENT, consentChanged);
 		return () => {
 			observer.disconnect();
@@ -59,5 +65,6 @@
 		data-ad-slot={adSlot}
 		data-ad-format="horizontal"
 		data-full-width-responsive="true"
+		data-restrict-data-processing={restrictDataProcessing ? '1' : '0'}
 	></ins>
 </aside>

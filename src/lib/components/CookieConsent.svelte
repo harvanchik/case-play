@@ -59,14 +59,12 @@
 	>
 		<h2 id="cookie-consent-title" class="text-base font-bold text-stone-900">We Value Your Privacy</h2>
 		<p class="mt-1 text-sm leading-5 text-stone-700">
-			We use essential cookies to keep the site working. You can accept all cookies or reject optional
-			cookies; choosing essential cookies only disables personalized advertising.
+			We use essential cookies to keep the site working. You can accept all cookies or reject optional cookies; choosing essential cookies only
+			disables personalized advertising.
 		</p>
 		<p class="mt-2 text-xs text-stone-600">
-			Google AdSense may still serve privacy-restricted ads when optional cookies are declined. Google’s
-			certified consent platform applies additional regional requirements. Our site analytics are completely
-			cookie-less and do not store or read any data on your device. You can change your choice through
-			<strong>Use of Cookies</strong> in the footer. For more information, read the
+			Google AdSense may still serve privacy-restricted ads when optional cookies are declined. This site's analytics are completely cookie-less and
+			do not store or read any data on your device. You can change your choice at any time. For more information, read the
 			<a class="font-semibold underline" href="/cookie-policy">Cookie Policy</a> and
 			<a class="font-semibold underline" href="/privacy">Privacy Policy</a>.
 		</p>

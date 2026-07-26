@@ -135,6 +135,9 @@ const googleCmpHandlesRegion = () =>
 
 export const canLoadAdvertising = () => googleCmpHandlesRegion() || readConsent() !== null;
 
+export const shouldRestrictAdDataProcessing = () =>
+	!googleCmpHandlesRegion() && (readConsent() === 'essential' || hasGlobalPrivacyControl());
+
 const configureAdPrivacy = () => {
 	if (typeof window === 'undefined') return;
 	const choice = readConsent();

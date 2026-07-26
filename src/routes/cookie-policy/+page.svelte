@@ -35,9 +35,10 @@
 		<p class="mt-2 leading-7">
 			Choosing <strong>Accept All Cookies</strong> permits Google AdSense to request personalized ads and use optional advertising storage where
 			allowed. Choosing <strong>Essential Cookies Only</strong> tells AdSense to disable personalization; ads may still appear as non-personalized or
-			limited ads. Google Privacy &amp; Messaging is a Google-certified consent management platform that presents and records the additional choices
-			required in the EEA, UK, Switzerland, and other supported regions. Its regional consent signals take precedence over less restrictive site
-			settings.
+			limited ads. For U.S. state privacy opt-outs and supported Global Privacy Control signals, CasePlay.org also requests Google's restricted data
+			processing mode. Google Privacy &amp; Messaging is a Google-certified consent management platform that presents and records the additional
+			choices required in the EEA, UK, Switzerland, supported U.S. states, and other supported regions. Its regional consent signals take precedence
+			over less restrictive site settings.
 		</p>
 		<p class="mt-2 leading-7">
 			Privacy-restricted advertising still processes technical information needed to deliver an ad, such as an IP address, and Google’s ad code may be
@@ -61,9 +62,10 @@
 
 		<h2 class="mt-7 text-xl font-bold">Change your choice</h2>
 		<p class="mt-2 leading-7">
-			Use <strong>Use of Cookies</strong> in the footer or the <a class="font-semibold underline" href="/privacy">Privacy</a> page to change your
-			advertising choice at any time. In regions handled by Google Privacy &amp; Messaging, this opens Google’s certified consent controls. Global
-			Privacy Control is treated as an advertising-personalization opt-out. You can also clear existing site data in your browser.
+			Use <strong>Use of Cookies</strong> or <strong>Do Not Sell or Share My Personal Information</strong> in the footer, or the
+			<a class="font-semibold underline" href="/privacy">Privacy</a> page, to change your advertising choice at any time. In regions handled by
+			Google Privacy &amp; Messaging, this opens Google’s certified consent controls. Global Privacy Control is treated as an
+			advertising-personalization, sale, sharing, and targeted-advertising opt-out. You can also clear existing site data in your browser.
 		</p>
 	</article>
 	<PublicSiteFooter />

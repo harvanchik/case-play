@@ -46,8 +46,9 @@
 		<h2 class="mt-7 text-xl font-bold">Advertising</h2>
 		<p class="mt-2 leading-7">
 			Google AdSense ads help fund the domain, hosting, and database. Google Privacy &amp; Messaging, a Google-certified consent management platform,
-			handles consent requirements in the EEA, UK, Switzerland, and other supported regions. If you choose <strong>Accept All Cookies</strong>, Google
-			and approved partners may use permitted cookies and activity data for personalized advertising and measurement. If you choose
+			handles consent and opt-out requirements in the EEA, UK, Switzerland, supported U.S. states, and other supported regions. If you choose
+			<strong>Accept All Cookies</strong>, Google and approved partners may use permitted cookies and activity data for personalized advertising and
+			measurement. If you choose
 			<strong>Essential Cookies Only</strong>, CasePlay.org requests ads with personalization disabled. Google may then serve non-personalized or
 			limited ads, depending on your location and the choices recorded by its certified consent platform. Limited advertising still requires technical
 			processing such as using an IP address to deliver an ad, and Google may use narrowly limited storage for security and invalid-traffic prevention
@@ -88,9 +89,31 @@
 			the right to complain to your local data-protection authority. To exercise a right, identify the relevant saved-play URL and contact
 			<a class="font-semibold underline" href="mailto:contact@caseplay.org">contact@caseplay.org</a>.
 		</p>
+
+		<h2 class="mt-7 text-xl font-bold">United States State Privacy Notice</h2>
+		<p class="mt-2 leading-7">
+			In the preceding 12 months, CasePlay.org may have processed identifiers and network information (such as IP address and browser or device
+			information), internet or electronic activity (such as page requests, ad interactions, and security events), and content you submit (such as
+			saved play diagrams and labels). This information comes from you, your browser, and the service providers identified above. It is used to
+			provide requested features, secure and maintain the service, measure aggregate use, and fund the service through advertising. It may be
+			disclosed to Vercel, Turso, Google and its approved advertising partners, or authorities when legally required. CasePlay.org does not sell
+			personal information for money.
+		</p>
+		<p class="mt-2 leading-7">
+			Some state laws may define personalized advertising disclosures as a sale, sharing, or targeted advertising. You can opt out by choosing
+			<strong>Essential Cookies Only</strong>, using <strong>Do Not Sell or Share My Personal Information</strong> in the footer, or enabling a
+			supported Global Privacy Control signal. For that choice, CasePlay.org disables ad personalization and requests Google's restricted data
+			processing mode. Subject to applicable law and verification, you may also request access, correction, deletion, or portability; use an
+			authorized agent; or appeal a denied request by replying to the decision. CasePlay.org will not discriminate against you for exercising a
+			privacy right. Send requests and appeals to
+			<a class="font-semibold underline" href="mailto:contact@caseplay.org">contact@caseplay.org</a>.
+		</p>
 		<div class="mt-4 flex flex-wrap gap-2">
 			<button class="cursor-pointer border-2 border-stone-900 bg-white px-4 py-2 font-bold text-stone-900" on:click={openConsentChoices}>
 				Use of Cookies
+			</button>
+			<button class="cursor-pointer border-2 border-stone-900 bg-white px-4 py-2 font-bold text-stone-900" on:click={openConsentChoices}>
+				Do Not Sell or Share My Personal Information
 			</button>
 		</div>
 	</article>
