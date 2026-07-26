@@ -16,13 +16,19 @@
 	<article class="mx-auto max-w-3xl border-2 border-stone-900 bg-white p-6 sm:p-10">
 		<a href="/" class="font-semibold underline">&larr; CasePlay.org</a>
 		<h1 class="mt-5 text-3xl font-bold">Cookie Policy</h1>
-		<p class="mt-2 text-sm text-stone-500">Last updated July 24, 2026</p>
+		<p class="mt-2 text-sm text-stone-500">Last updated July 25, 2026</p>
 
 		<h2 class="mt-7 text-xl font-bold">Essential storage</h2>
 		<p class="mt-2 leading-7">
 			CasePlay.org uses local storage to remember your privacy choice, play-builder creator access, unsaved play-builder drafts, and tool preferences.
 			Session storage supports short-lived editing messages, and a protected session cookie is used for authorized administrators. These support
-			requested features, security, and site operation.
+			requested features, security, and site operation. Creator access is an editing credential stored only in your browser; do not copy it into
+			messages or share access to your browser profile.
+		</p>
+		<p class="mt-2 leading-7">
+			Consent choices expire after one year. Drafts, creator access, and preferences remain until the related play is restored, the app removes them,
+			or you clear site data. Short-lived editing messages last for the browser session. The administrative session cookie is HTTP-only, Secure in
+			production, SameSite=Lax, and expires after 30 days.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Advertising choices</h2>

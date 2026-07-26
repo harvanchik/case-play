@@ -22,8 +22,7 @@ const getSessionSecret = () => {
 
 const createSessionHash = (token: string) => createHash('sha256').update(token).digest('hex');
 
-const signToken = (token: string) =>
-	createHmac('sha256', getSessionSecret()).update(token).digest('hex');
+const signToken = (token: string) => createHmac('sha256', getSessionSecret()).update(token).digest('hex');
 
 const safeEquals = (left: string, right: string) => {
 	const leftBuffer = Buffer.from(left, 'utf8');
@@ -71,6 +70,7 @@ export const setSessionCookie = (cookies: Cookies, cookieValue: string, expiresA
 		path: '/',
 		sameSite: 'lax',
 		secure: !dev,
+		priority: 'high',
 		expires: expiresAt
 	});
 };
@@ -80,13 +80,12 @@ export const clearSessionCookie = (cookies: Cookies) => {
 		httpOnly: true,
 		path: '/',
 		sameSite: 'lax',
-		secure: !dev
+		secure: !dev,
+		priority: 'high'
 	});
 };
 
-export const authenticateRequest = async (
-	cookieValue: string | undefined
-): Promise<AuthenticatedUser | null> => {
+export const authenticateRequest = async (cookieValue: string | undefined): Promise<AuthenticatedUser | null> => {
 	const token = parseCookieValue(cookieValue);
 
 	if (!token) {

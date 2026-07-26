@@ -9,16 +9,12 @@ import {
 	upsertRulebook,
 	upsertSport
 } from '$lib/server/db/repositories/reference-data';
-import { readOptionalText, readRequiredText } from '$lib/server/forms';
+import { FormInputError, readOptionalText, readRequiredText } from '$lib/server/forms';
 
 const handleConstraintError = (error: unknown) => {
-	if (error instanceof Error) {
-		return fail(400, {
-			error: error.message
-		});
-	}
-
-	return fail(400, {
+	if (error instanceof FormInputError) return fail(400, { error: error.message });
+	console.error('Failed to save reference data.', error instanceof Error ? { name: error.name, message: error.message } : undefined);
+	return fail(500, {
 		error: 'Unable to save the record.'
 	});
 };
@@ -35,9 +31,9 @@ export const actions = {
 
 		try {
 			await upsertAuthor({
-				id: readOptionalText(formData, 'id') || undefined,
-				firstName: readRequiredText(formData, 'firstName'),
-				lastName: readRequiredText(formData, 'lastName')
+				id: readOptionalText(formData, 'id', 128) || undefined,
+				firstName: readRequiredText(formData, 'firstName', 100),
+				lastName: readRequiredText(formData, 'lastName', 100)
 			});
 		} catch (error) {
 			return handleConstraintError(error);
@@ -47,7 +43,7 @@ export const actions = {
 	},
 	deleteAuthor: async ({ request }) => {
 		const formData = await request.formData();
-		const id = readRequiredText(formData, 'id');
+		const id = readRequiredText(formData, 'id', 128);
 		await deleteAuthor(id);
 		throw redirect(303, '/admin/reference');
 	},
@@ -56,10 +52,10 @@ export const actions = {
 
 		try {
 			await upsertRulebook({
-				id: readOptionalText(formData, 'id') || undefined,
-				title: readRequiredText(formData, 'title'),
-				slug: readOptionalText(formData, 'slug'),
-				nickname: readOptionalText(formData, 'nickname')
+				id: readOptionalText(formData, 'id', 128) || undefined,
+				title: readRequiredText(formData, 'title', 160),
+				slug: readOptionalText(formData, 'slug', 160),
+				nickname: readOptionalText(formData, 'nickname', 160)
 			});
 		} catch (error) {
 			return handleConstraintError(error);
@@ -69,7 +65,7 @@ export const actions = {
 	},
 	deleteRulebook: async ({ request }) => {
 		const formData = await request.formData();
-		const id = readRequiredText(formData, 'id');
+		const id = readRequiredText(formData, 'id', 128);
 		await deleteRulebook(id);
 		throw redirect(303, '/admin/reference');
 	},
@@ -78,9 +74,9 @@ export const actions = {
 
 		try {
 			await upsertSport({
-				id: readOptionalText(formData, 'id') || undefined,
-				name: readRequiredText(formData, 'name'),
-				slug: readOptionalText(formData, 'slug')
+				id: readOptionalText(formData, 'id', 128) || undefined,
+				name: readRequiredText(formData, 'name', 100),
+				slug: readOptionalText(formData, 'slug', 160)
 			});
 		} catch (error) {
 			return handleConstraintError(error);
@@ -90,7 +86,7 @@ export const actions = {
 	},
 	deleteSport: async ({ request }) => {
 		const formData = await request.formData();
-		const id = readRequiredText(formData, 'id');
+		const id = readRequiredText(formData, 'id', 128);
 		await deleteSport(id);
 		throw redirect(303, '/admin/reference');
 	}
