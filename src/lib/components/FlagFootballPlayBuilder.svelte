@@ -436,8 +436,7 @@
 	let draggedYardPath: FieldPath | undefined;
 	$: {
 		const target = dragTarget;
-		draggedYardMarker =
-			target?.type === 'marker' && target.moved ? markers.find((marker) => marker.id === target.id) : undefined;
+		draggedYardMarker = target?.type === 'marker' && target.moved ? markers.find((marker) => marker.id === target.id) : undefined;
 		draggedYardPath = target?.type === 'path' && target.moved ? paths.find((path) => path.id === target.id) : undefined;
 	}
 	let editingMarkerId: number | null = null;
@@ -536,8 +535,7 @@
 	$: editingPath = paths.find((path) => path.id === editingPathId);
 	$: editingLineFormatDefault = lineFormatDefaultFor(editingGuide, editingPath);
 	$: showLineFormatReset =
-		editingLineFormatDefault !== null &&
-		(guideEditColor !== editingLineFormatDefault.color || guideEditStyle !== editingLineFormatDefault.style);
+		editingLineFormatDefault !== null && (guideEditColor !== editingLineFormatDefault.color || guideEditStyle !== editingLineFormatDefault.style);
 	$: editingDownGuide = guides.find((guide) => guide.id === editingDownGuideId && guide.kind === 'line-to-gain');
 	$: if (editingGuideId === null && editingDownGuideId === null && inlineGuideEditorPinnedLeft !== null) inlineGuideEditorPinnedLeft = null;
 	$: lineOfScrimmageX = guides.find((guide) => guide.kind === 'line-of-scrimmage')?.x ?? null;
@@ -2269,9 +2267,7 @@
 		if (marker.kind === 'event') return marker.y + eventTagHeight / 2 + yardLinePreviewGap;
 		const descriptionY = markerDescriptionY(marker);
 		const descriptionLines = marker.label ? penaltyLabelLines(marker.label).length : 0;
-		return descriptionLines > 0
-			? descriptionY + (descriptionLines - 1) * 9 + yardLinePreviewGap
-			: descriptionY - 9 + yardLinePreviewGap;
+		return descriptionLines > 0 ? descriptionY + (descriptionLines - 1) * 9 + yardLinePreviewGap : descriptionY - 9 + yardLinePreviewGap;
 	};
 	const toolYardLinePreviewY = (activeTool: ActiveTool, point: Point) => {
 		if (isPathTool(activeTool)) return point.y + yardLinePreviewGap;
@@ -3264,9 +3260,7 @@
 			if (laserColors.some((option) => option.id === color)) {
 				laserColor = color as LaserColor;
 				rainbowLaserEnabled = false;
-				laserDrawings = laserDrawings.map((drawing) =>
-					drawing.color === 'rainbow' ? { ...drawing, color: laserColor } : drawing
-				);
+				laserDrawings = laserDrawings.map((drawing) => (drawing.color === 'rainbow' ? { ...drawing, color: laserColor } : drawing));
 				if (activeLaserDrawing?.color === 'rainbow') activeLaserDrawing = { ...activeLaserDrawing, color: laserColor };
 			}
 			toolbarEditorTool = null;
@@ -4482,9 +4476,7 @@
 		return false;
 	};
 	const eraseLaserDrawingAt = (point: Point) => {
-		const hitDrawings = new Set(
-			laserDrawings.filter((drawing) => drawing.releasedAt === null && laserDrawingContainsPoint(drawing, point))
-		);
+		const hitDrawings = new Set(laserDrawings.filter((drawing) => drawing.releasedAt === null && laserDrawingContainsPoint(drawing, point)));
 		if (hitDrawings.size === 0) return;
 		if (!eraseHistorySaved) {
 			saveHistory();
@@ -4880,11 +4872,7 @@
 	};
 	const continuePointer = (event: PointerEvent) => {
 		if (viewOnly) return;
-		if (
-			stylusEraserActive &&
-			event.pointerType === 'pen' &&
-			(event.pointerId !== stylusEraserPointerId || !isStylusEraserEvent(event))
-		) {
+		if (stylusEraserActive && event.pointerType === 'pen' && (event.pointerId !== stylusEraserPointerId || !isStylusEraserEvent(event))) {
 			resetStylusEraser();
 		}
 		if (stylusEraserActive && event.pointerId === stylusEraserPointerId) {
@@ -5119,10 +5107,7 @@
 			// tip lifts. Preserve the last valid move sample instead of collapsing a
 			// completed horizontal or vertical stroke at pointerup.
 			const finalPoint = activeFreeDrawShape === 'straight' && trackedFinalPoint ? trackedFinalPoint : eventFinalPoint;
-			if (
-				activeFreeDrawShape === 'straight' &&
-				Math.hypot(finalPoint.x - first.x, finalPoint.y - first.y) < minimumStraightDrawingLength
-			) {
+			if (activeFreeDrawShape === 'straight' && Math.hypot(finalPoint.x - first.x, finalPoint.y - first.y) < minimumStraightDrawingLength) {
 				activeFreeStroke = null;
 				activeFreeDrawShape = freeDrawShape;
 				if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
@@ -5560,8 +5545,7 @@
 							: guidePlacementStyles[toolbarEditorTool]}
 				{@const toolbarDefaultFormat = toolbarLineFormatDefaultFor(toolbarEditorTool)}
 				{@const showToolbarLineFormatReset =
-					toolbarDefaultFormat !== null &&
-					(toolbarPresetColor !== toolbarDefaultFormat.color || toolbarPresetStyle !== toolbarDefaultFormat.style)}
+					toolbarDefaultFormat !== null && (toolbarPresetColor !== toolbarDefaultFormat.color || toolbarPresetStyle !== toolbarDefaultFormat.style)}
 				<div
 					bind:this={toolbarEditorElement}
 					data-line-format-editor
@@ -6033,18 +6017,22 @@
 				<div bind:this={playStripElement} class="play-tabs-scroll absolute right-0 bottom-0 left-0 overflow-x-auto overflow-y-hidden">
 					<div class="flex w-max items-stretch gap-1">
 						{#each playEntries as play, index (play.id)}
-							<HoverTooltip text={editingPlayId === play.id ? '' : 'Double Click for Options'} minWidthPx={0} wrapperClass="flex h-9 min-w-20 shrink-0">
-							<button
-								data-play-id={play.id}
-								type="button"
-								aria-label={`Open ${play.name}`}
-								aria-pressed={index === activePlayIndex}
-								on:click={() => switchPlay(play.id)}
-								on:dblclick={(event) => openPlayMenu(event, play.id)}
-								class="flex h-9 min-w-20 shrink-0 cursor-pointer items-center justify-center border border-stone-500 bg-stone-100 px-3 text-[10px] font-black whitespace-nowrap text-stone-800 hover:bg-white aria-pressed:border-stone-950 aria-pressed:bg-stone-900 aria-pressed:text-white"
+							<HoverTooltip
+								text={editingPlayId === play.id ? '' : 'Double Click for Options'}
+								minWidthPx={0}
+								wrapperClass="flex h-9 min-w-20 shrink-0"
 							>
-								{play.name}
-							</button>
+								<button
+									data-play-id={play.id}
+									type="button"
+									aria-label={`Open ${play.name}`}
+									aria-pressed={index === activePlayIndex}
+									on:click={() => switchPlay(play.id)}
+									on:dblclick={(event) => openPlayMenu(event, play.id)}
+									class="flex h-9 min-w-20 shrink-0 cursor-pointer items-center justify-center border border-stone-500 bg-stone-100 px-3 text-[10px] font-black whitespace-nowrap text-stone-800 hover:bg-white aria-pressed:border-stone-950 aria-pressed:bg-stone-900 aria-pressed:text-white"
+								>
+									{play.name}
+								</button>
 							</HoverTooltip>
 						{/each}
 						<HoverTooltip
@@ -6109,7 +6097,14 @@
 									class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center border border-red-700 bg-white text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
 								>
 									<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-										<path d="M4 7h16M10 11v6M14 11v6M9 7V4h6v3M6 7l1 13h10l1-13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+										<path
+											d="M4 7h16M10 11v6M14 11v6M9 7V4h6v3M6 7l1 13h10l1-13"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										/>
 									</svg>
 								</button>
 							</HoverTooltip>
@@ -6244,544 +6239,529 @@
 			</div>
 			<div class="field-canvas relative my-auto w-full shrink-0">
 				<HoverTooltip text={fieldControlTooltip} minWidthPx={0} wrapperClass="contents">
-				<svg
-					bind:this={svg}
-					data-tutorial="field"
-					viewBox="0 0 1000 484"
-					font-family="ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"
-					class="block h-auto w-full select-none"
-					class:cursor-none={!dragTarget?.moved &&
-						tool !== 'select' &&
-						tool !== 'free-draw' &&
-						!isGuideTool(tool) &&
-						!isPathTool(tool) &&
-						pointerOnField}
-					class:cursor-grab={!dragTarget?.moved &&
-						!marqueeSelection &&
-						tool === 'select' &&
-						(selectedTargets.length < 2 || pointerInsideSelectedGroup)}
-					class:group-selection-outside={selectedTargets.length > 1 && !pointerInsideSelectedGroup}
-					class:group-selection-inside={selectedTargets.length > 1 && pointerInsideSelectedGroup && !dragTarget?.moved}
-					class:laser-cursor={tool === 'laser' && pointerOnField}
-					class:cursor-crosshair={!dragTarget?.moved && (Boolean(marqueeSelection) || ((isGuideTool(tool) || isPathTool(tool)) && pointerOnField))}
-					class:drawing-cursor={tool === 'free-draw' && freeDrawMode === 'draw'}
-					class:erasing-cursor={tool === 'free-draw' && freeDrawMode === 'erase'}
-					class:!cursor-grabbing={dragTarget?.moved}
-					style="touch-action: none;"
-					style:pointer-events={viewOnly ? 'none' : undefined}
-					role="application"
-					aria-label="Blank horizontal NIRSA flag football field drawing area"
-					aria-disabled={viewOnly}
-					on:pointerdown|capture={beginStylusEraser}
-					on:pointerdown={beginOnField}
-					on:pointermove={(event) => {
-						updateFieldControlTooltip(event);
-						continuePointer(event);
-					}}
-					on:contextmenu|preventDefault
-					on:pointerenter={(event) => {
-						hoveringElement = false;
-						const canvasPoint = canvasPointFromEvent(event);
-						pointerInsideSelectedGroup = isPointInSelectedGroup(canvasPoint);
-						pointerOnField = isPointInActiveToolArea(canvasPoint);
-						const point = pointForActiveTool(canvasPoint);
-						const groupSelectionActive = selectedTargets.length > 1;
-						hoverPoint = !groupSelectionActive && (pointerOnField || tool === 'free-draw') ? point : null;
-						if (tool === 'laser' && pointerOnField) updateLaserPointer(point);
-						lastPlacementHoverPoint = !groupSelectionActive && pointerOnField ? point : null;
-						if (!groupSelectionActive && pointerOnField && shouldSnapElements(event)) schedulePlacementSnap(point, true);
-						else clearPlacementSnap();
-					}}
-					on:pointerleave={() => {
-						fieldControlTooltip = '';
-						hoverPoint = null;
-						pointerOnField = false;
-						pointerInsideSelectedGroup = false;
-						hoveringElement = false;
-						laserPointer = null;
-						clearPlacementSnap();
-						lastPlacementHoverPoint = null;
-					}}
-					on:pointerup={endPointer}
-					on:pointercancel={cancelPointer}
-				>
-					<defs>
-						<pattern id="builder-grass-stripe" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform="rotate(18)">
-							<rect width="16" height="32" fill="rgba(255,255,255,0.025)" />
-						</pattern>
-						<filter id="builder-air-shadow" x="-15%" y="-40%" width="130%" height="180%">
-							<feGaussianBlur stdDeviation="3" />
-						</filter>
-						<filter id="builder-neon-glow" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB">
-							<feGaussianBlur in="SourceGraphic" stdDeviation="5" result="neon-wide" />
-							<feComponentTransfer in="neon-wide" result="neon-wide-soft">
-								<feFuncA type="linear" slope="0.32" />
-							</feComponentTransfer>
-							<feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="neon-close" />
-							<feComponentTransfer in="neon-close" result="neon-close-soft">
-								<feFuncA type="linear" slope="0.78" />
-							</feComponentTransfer>
-							<feMerge>
-								<feMergeNode in="neon-wide-soft" />
-								<feMergeNode in="neon-close-soft" />
-								<feMergeNode in="SourceGraphic" />
-							</feMerge>
-						</filter>
-						<marker
-							id="builder-path-arrow"
-							viewBox="0 0 10 10"
-							refX="0"
-							refY="5"
-							markerUnits="userSpaceOnUse"
-							markerWidth="22.5"
-							markerHeight="22.5"
-							orient="auto"
-						>
-							<path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
-						</marker>
-					</defs>
+					<svg
+						bind:this={svg}
+						data-tutorial="field"
+						viewBox="0 0 1000 484"
+						font-family="ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"
+						class="block h-auto w-full select-none"
+						class:cursor-none={!dragTarget?.moved &&
+							tool !== 'select' &&
+							tool !== 'free-draw' &&
+							!isGuideTool(tool) &&
+							!isPathTool(tool) &&
+							pointerOnField}
+						class:cursor-grab={!dragTarget?.moved &&
+							!marqueeSelection &&
+							tool === 'select' &&
+							(selectedTargets.length < 2 || pointerInsideSelectedGroup)}
+						class:group-selection-outside={selectedTargets.length > 1 && !pointerInsideSelectedGroup}
+						class:group-selection-inside={selectedTargets.length > 1 && pointerInsideSelectedGroup && !dragTarget?.moved}
+						class:laser-cursor={tool === 'laser' && pointerOnField}
+						class:cursor-crosshair={!dragTarget?.moved && (Boolean(marqueeSelection) || ((isGuideTool(tool) || isPathTool(tool)) && pointerOnField))}
+						class:drawing-cursor={tool === 'free-draw' && freeDrawMode === 'draw'}
+						class:erasing-cursor={tool === 'free-draw' && freeDrawMode === 'erase'}
+						class:!cursor-grabbing={dragTarget?.moved}
+						style="touch-action: none;"
+						style:pointer-events={viewOnly ? 'none' : undefined}
+						role="application"
+						aria-label="Blank horizontal NIRSA flag football field drawing area"
+						aria-disabled={viewOnly}
+						on:pointerdown|capture={beginStylusEraser}
+						on:pointerdown={beginOnField}
+						on:pointermove={(event) => {
+							updateFieldControlTooltip(event);
+							continuePointer(event);
+						}}
+						on:contextmenu|preventDefault
+						on:pointerenter={(event) => {
+							hoveringElement = false;
+							const canvasPoint = canvasPointFromEvent(event);
+							pointerInsideSelectedGroup = isPointInSelectedGroup(canvasPoint);
+							pointerOnField = isPointInActiveToolArea(canvasPoint);
+							const point = pointForActiveTool(canvasPoint);
+							const groupSelectionActive = selectedTargets.length > 1;
+							hoverPoint = !groupSelectionActive && (pointerOnField || tool === 'free-draw') ? point : null;
+							if (tool === 'laser' && pointerOnField) updateLaserPointer(point);
+							lastPlacementHoverPoint = !groupSelectionActive && pointerOnField ? point : null;
+							if (!groupSelectionActive && pointerOnField && shouldSnapElements(event)) schedulePlacementSnap(point, true);
+							else clearPlacementSnap();
+						}}
+						on:pointerleave={() => {
+							fieldControlTooltip = '';
+							hoverPoint = null;
+							pointerOnField = false;
+							pointerInsideSelectedGroup = false;
+							hoveringElement = false;
+							laserPointer = null;
+							clearPlacementSnap();
+							lastPlacementHoverPoint = null;
+						}}
+						on:pointerup={endPointer}
+						on:pointercancel={cancelPointer}
+					>
+						<defs>
+							<pattern id="builder-grass-stripe" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform="rotate(18)">
+								<rect width="16" height="32" fill="rgba(255,255,255,0.025)" />
+							</pattern>
+							<filter id="builder-air-shadow" x="-15%" y="-40%" width="130%" height="180%">
+								<feGaussianBlur stdDeviation="3" />
+							</filter>
+							<filter id="builder-neon-glow" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB">
+								<feGaussianBlur in="SourceGraphic" stdDeviation="5" result="neon-wide" />
+								<feComponentTransfer in="neon-wide" result="neon-wide-soft">
+									<feFuncA type="linear" slope="0.32" />
+								</feComponentTransfer>
+								<feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="neon-close" />
+								<feComponentTransfer in="neon-close" result="neon-close-soft">
+									<feFuncA type="linear" slope="0.78" />
+								</feComponentTransfer>
+								<feMerge>
+									<feMergeNode in="neon-wide-soft" />
+									<feMergeNode in="neon-close-soft" />
+									<feMergeNode in="SourceGraphic" />
+								</feMerge>
+							</filter>
+							<marker
+								id="builder-path-arrow"
+								viewBox="0 0 10 10"
+								refX="0"
+								refY="5"
+								markerUnits="userSpaceOnUse"
+								markerWidth="22.5"
+								markerHeight="22.5"
+								orient="auto"
+							>
+								<path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
+							</marker>
+						</defs>
 
-					{#key fieldSettings.fieldType}
-						{#if fieldSettings.showTeamBoxes && fieldLayout.teamBox}
-							{@const teamBox = fieldLayout.teamBox}
-							{@const teamBoxSetback = fieldLayout.teamBoxSetbackYards * (fieldWidth / fieldLayout.totalYards) + teamBoxExtraSetback}
-							{#each [fieldTop - teamBoxSetback - 20, fieldBottom + teamBoxSetback] as teamBoxY, teamBoxIndex}
-								{@const teamBoxLabel = teamBoxIndex === 0 ? fieldSettings.teamBoxTopLabel : fieldSettings.teamBoxBottomLabel}
-								{@const teamBoxWidth = xForYards(teamBox[1]) - xForYards(teamBox[0])}
-								{@const teamBoxTextHitWidth = Math.min(teamBoxWidth, Math.max(56, teamBoxLabel.length * 9 + 18))}
-								<g>
-									<rect x={xForYards(teamBox[0])} y={teamBoxY} width={teamBoxWidth} height="20" fill="transparent" pointer-events="none" />
-									<rect
-										data-pdf-outline
-										x={xForYards(teamBox[0]) - 4}
-										y={teamBoxY - 4}
-										width={teamBoxWidth + 8}
-										height="28"
-										fill="none"
-										stroke="#1c1917"
-										stroke-width="6"
-										display="none"
-										pointer-events="none"
-									/>
-									<rect
-										data-export-team-box
-										x={xForYards(teamBox[0])}
-										y={teamBoxY}
-										width={teamBoxWidth}
-										height="20"
-										fill="#d2b48c"
-										stroke="rgba(255,255,255,0.82)"
-										stroke-width="2"
-										pointer-events="none"
-									/>
-									<rect
-										data-field-element
-										data-field-type="team-box-text"
-										data-hover-tooltip="Double Click to Edit"
-										role="button"
-										tabindex="0"
-										aria-label={`${teamBoxLabel}, double-click to rename team box`}
-										x={(xForYards(teamBox[0]) + xForYards(teamBox[1]) - teamBoxTextHitWidth) / 2}
-										y={teamBoxY + 2}
-										width={teamBoxTextHitWidth}
-										height="16"
-										fill="transparent"
-										pointer-events="all"
-										on:pointerdown|stopPropagation
-										on:dblclick|stopPropagation={(event) => startEditingTeamBox(event, teamBoxY, teamBoxIndex)}
-										on:keydown={(event) => {
-											if (event.key === 'Enter') void startEditingTeamBox(event, teamBoxY, teamBoxIndex);
-										}}
-										class="cursor-text focus:outline-none"
-									/>
-									<text
-										x={(xForYards(teamBox[0]) + xForYards(teamBox[1])) / 2}
-										y={teamBoxY + 14}
-										text-anchor="middle"
-										fill="#292524"
-										font-size="12"
-										font-weight="800"
-										letter-spacing="2"
-										pointer-events="none">{teamBoxLabel}</text
-									>
-								</g>
-							{/each}
-						{/if}
+						{#key fieldSettings.fieldType}
+							{#if fieldSettings.showTeamBoxes && fieldLayout.teamBox}
+								{@const teamBox = fieldLayout.teamBox}
+								{@const teamBoxSetback = fieldLayout.teamBoxSetbackYards * (fieldWidth / fieldLayout.totalYards) + teamBoxExtraSetback}
+								{#each [fieldTop - teamBoxSetback - 20, fieldBottom + teamBoxSetback] as teamBoxY, teamBoxIndex}
+									{@const teamBoxLabel = teamBoxIndex === 0 ? fieldSettings.teamBoxTopLabel : fieldSettings.teamBoxBottomLabel}
+									{@const teamBoxWidth = xForYards(teamBox[1]) - xForYards(teamBox[0])}
+									{@const teamBoxTextHitWidth = Math.min(teamBoxWidth, Math.max(56, teamBoxLabel.length * 9 + 18))}
+									<g>
+										<rect x={xForYards(teamBox[0])} y={teamBoxY} width={teamBoxWidth} height="20" fill="transparent" pointer-events="none" />
+										<rect
+											data-pdf-outline
+											x={xForYards(teamBox[0]) - 4}
+											y={teamBoxY - 4}
+											width={teamBoxWidth + 8}
+											height="28"
+											fill="none"
+											stroke="#1c1917"
+											stroke-width="6"
+											display="none"
+											pointer-events="none"
+										/>
+										<rect
+											data-export-team-box
+											x={xForYards(teamBox[0])}
+											y={teamBoxY}
+											width={teamBoxWidth}
+											height="20"
+											fill="#d2b48c"
+											stroke="rgba(255,255,255,0.82)"
+											stroke-width="2"
+											pointer-events="none"
+										/>
+										<rect
+											data-field-element
+											data-field-type="team-box-text"
+											data-hover-tooltip="Double Click to Edit"
+											role="button"
+											tabindex="0"
+											aria-label={`${teamBoxLabel}, double-click to rename team box`}
+											x={(xForYards(teamBox[0]) + xForYards(teamBox[1]) - teamBoxTextHitWidth) / 2}
+											y={teamBoxY + 2}
+											width={teamBoxTextHitWidth}
+											height="16"
+											fill="transparent"
+											pointer-events="all"
+											on:pointerdown|stopPropagation
+											on:dblclick|stopPropagation={(event) => startEditingTeamBox(event, teamBoxY, teamBoxIndex)}
+											on:keydown={(event) => {
+												if (event.key === 'Enter') void startEditingTeamBox(event, teamBoxY, teamBoxIndex);
+											}}
+											class="cursor-text focus:outline-none"
+										/>
+										<text
+											x={(xForYards(teamBox[0]) + xForYards(teamBox[1])) / 2}
+											y={teamBoxY + 14}
+											text-anchor="middle"
+											fill="#292524"
+											font-size="12"
+											font-weight="800"
+											letter-spacing="2"
+											pointer-events="none">{teamBoxLabel}</text
+										>
+									</g>
+								{/each}
+							{/if}
 
-						{#if fieldLayout.teamBox}
-							{@const scoreboardTeamBox = fieldLayout.teamBox}
-							{@const scoreboardTeamBoxY =
-								fieldTop - fieldLayout.teamBoxSetbackYards * (fieldWidth / fieldLayout.totalYards) - teamBoxExtraSetback - 20}
-							{@const scoreboardWidth = 58}
-							{@const scoreboardGap = 10}
-							{@const quarterBoxX = xForYards(scoreboardTeamBox[0]) - scoreboardGap - scoreboardWidth}
-							{@const clockBoxX = xForYards(scoreboardTeamBox[1]) + scoreboardGap}
-							{#each [{ kind: 'quarter' as const, x: quarterBoxX, value: fieldSettings.gameQuarter.toUpperCase(), label: `Quarter ${fieldSettings.gameQuarter}, click for next quarter` }, { kind: 'clock' as const, x: clockBoxX, value: formatPlayBuilderGameClock(fieldSettings.gameClockSeconds), label: `Game clock ${formatPlayBuilderGameClock(fieldSettings.gameClockSeconds)}, click to edit` }] as scoreboardItem}
-								<g data-export-scoreboard>
-									<rect
-										x={scoreboardItem.x}
-										y={scoreboardTeamBoxY}
-										width={scoreboardWidth}
-										height="20"
-										fill="#111827"
-										stroke="#facc15"
-										stroke-width="2"
-										pointer-events="none"
-									/>
-									{#if scoreboardItem.kind === 'clock' && editingScoreboard === 'clock'}
-										<foreignObject
-											bind:this={editorElement}
-											data-scoreboard-inline-editor
+							{#if fieldLayout.teamBox}
+								{@const scoreboardTeamBox = fieldLayout.teamBox}
+								{@const scoreboardTeamBoxY =
+									fieldTop - fieldLayout.teamBoxSetbackYards * (fieldWidth / fieldLayout.totalYards) - teamBoxExtraSetback - 20}
+								{@const scoreboardWidth = 58}
+								{@const scoreboardGap = 10}
+								{@const quarterBoxX = xForYards(scoreboardTeamBox[0]) - scoreboardGap - scoreboardWidth}
+								{@const clockBoxX = xForYards(scoreboardTeamBox[1]) + scoreboardGap}
+								{#each [{ kind: 'quarter' as const, x: quarterBoxX, value: fieldSettings.gameQuarter.toUpperCase(), label: `Quarter ${fieldSettings.gameQuarter}, click for next quarter` }, { kind: 'clock' as const, x: clockBoxX, value: formatPlayBuilderGameClock(fieldSettings.gameClockSeconds), label: `Game clock ${formatPlayBuilderGameClock(fieldSettings.gameClockSeconds)}, click to edit` }] as scoreboardItem}
+									<g data-export-scoreboard>
+										<rect
 											x={scoreboardItem.x}
 											y={scoreboardTeamBoxY}
 											width={scoreboardWidth}
 											height="20"
-										>
-											<input
-												bind:this={gameClockEditInput}
-												bind:value={gameClockEditValue}
-												inputmode="numeric"
-												maxlength="5"
-												pattern="[0-9][0-9]:[0-5][0-9]"
-												aria-label="Game clock"
-												autocomplete="off"
-												enterkeyhint="done"
-												class="block h-full w-full border-0 bg-transparent p-0 text-center font-mono text-[12px] font-black tracking-[0.075em] text-[#facc15] outline-none"
-												on:beforeinput={handleGameClockInput}
-												on:input={normalizeGameClockInput}
-												on:blur={commitScoreboardEditor}
-												on:keydown|stopPropagation={(event) => {
-													if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-														event.preventDefault();
-														void stepGameClock(event.key === 'ArrowUp' ? 1 : -1);
-													} else if (event.key === 'Enter') {
-														event.preventDefault();
-														commitScoreboardEditor();
-													} else if (event.key === 'Escape') {
-														event.preventDefault();
-														gameClockEditValue = formatPlayBuilderGameClock(fieldSettings.gameClockSeconds);
-														gameClockEditDigits = gameClockEditValue.replace(/\D/g, '');
-														editingScoreboard = null;
-														scoreboardHistorySaved = false;
-													}
-												}}
-											/>
-										</foreignObject>
-									{:else}
-										<text
-											x={scoreboardItem.x + scoreboardWidth / 2}
-											y={scoreboardTeamBoxY + 14}
-											text-anchor="middle"
-											fill="#facc15"
-											font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-											font-size="12"
-											font-weight="900"
-											letter-spacing="0.75"
-											pointer-events="none">{scoreboardItem.value}</text
-										>
-									{/if}
-									<rect
-										data-field-element
-										data-scoreboard-control={scoreboardItem.kind}
-										data-hover-tooltip={scoreboardItem.kind === 'quarter' ? 'Cycle Through Downs' : 'Set Game Time'}
-										role="button"
-										tabindex={tool === 'laser' ? -1 : 0}
-										aria-label={scoreboardItem.label}
-										aria-disabled={tool === 'laser'}
-										x={scoreboardItem.x}
-										y={scoreboardTeamBoxY}
-										width={scoreboardWidth}
-										height="20"
-										fill="transparent"
-										pointer-events={tool === 'laser' || (scoreboardItem.kind === 'clock' && editingScoreboard === 'clock') ? 'none' : 'all'}
-										on:pointerdown|stopPropagation
-										on:click|stopPropagation={(event) => (scoreboardItem.kind === 'quarter' ? cycleGameQuarter(event) : startEditingGameClock(event))}
-										on:keydown={(event) => {
-											if (event.key !== 'Enter' && event.key !== ' ') return;
-											event.preventDefault();
-											if (scoreboardItem.kind === 'quarter') cycleGameQuarter(event);
-											else startEditingGameClock(event);
-										}}
-										class={tool === 'laser' ? 'focus:outline-none' : 'cursor-pointer focus:outline-none'}
-									/>
-								</g>
-							{/each}
-						{/if}
-
-						<rect x={fieldLeft} y={fieldTop} width={fieldWidth} height={fieldHeight} fill={fieldPalette.field} />
-						<rect x={fieldLeft} y={fieldTop} width={fieldWidth} height={fieldHeight} fill="url(#builder-grass-stripe)" />
-						<rect
-							x={fieldLeft}
-							y={fieldTop}
-							width={xForYards(fieldLayout.goalLines[0]) - fieldLeft}
-							height={fieldHeight}
-							fill={fieldPalette.endZone}
-						/>
-						<rect
-							x={xForYards(fieldLayout.goalLines[1])}
-							y={fieldTop}
-							width={fieldRight - xForYards(fieldLayout.goalLines[1])}
-							height={fieldHeight}
-							fill={fieldPalette.endZone}
-						/>
-						<rect
-							x={fieldLeft}
-							y={fieldTop}
-							width={xForYards(fieldLayout.goalLines[0]) - fieldLeft}
-							height={fieldHeight}
-							fill="url(#builder-grass-stripe)"
-						/>
-						<rect
-							x={xForYards(fieldLayout.goalLines[1])}
-							y={fieldTop}
-							width={fieldRight - xForYards(fieldLayout.goalLines[1])}
-							height={fieldHeight}
-							fill="url(#builder-grass-stripe)"
-						/>
-						{#each fieldLayout.shadedZones as zone}
-							<rect
-								x={xForYards(zone[0])}
-								y={fieldTop}
-								width={xForYards(zone[1]) - xForYards(zone[0])}
-								height={fieldHeight}
-								fill="rgba(0,0,0,0.06)"
-							/>
-						{/each}
-						{#each fieldLayout.noRunZones as zone}
-							<rect
-								x={xForYards(zone[0])}
-								y={fieldTop}
-								width={xForYards(zone[1]) - xForYards(zone[0])}
-								height={fieldHeight}
-								fill="rgba(255,255,255,0.16)"
-								pointer-events="none"
-							/>
-						{/each}
-						<rect
-							data-export-field-outline
-							x={fieldLeft - fieldLineWidth * 2}
-							y={fieldTop - fieldLineWidth * 2}
-							width={fieldWidth + fieldLineWidth * 4}
-							height={fieldHeight + fieldLineWidth * 4}
-							fill="none"
-							stroke="#1c1917"
-							stroke-width={fieldLineWidth * 3}
-							display="none"
-							pointer-events="none"
-						/>
-						<rect
-							data-export-field-boundary
-							x={fieldLeft}
-							y={fieldTop}
-							width={fieldWidth}
-							height={fieldHeight}
-							fill="none"
-							stroke="#ffffff"
-							stroke-width={fieldLineWidth}
-							pointer-events="none"
-						/>
-
-						{#each fieldLayout.zoneLines as yards}
-							<line
-								x1={xForYards(yards)}
-								y1={fieldTop}
-								x2={xForYards(yards)}
-								y2={fieldBottom}
-								stroke="rgba(255,255,255,0.82)"
-								stroke-width={fieldLineWidth}
-								pointer-events="none"
-							/>
-						{/each}
-						{#if fieldSettings.showHashes}
-							{#each fieldLayout.hashLines as yards}
-								{#each fieldLayout.hashYFractions as yFraction}
-									<line
-										x1={xForYards(yards) - 10}
-										y1={fieldTop + fieldHeight * yFraction}
-										x2={xForYards(yards) + 10}
-										y2={fieldTop + fieldHeight * yFraction}
-										stroke="#fff"
-										stroke-width={fieldLineWidth}
-										pointer-events="none"
-									/>
-								{/each}
-							{/each}
-						{/if}
-						{#if fieldSettings.showThreeYardMarker}
-							{#each fieldLayout.threeYardMarkers as yards}
-								<line
-									x1={xForYards(yards)}
-									y1={fieldTop + fieldHeight / 2 - 12}
-									x2={xForYards(yards)}
-									y2={fieldTop + fieldHeight / 2 + 12}
-									stroke="rgba(255,255,255,0.9)"
-									stroke-width={fieldLineWidth}
-									pointer-events="none"
-								/>
-							{/each}
-						{/if}
-						{#if fieldSettings.showTenYardMarker}
-							{#each fieldLayout.tenYardMarkers as yards}
-								<line
-									x1={xForYards(yards)}
-									y1={fieldTop + fieldHeight / 2 - 12}
-									x2={xForYards(yards)}
-									y2={fieldTop + fieldHeight / 2 + 12}
-									stroke="rgba(255,255,255,0.9)"
-									stroke-width={fieldLineWidth}
-									pointer-events="none"
-								/>
-							{/each}
-						{/if}
-						{#if fieldSettings.showThirtyYardMarker}
-							{#each fieldLayout.thirtyYardMarkers as yards}
-								<line
-									x1={xForYards(yards)}
-									y1={fieldTop + fieldHeight / 2 - 16}
-									x2={xForYards(yards)}
-									y2={fieldTop + fieldHeight / 2 + 16}
-									stroke="rgba(255,255,255,0.78)"
-									stroke-width={fieldLineWidth}
-									pointer-events="none"
-								/>
-							{/each}
-						{/if}
-						{#each fieldLayout.noRunLines as yards}
-							<line
-								x1={xForYards(yards)}
-								y1={fieldTop}
-								x2={xForYards(yards)}
-								y2={fieldBottom}
-								stroke="rgba(255,255,255,0.58)"
-								stroke-width={fieldLineWidth}
-								stroke-dasharray="10 8"
-								pointer-events="none"
-							/>
-						{/each}
-						{#if (fieldSettings.fieldType === 'unified' || fieldSettings.fieldType === 'nfl-flag') && fieldSettings.showNoRunZoneText}
-							{#each fieldLayout.noRunZones as zone}
-								{@const noRunCenter = (xForYards(zone[0]) + xForYards(zone[1])) / 2}
-								<text
-									x={noRunCenter}
-									y={fieldTop + fieldHeight / 2}
-									transform={`rotate(-90 ${noRunCenter} ${fieldTop + fieldHeight / 2})`}
-									text-anchor="middle"
-									fill="rgba(255,255,255,0.72)"
-									font-size="15"
-									font-weight="900"
-									letter-spacing="1.5"
-									pointer-events="none">NO RUN ZONE</text
-								>
-							{/each}
-						{/if}
-						{#if fieldSettings.showEndZoneText}
-							<text
-								x={xForYards(fieldLayout.endZoneCenters[0])}
-								y={fieldTop + fieldHeight / 2}
-								transform={`rotate(-90 ${xForYards(fieldLayout.endZoneCenters[0])} ${fieldTop + fieldHeight / 2})`}
-								text-anchor="middle"
-								fill="#ffffff"
-								fill-opacity="0.72"
-								font-size="26"
-								font-weight="800"
-								letter-spacing="4"
-								pointer-events="none">END ZONE</text
-							>
-							<text
-								x={xForYards(fieldLayout.endZoneCenters[1])}
-								y={fieldTop + fieldHeight / 2}
-								transform={`rotate(90 ${xForYards(fieldLayout.endZoneCenters[1])} ${fieldTop + fieldHeight / 2})`}
-								text-anchor="middle"
-								fill="#ffffff"
-								fill-opacity="0.72"
-								font-size="26"
-								font-weight="800"
-								letter-spacing="4"
-								pointer-events="none">END ZONE</text
-							>
-						{/if}
-						{#if fieldSettings.showYardNumbers}
-							{#each [fieldTop + 35, fieldBottom - 15] as yardLabelY}
-								{#each fieldLayout.yardLabels as fieldMarker}
-									<text
-										x={xForYards(fieldMarker.x) - 5}
-										y={yardLabelY}
-										text-anchor="end"
-										fill="rgba(255,255,255,0.72)"
-										font-size="26"
-										font-weight="900"
-										pointer-events="none">{fieldMarker.label[0]}</text
-									>
-									<text
-										x={xForYards(fieldMarker.x) + 5}
-										y={yardLabelY}
-										text-anchor="start"
-										fill="rgba(255,255,255,0.72)"
-										font-size="26"
-										font-weight="900"
-										pointer-events="none">{fieldMarker.label[1]}</text
-									>
-								{/each}
-							{/each}
-						{/if}
-						{#if fieldSettings.showGoalLetters}
-							{#each [fieldTop + 35, fieldBottom - 15] as goalLabelY}
-								{#each fieldLayout.goalLabelYards as goalLabelYards}
-									<text
-										x={xForYards(goalLabelYards)}
-										y={goalLabelY}
-										text-anchor="middle"
-										fill="rgba(255,255,255,0.72)"
-										font-size="26"
-										font-weight="900"
-										pointer-events="none">G</text
-									>
-								{/each}
-							{/each}
-						{/if}
-
-						<g data-field-watermark aria-hidden="true" pointer-events="none">
-							<text
-								x={fieldLeft + fieldWidth / 2}
-								y={fieldTop + fieldHeight / 2}
-								transform={`rotate(${fieldWatermarkAngle} ${fieldLeft + fieldWidth / 2} ${fieldTop + fieldHeight / 2})`}
-								text-anchor="middle"
-								dominant-baseline="middle"
-								fill="#ffffff"
-								fill-opacity="0.1"
-								font-size="52"
-								font-weight="900"
-								letter-spacing="7">CASEPLAY.ORG</text
-							>
-						</g>
-					{/key}
-
-					<!-- Pylons are field fixtures, so every interactive diagram element renders above them. -->
-					<g data-field-fixtures-layer pointer-events="none">
-						{#key fieldSettings.fieldType}
-							{#if fieldSettings.showPylons}
-								{#each fieldLayout.endZonePylonYards as yards}
-									{#each [fieldTop, fieldBottom] as pylonY}
+											fill="#111827"
+											stroke="#facc15"
+											stroke-width="2"
+											pointer-events="none"
+										/>
+										{#if scoreboardItem.kind === 'clock' && editingScoreboard === 'clock'}
+											<foreignObject
+												bind:this={editorElement}
+												data-scoreboard-inline-editor
+												x={scoreboardItem.x}
+												y={scoreboardTeamBoxY}
+												width={scoreboardWidth}
+												height="20"
+											>
+												<input
+													bind:this={gameClockEditInput}
+													bind:value={gameClockEditValue}
+													inputmode="numeric"
+													maxlength="5"
+													pattern="[0-9][0-9]:[0-5][0-9]"
+													aria-label="Game clock"
+													autocomplete="off"
+													enterkeyhint="done"
+													class="block h-full w-full border-0 bg-transparent p-0 text-center font-mono text-[12px] font-black tracking-[0.075em] text-[#facc15] outline-none"
+													on:beforeinput={handleGameClockInput}
+													on:input={normalizeGameClockInput}
+													on:blur={commitScoreboardEditor}
+													on:keydown|stopPropagation={(event) => {
+														if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+															event.preventDefault();
+															void stepGameClock(event.key === 'ArrowUp' ? 1 : -1);
+														} else if (event.key === 'Enter') {
+															event.preventDefault();
+															commitScoreboardEditor();
+														} else if (event.key === 'Escape') {
+															event.preventDefault();
+															gameClockEditValue = formatPlayBuilderGameClock(fieldSettings.gameClockSeconds);
+															gameClockEditDigits = gameClockEditValue.replace(/\D/g, '');
+															editingScoreboard = null;
+															scoreboardHistorySaved = false;
+														}
+													}}
+												/>
+											</foreignObject>
+										{:else}
+											<text
+												x={scoreboardItem.x + scoreboardWidth / 2}
+												y={scoreboardTeamBoxY + 14}
+												text-anchor="middle"
+												fill="#facc15"
+												font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+												font-size="12"
+												font-weight="900"
+												letter-spacing="0.75"
+												pointer-events="none">{scoreboardItem.value}</text
+											>
+										{/if}
 										<rect
-											data-field-fixture="pylon"
-											x={xForYards(yards) - 3.5}
-											y={pylonY - 3.5}
-											width="7"
-											height="7"
-											fill="#f97316"
+											data-field-element
+											data-scoreboard-control={scoreboardItem.kind}
+											data-hover-tooltip={scoreboardItem.kind === 'quarter' ? 'Cycle Through Periods' : 'Set Game Time'}
+											role="button"
+											tabindex={tool === 'laser' ? -1 : 0}
+											aria-label={scoreboardItem.label}
+											aria-disabled={tool === 'laser'}
+											x={scoreboardItem.x}
+											y={scoreboardTeamBoxY}
+											width={scoreboardWidth}
+											height="20"
+											fill="transparent"
+											pointer-events={tool === 'laser' || (scoreboardItem.kind === 'clock' && editingScoreboard === 'clock') ? 'none' : 'all'}
+											on:pointerdown|stopPropagation
+											on:click|stopPropagation={(event) =>
+												scoreboardItem.kind === 'quarter' ? cycleGameQuarter(event) : startEditingGameClock(event)}
+											on:keydown={(event) => {
+												if (event.key !== 'Enter' && event.key !== ' ') return;
+												event.preventDefault();
+												if (scoreboardItem.kind === 'quarter') cycleGameQuarter(event);
+												else startEditingGameClock(event);
+											}}
+											class={tool === 'laser' ? 'focus:outline-none' : 'cursor-pointer focus:outline-none'}
+										/>
+									</g>
+								{/each}
+							{/if}
+
+							<rect x={fieldLeft} y={fieldTop} width={fieldWidth} height={fieldHeight} fill={fieldPalette.field} />
+							<rect x={fieldLeft} y={fieldTop} width={fieldWidth} height={fieldHeight} fill="url(#builder-grass-stripe)" />
+							<rect
+								x={fieldLeft}
+								y={fieldTop}
+								width={xForYards(fieldLayout.goalLines[0]) - fieldLeft}
+								height={fieldHeight}
+								fill={fieldPalette.endZone}
+							/>
+							<rect
+								x={xForYards(fieldLayout.goalLines[1])}
+								y={fieldTop}
+								width={fieldRight - xForYards(fieldLayout.goalLines[1])}
+								height={fieldHeight}
+								fill={fieldPalette.endZone}
+							/>
+							<rect
+								x={fieldLeft}
+								y={fieldTop}
+								width={xForYards(fieldLayout.goalLines[0]) - fieldLeft}
+								height={fieldHeight}
+								fill="url(#builder-grass-stripe)"
+							/>
+							<rect
+								x={xForYards(fieldLayout.goalLines[1])}
+								y={fieldTop}
+								width={fieldRight - xForYards(fieldLayout.goalLines[1])}
+								height={fieldHeight}
+								fill="url(#builder-grass-stripe)"
+							/>
+							{#each fieldLayout.shadedZones as zone}
+								<rect
+									x={xForYards(zone[0])}
+									y={fieldTop}
+									width={xForYards(zone[1]) - xForYards(zone[0])}
+									height={fieldHeight}
+									fill="rgba(0,0,0,0.06)"
+								/>
+							{/each}
+							{#each fieldLayout.noRunZones as zone}
+								<rect
+									x={xForYards(zone[0])}
+									y={fieldTop}
+									width={xForYards(zone[1]) - xForYards(zone[0])}
+									height={fieldHeight}
+									fill="rgba(255,255,255,0.16)"
+									pointer-events="none"
+								/>
+							{/each}
+							<rect
+								data-export-field-outline
+								x={fieldLeft - fieldLineWidth * 2}
+								y={fieldTop - fieldLineWidth * 2}
+								width={fieldWidth + fieldLineWidth * 4}
+								height={fieldHeight + fieldLineWidth * 4}
+								fill="none"
+								stroke="#1c1917"
+								stroke-width={fieldLineWidth * 3}
+								display="none"
+								pointer-events="none"
+							/>
+							<rect
+								data-export-field-boundary
+								x={fieldLeft}
+								y={fieldTop}
+								width={fieldWidth}
+								height={fieldHeight}
+								fill="none"
+								stroke="#ffffff"
+								stroke-width={fieldLineWidth}
+								pointer-events="none"
+							/>
+
+							{#each fieldLayout.zoneLines as yards}
+								<line
+									x1={xForYards(yards)}
+									y1={fieldTop}
+									x2={xForYards(yards)}
+									y2={fieldBottom}
+									stroke="rgba(255,255,255,0.82)"
+									stroke-width={fieldLineWidth}
+									pointer-events="none"
+								/>
+							{/each}
+							{#if fieldSettings.showHashes}
+								{#each fieldLayout.hashLines as yards}
+									{#each fieldLayout.hashYFractions as yFraction}
+										<line
+											x1={xForYards(yards) - 10}
+											y1={fieldTop + fieldHeight * yFraction}
+											x2={xForYards(yards) + 10}
+											y2={fieldTop + fieldHeight * yFraction}
 											stroke="#fff"
-											stroke-width="1.5"
+											stroke-width={fieldLineWidth}
 											pointer-events="none"
 										/>
 									{/each}
 								{/each}
-								{#if fieldSettings.showHashes}
-									{#each fieldLayout.endLinePylonFractions as yFraction}
-										{#each [fieldLeft - 7, fieldRight + 7] as pylonX}
+							{/if}
+							{#if fieldSettings.showThreeYardMarker}
+								{#each fieldLayout.threeYardMarkers as yards}
+									<line
+										x1={xForYards(yards)}
+										y1={fieldTop + fieldHeight / 2 - 12}
+										x2={xForYards(yards)}
+										y2={fieldTop + fieldHeight / 2 + 12}
+										stroke="rgba(255,255,255,0.9)"
+										stroke-width={fieldLineWidth}
+										pointer-events="none"
+									/>
+								{/each}
+							{/if}
+							{#if fieldSettings.showTenYardMarker}
+								{#each fieldLayout.tenYardMarkers as yards}
+									<line
+										x1={xForYards(yards)}
+										y1={fieldTop + fieldHeight / 2 - 12}
+										x2={xForYards(yards)}
+										y2={fieldTop + fieldHeight / 2 + 12}
+										stroke="rgba(255,255,255,0.9)"
+										stroke-width={fieldLineWidth}
+										pointer-events="none"
+									/>
+								{/each}
+							{/if}
+							{#if fieldSettings.showThirtyYardMarker}
+								{#each fieldLayout.thirtyYardMarkers as yards}
+									<line
+										x1={xForYards(yards)}
+										y1={fieldTop + fieldHeight / 2 - 16}
+										x2={xForYards(yards)}
+										y2={fieldTop + fieldHeight / 2 + 16}
+										stroke="rgba(255,255,255,0.78)"
+										stroke-width={fieldLineWidth}
+										pointer-events="none"
+									/>
+								{/each}
+							{/if}
+							{#each fieldLayout.noRunLines as yards}
+								<line
+									x1={xForYards(yards)}
+									y1={fieldTop}
+									x2={xForYards(yards)}
+									y2={fieldBottom}
+									stroke="rgba(255,255,255,0.58)"
+									stroke-width={fieldLineWidth}
+									stroke-dasharray="10 8"
+									pointer-events="none"
+								/>
+							{/each}
+							{#if (fieldSettings.fieldType === 'unified' || fieldSettings.fieldType === 'nfl-flag') && fieldSettings.showNoRunZoneText}
+								{#each fieldLayout.noRunZones as zone}
+									{@const noRunCenter = (xForYards(zone[0]) + xForYards(zone[1])) / 2}
+									<text
+										x={noRunCenter}
+										y={fieldTop + fieldHeight / 2}
+										transform={`rotate(-90 ${noRunCenter} ${fieldTop + fieldHeight / 2})`}
+										text-anchor="middle"
+										fill="rgba(255,255,255,0.72)"
+										font-size="15"
+										font-weight="900"
+										letter-spacing="1.5"
+										pointer-events="none">NO RUN ZONE</text
+									>
+								{/each}
+							{/if}
+							{#if fieldSettings.showEndZoneText}
+								<text
+									x={xForYards(fieldLayout.endZoneCenters[0])}
+									y={fieldTop + fieldHeight / 2}
+									transform={`rotate(-90 ${xForYards(fieldLayout.endZoneCenters[0])} ${fieldTop + fieldHeight / 2})`}
+									text-anchor="middle"
+									fill="#ffffff"
+									fill-opacity="0.72"
+									font-size="26"
+									font-weight="800"
+									letter-spacing="4"
+									pointer-events="none">END ZONE</text
+								>
+								<text
+									x={xForYards(fieldLayout.endZoneCenters[1])}
+									y={fieldTop + fieldHeight / 2}
+									transform={`rotate(90 ${xForYards(fieldLayout.endZoneCenters[1])} ${fieldTop + fieldHeight / 2})`}
+									text-anchor="middle"
+									fill="#ffffff"
+									fill-opacity="0.72"
+									font-size="26"
+									font-weight="800"
+									letter-spacing="4"
+									pointer-events="none">END ZONE</text
+								>
+							{/if}
+							{#if fieldSettings.showYardNumbers}
+								{#each [fieldTop + 35, fieldBottom - 15] as yardLabelY}
+									{#each fieldLayout.yardLabels as fieldMarker}
+										<text
+											x={xForYards(fieldMarker.x) - 5}
+											y={yardLabelY}
+											text-anchor="end"
+											fill="rgba(255,255,255,0.72)"
+											font-size="26"
+											font-weight="900"
+											pointer-events="none">{fieldMarker.label[0]}</text
+										>
+										<text
+											x={xForYards(fieldMarker.x) + 5}
+											y={yardLabelY}
+											text-anchor="start"
+											fill="rgba(255,255,255,0.72)"
+											font-size="26"
+											font-weight="900"
+											pointer-events="none">{fieldMarker.label[1]}</text
+										>
+									{/each}
+								{/each}
+							{/if}
+							{#if fieldSettings.showGoalLetters}
+								{#each [fieldTop + 35, fieldBottom - 15] as goalLabelY}
+									{#each fieldLayout.goalLabelYards as goalLabelYards}
+										<text
+											x={xForYards(goalLabelYards)}
+											y={goalLabelY}
+											text-anchor="middle"
+											fill="rgba(255,255,255,0.72)"
+											font-size="26"
+											font-weight="900"
+											pointer-events="none">G</text
+										>
+									{/each}
+								{/each}
+							{/if}
+
+							<g data-field-watermark aria-hidden="true" pointer-events="none">
+								<text
+									x={fieldLeft + fieldWidth / 2}
+									y={fieldTop + fieldHeight / 2}
+									transform={`rotate(${fieldWatermarkAngle} ${fieldLeft + fieldWidth / 2} ${fieldTop + fieldHeight / 2})`}
+									text-anchor="middle"
+									dominant-baseline="middle"
+									fill="#ffffff"
+									fill-opacity="0.1"
+									font-size="52"
+									font-weight="900"
+									letter-spacing="7">CASEPLAY.ORG</text
+								>
+							</g>
+						{/key}
+
+						<!-- Pylons are field fixtures, so every interactive diagram element renders above them. -->
+						<g data-field-fixtures-layer pointer-events="none">
+							{#key fieldSettings.fieldType}
+								{#if fieldSettings.showPylons}
+									{#each fieldLayout.endZonePylonYards as yards}
+										{#each [fieldTop, fieldBottom] as pylonY}
 											<rect
 												data-field-fixture="pylon"
-												x={pylonX - 3.5}
-												y={fieldTop + fieldHeight * yFraction - 3.5}
+												x={xForYards(yards) - 3.5}
+												y={pylonY - 3.5}
 												width="7"
 												height="7"
 												fill="#f97316"
@@ -6791,178 +6771,176 @@
 											/>
 										{/each}
 									{/each}
+									{#if fieldSettings.showHashes}
+										{#each fieldLayout.endLinePylonFractions as yFraction}
+											{#each [fieldLeft - 7, fieldRight + 7] as pylonX}
+												<rect
+													data-field-fixture="pylon"
+													x={pylonX - 3.5}
+													y={fieldTop + fieldHeight * yFraction - 3.5}
+													width="7"
+													height="7"
+													fill="#f97316"
+													stroke="#fff"
+													stroke-width="1.5"
+													pointer-events="none"
+												/>
+											{/each}
+										{/each}
+									{/if}
 								{/if}
-							{/if}
-						{/key}
-					</g>
+							{/key}
+						</g>
 
-					{#if hoverPoint && !hoveringElement && !drawing && !dragTarget}
-						{#if isGuideTool(tool)}
-							{@const rawGuidePreviewX = placementSnapX ?? hoverPoint.x}
-							{@const guidePreviewX = tool === 'line-to-gain' ? wholeYardLineToGainX(rawGuidePreviewX) : wholeYardLineOfScrimmageX(rawGuidePreviewX)}
-							<line
-								x1={guidePreviewX}
-								y1={fieldTop + guideSidelineInset}
-								x2={guidePreviewX}
-								y2={fieldBottom - guideSidelineInset}
-								stroke={guideColor(defaultGuideColor(tool))}
-								stroke-width={guideStrokeWidth}
-								stroke-dasharray={guideDash(defaultGuideStyle(tool))}
-								opacity="0.45"
-								pointer-events="none"
-							/>
-						{:else if isPathTool(tool)}
-							{@const preview = previewPathFrom(hoverPoint)}
-							{@const previewStart = preview.start}
-							{@const previewEnd = preview.end}
-							{#if tool === 'pass' || tool === 'kick'}
-								<g opacity="0.48" pointer-events="none">
-									<path
-										d={airShadowPath(previewStart, previewEnd)}
-										fill="none"
-										stroke="#10291b"
-										stroke-width={tool === 'kick' ? 7 : 5}
-										opacity="0.28"
-										filter="url(#builder-air-shadow)"
-									/>
-									{#each airborneSegments(tool, previewStart, previewEnd, defaultPathStyle(tool)) as segment}
-										<path d={segment.d} fill="none" stroke={defaultPathColor(tool)} stroke-width={segment.width} stroke-linecap={segment.linecap} />
-									{/each}
-									<path
-										d={pathData(tool, previewStart, previewEnd)}
-										fill="none"
-										stroke={defaultPathColor(tool)}
-										stroke-width="0.01"
-										marker-end={pathMarker(tool)}
-									/>
-								</g>
-							{:else}
+						{#if hoverPoint && !hoveringElement && !drawing && !dragTarget}
+							{#if isGuideTool(tool)}
+								{@const rawGuidePreviewX = placementSnapX ?? hoverPoint.x}
+								{@const guidePreviewX =
+									tool === 'line-to-gain' ? wholeYardLineToGainX(rawGuidePreviewX) : wholeYardLineOfScrimmageX(rawGuidePreviewX)}
 								<line
-									x1={previewStart.x}
-									y1={previewStart.y}
-									x2={previewEnd.x}
-									y2={previewEnd.y}
-									stroke={defaultPathColor(tool)}
-									stroke-width={pathStrokeWidth}
-									stroke-dasharray={guideDash(defaultPathStyle(tool))}
-									stroke-linecap={defaultPathStyle(tool) === 'dotted' ? 'round' : 'square'}
-									marker-end={pathMarker(tool)}
-									opacity="0.48"
+									x1={guidePreviewX}
+									y1={fieldTop + guideSidelineInset}
+									x2={guidePreviewX}
+									y2={fieldBottom - guideSidelineInset}
+									stroke={guideColor(defaultGuideColor(tool))}
+									stroke-width={guideStrokeWidth}
+									stroke-dasharray={guideDash(defaultGuideStyle(tool))}
+									opacity="0.45"
 									pointer-events="none"
 								/>
-							{/if}
-						{:else if tool === 'team-a' || tool === 'team-k' || tool === 'team-b' || tool === 'team-r'}
-							<circle
-								cx={hoverPoint.x}
-								cy={hoverPoint.y}
-								r={playerRadius}
-								fill={tool === 'team-a' || tool === 'team-k' ? '#1c1917' : '#fff'}
-								stroke={tool === 'team-a' || tool === 'team-k' ? '#fff' : '#1c1917'}
-								stroke-width={playerStrokeWidth}
-								opacity="0.55"
-								pointer-events="none"
-							/>
-							<text
-								x={hoverPoint.x}
-								y={hoverPoint.y + 3.4}
-								text-anchor="middle"
-								fill={tool === 'team-a' || tool === 'team-k' ? '#fff' : '#1c1917'}
-								font-size="8.925"
-								font-weight="900"
-								opacity="0.65"
-								pointer-events="none">{tool.slice(-1).toUpperCase()}</text
-							>
-						{:else if isOfficialKind(tool)}
-							<image
-								href={officialImages[tool]}
-								x={hoverPoint.x - officialSize / 2}
-								y={hoverPoint.y - officialSize / 2}
-								width={officialSize}
-								height={officialSize}
-								opacity="0.58"
-								pointer-events="none"
-							/>
-						{:else if tool === 'ball'}
-							<image
-								href="/images/football.webp"
-								x={(placementSnapX ?? hoverPoint.x) - footballSize / 2}
-								y={hoverPoint.y - footballSize / 2}
-								width={footballSize}
-								height={footballSize}
-								opacity="0.58"
-								pointer-events="none"
-							/>
-						{:else if tool === 'deflag'}
-							<image
-								href={deflagImage(deflagPlacementColor)}
-								x={hoverPoint.x - deflagSize / 2}
-								y={hoverPoint.y - deflagSize / 2}
-								width={deflagSize}
-								height={deflagSize}
-								opacity="0.58"
-								pointer-events="none"
-							/>
-						{:else if tool === 'flag'}
-							<image
-								href="/images/penalty-flag.webp"
-								x={hoverPoint.x - foulFlagSize / 2}
-								y={hoverPoint.y - foulFlagSize / 2}
-								width={foulFlagSize}
-								height={foulFlagSize}
-								opacity="0.58"
-								pointer-events="none"
-							/>
-						{:else if tool === 'bean-bag'}
-							<image
-								href={beanBagImage(beanBagPlacementColor)}
-								x={hoverPoint.x - beanBagSize / 2}
-								y={hoverPoint.y - beanBagSize / 2}
-								width={beanBagSize}
-								height={beanBagSize}
-								opacity="0.58"
-								pointer-events="none"
-							/>
-						{:else if tool === 'event'}
-							<g opacity="0.58" pointer-events="none">
-								<rect
-									x={hoverPoint.x - eventTagWidth / 2}
-									y={hoverPoint.y - eventTagHeight / 2}
-									width={eventTagWidth}
-									height={eventTagHeight}
-									fill="#fff"
-									stroke="#1c1917"
-									stroke-width="2.25"
+							{:else if isPathTool(tool)}
+								{@const preview = previewPathFrom(hoverPoint)}
+								{@const previewStart = preview.start}
+								{@const previewEnd = preview.end}
+								{#if tool === 'pass' || tool === 'kick'}
+									<g opacity="0.48" pointer-events="none">
+										<path
+											d={airShadowPath(previewStart, previewEnd)}
+											fill="none"
+											stroke="#10291b"
+											stroke-width={tool === 'kick' ? 7 : 5}
+											opacity="0.28"
+											filter="url(#builder-air-shadow)"
+										/>
+										{#each airborneSegments(tool, previewStart, previewEnd, defaultPathStyle(tool)) as segment}
+											<path d={segment.d} fill="none" stroke={defaultPathColor(tool)} stroke-width={segment.width} stroke-linecap={segment.linecap} />
+										{/each}
+										<path
+											d={pathData(tool, previewStart, previewEnd)}
+											fill="none"
+											stroke={defaultPathColor(tool)}
+											stroke-width="0.01"
+											marker-end={pathMarker(tool)}
+										/>
+									</g>
+								{:else}
+									<line
+										x1={previewStart.x}
+										y1={previewStart.y}
+										x2={previewEnd.x}
+										y2={previewEnd.y}
+										stroke={defaultPathColor(tool)}
+										stroke-width={pathStrokeWidth}
+										stroke-dasharray={guideDash(defaultPathStyle(tool))}
+										stroke-linecap={defaultPathStyle(tool) === 'dotted' ? 'round' : 'square'}
+										marker-end={pathMarker(tool)}
+										opacity="0.48"
+										pointer-events="none"
+									/>
+								{/if}
+							{:else if tool === 'team-a' || tool === 'team-k' || tool === 'team-b' || tool === 'team-r'}
+								<circle
+									cx={hoverPoint.x}
+									cy={hoverPoint.y}
+									r={playerRadius}
+									fill={tool === 'team-a' || tool === 'team-k' ? '#1c1917' : '#fff'}
+									stroke={tool === 'team-a' || tool === 'team-k' ? '#fff' : '#1c1917'}
+									stroke-width={playerStrokeWidth}
+									opacity="0.55"
+									pointer-events="none"
 								/>
-								<text x={hoverPoint.x} y={hoverPoint.y + 3.5} text-anchor="middle" fill="#1c1917" font-size="9" font-weight="900">EVENT</text>
-							</g>
-						{/if}
-						{#if showYardLineCursorEnabled && (isMarkerTool(tool) || isPathTool(tool))}
-							{@const yardPreviewX = tool === 'ball' ? (placementSnapX ?? hoverPoint.x) : hoverPoint.x}
-							{@const yardPreviewPoint = { x: yardPreviewX, y: hoverPoint.y }}
-							{#if isPointOnField(yardPreviewPoint)}
 								<text
-									data-yard-line-preview
-									x={yardPreviewX}
-									y={toolYardLinePreviewY(tool, yardPreviewPoint)}
+									x={hoverPoint.x}
+									y={hoverPoint.y + 3.4}
 									text-anchor="middle"
-									fill="#fff"
-									stroke="#1c1917"
-									stroke-width="2"
-									paint-order="stroke"
-									font-size="8"
+									fill={tool === 'team-a' || tool === 'team-k' ? '#fff' : '#1c1917'}
+									font-size="8.925"
 									font-weight="900"
-									opacity="0.58"
-									pointer-events="none">{yardLinePreviewText(yardPreviewX)}</text
+									opacity="0.65"
+									pointer-events="none">{tool.slice(-1).toUpperCase()}</text
 								>
+							{:else if isOfficialKind(tool)}
+								<image
+									href={officialImages[tool]}
+									x={hoverPoint.x - officialSize / 2}
+									y={hoverPoint.y - officialSize / 2}
+									width={officialSize}
+									height={officialSize}
+									opacity="0.58"
+									pointer-events="none"
+								/>
+							{:else if tool === 'ball'}
+								<image
+									href="/images/football.webp"
+									x={(placementSnapX ?? hoverPoint.x) - footballSize / 2}
+									y={hoverPoint.y - footballSize / 2}
+									width={footballSize}
+									height={footballSize}
+									opacity="0.58"
+									pointer-events="none"
+								/>
+							{:else if tool === 'deflag'}
+								<image
+									href={deflagImage(deflagPlacementColor)}
+									x={hoverPoint.x - deflagSize / 2}
+									y={hoverPoint.y - deflagSize / 2}
+									width={deflagSize}
+									height={deflagSize}
+									opacity="0.58"
+									pointer-events="none"
+								/>
+							{:else if tool === 'flag'}
+								<image
+									href="/images/penalty-flag.webp"
+									x={hoverPoint.x - foulFlagSize / 2}
+									y={hoverPoint.y - foulFlagSize / 2}
+									width={foulFlagSize}
+									height={foulFlagSize}
+									opacity="0.58"
+									pointer-events="none"
+								/>
+							{:else if tool === 'bean-bag'}
+								<image
+									href={beanBagImage(beanBagPlacementColor)}
+									x={hoverPoint.x - beanBagSize / 2}
+									y={hoverPoint.y - beanBagSize / 2}
+									width={beanBagSize}
+									height={beanBagSize}
+									opacity="0.58"
+									pointer-events="none"
+								/>
+							{:else if tool === 'event'}
+								<g opacity="0.58" pointer-events="none">
+									<rect
+										x={hoverPoint.x - eventTagWidth / 2}
+										y={hoverPoint.y - eventTagHeight / 2}
+										width={eventTagWidth}
+										height={eventTagHeight}
+										fill="#fff"
+										stroke="#1c1917"
+										stroke-width="2.25"
+									/>
+									<text x={hoverPoint.x} y={hoverPoint.y + 3.5} text-anchor="middle" fill="#1c1917" font-size="9" font-weight="900">EVENT</text>
+								</g>
 							{/if}
-							{#if isPathTool(tool)}
-								{@const arrowPreview = previewPathFrom(hoverPoint)}
-								{@const arrowPreviewTip = arrowHitTip(tool, arrowPreview.start, arrowPreview.end)}
-								{#if isPointOnField(arrowPreviewTip)}
+							{#if showYardLineCursorEnabled && (isMarkerTool(tool) || isPathTool(tool))}
+								{@const yardPreviewX = tool === 'ball' ? (placementSnapX ?? hoverPoint.x) : hoverPoint.x}
+								{@const yardPreviewPoint = { x: yardPreviewX, y: hoverPoint.y }}
+								{#if isPointOnField(yardPreviewPoint)}
 									<text
 										data-yard-line-preview
-										x={arrowPreviewTip.x}
-										y={toolYardLinePreviewY(tool, arrowPreviewTip)}
+										x={yardPreviewX}
+										y={toolYardLinePreviewY(tool, yardPreviewPoint)}
 										text-anchor="middle"
 										fill="#fff"
 										stroke="#1c1917"
@@ -6971,706 +6949,683 @@
 										font-size="8"
 										font-weight="900"
 										opacity="0.58"
-										pointer-events="none">{yardLinePreviewText(arrowPreviewTip.x)}</text
+										pointer-events="none">{yardLinePreviewText(yardPreviewX)}</text
 									>
+								{/if}
+								{#if isPathTool(tool)}
+									{@const arrowPreview = previewPathFrom(hoverPoint)}
+									{@const arrowPreviewTip = arrowHitTip(tool, arrowPreview.start, arrowPreview.end)}
+									{#if isPointOnField(arrowPreviewTip)}
+										<text
+											data-yard-line-preview
+											x={arrowPreviewTip.x}
+											y={toolYardLinePreviewY(tool, arrowPreviewTip)}
+											text-anchor="middle"
+											fill="#fff"
+											stroke="#1c1917"
+											stroke-width="2"
+											paint-order="stroke"
+											font-size="8"
+											font-weight="900"
+											opacity="0.58"
+											pointer-events="none">{yardLinePreviewText(arrowPreviewTip.x)}</text
+										>
+									{/if}
 								{/if}
 							{/if}
 						{/if}
-					{/if}
 
-					{#each guides as guide}
-						<g
-							data-layer-type="guide"
-							data-layer-id={guide.id}
-							data-tutorial-kind={guide.kind}
-							data-field-element
-							data-field-type="guide"
-							role="button"
-							tabindex="0"
-							aria-label={`${guideLabel(guide)}, double-click to format`}
-							on:pointerdown|stopPropagation={(event) => beginOnGuide(event, guide)}
-							on:pointerenter={() => (hoveringElement = tool !== 'ball' && tool !== 'event')}
-							on:pointerleave={() => (hoveringElement = false)}
-							on:dblclick|stopPropagation={(event) => startEditingGuide(event, guide)}
-							on:keydown|stopPropagation={(event) => handleGuideKeydown(event, guide)}
-							class="focus:outline-none"
-							class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('guide', guide.id)}
-							class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('guide', guide.id)}
-						>
-							<line x1={guide.x} y1={fieldTop} x2={guide.x} y2={fieldBottom} stroke="transparent" stroke-width="14" />
-							<line
-								x1={guide.x}
-								y1={fieldTop + guideSidelineInset}
-								x2={guide.x}
-								y2={fieldBottom - guideSidelineInset}
-								stroke={renderedGuideColor(guide)}
-								stroke-width={guideStrokeWidth}
-								stroke-dasharray={renderedGuideDash(guide)}
-								stroke-linecap={guide.style === 'dotted' ? 'round' : 'square'}
-								pointer-events="none"
-							/>
-						</g>
-					{/each}
-
-					<g data-field-x-layer aria-hidden="true" pointer-events="none">
-						{#if fieldSettings.showTenYardMarker}
-							{#each fieldLayout.tenYardXs as yards}
-								<text
-									x={xForYards(yards)}
-									y={fieldTop + fieldHeight / 2 + 7}
-									text-anchor="middle"
-									fill="rgba(255,255,255,0.9)"
-									font-size="24"
-									font-weight="900">×</text
-								>
-							{/each}
-						{/if}
-						{#if fieldSettings.showFourteenYardX}
-							{#each fieldLayout.fourteenYardXs as yards}
-								<text
-									x={xForYards(yards)}
-									y={fieldTop + fieldHeight / 2 + 7}
-									text-anchor="middle"
-									fill="rgba(255,255,255,0.9)"
-									font-size="24"
-									font-weight="900">×</text
-								>
-							{/each}
-						{/if}
-					</g>
-
-					{#each paths as path}
-						{@const start = pathStart(path)}
-						<g data-layer-type="path" data-layer-id={path.id} data-tutorial-kind={path.kind}>
-							{#if path.kind === 'pass' || path.kind === 'kick'}
-								<path
-									data-field-element
-									data-field-type="path"
-									d={pathData(path.kind, start, path.end)}
-									fill="none"
-									stroke="transparent"
-									stroke-width="44"
-									role="button"
-									tabindex="0"
-									aria-label={`${path.kind} line`}
-									class="focus:outline-none"
-									class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
-									class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('path', path.id)}
-									on:pointerenter={() => (hoveringElement = tool !== 'event')}
-									on:pointerleave={() => (hoveringElement = false)}
-									on:pointerdown|stopPropagation={(event) => beginOnPath(event, path)}
-									on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
-									on:keydown={(event) => handlePathKeydown(event, path)}
+						{#each guides as guide}
+							<g
+								data-layer-type="guide"
+								data-layer-id={guide.id}
+								data-tutorial-kind={guide.kind}
+								data-field-element
+								data-field-type="guide"
+								role="button"
+								tabindex="0"
+								aria-label={`${guideLabel(guide)}, double-click to format`}
+								on:pointerdown|stopPropagation={(event) => beginOnGuide(event, guide)}
+								on:pointerenter={() => (hoveringElement = tool !== 'ball' && tool !== 'event')}
+								on:pointerleave={() => (hoveringElement = false)}
+								on:dblclick|stopPropagation={(event) => startEditingGuide(event, guide)}
+								on:keydown|stopPropagation={(event) => handleGuideKeydown(event, guide)}
+								class="focus:outline-none"
+								class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('guide', guide.id)}
+								class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('guide', guide.id)}
+							>
+								<line x1={guide.x} y1={fieldTop} x2={guide.x} y2={fieldBottom} stroke="transparent" stroke-width="14" />
+								<line
+									x1={guide.x}
+									y1={fieldTop + guideSidelineInset}
+									x2={guide.x}
+									y2={fieldBottom - guideSidelineInset}
+									stroke={renderedGuideColor(guide)}
+									stroke-width={guideStrokeWidth}
+									stroke-dasharray={renderedGuideDash(guide)}
+									stroke-linecap={guide.style === 'dotted' ? 'round' : 'square'}
+									pointer-events="none"
 								/>
-								<g pointer-events="none">
+							</g>
+						{/each}
+
+						<g data-field-x-layer aria-hidden="true" pointer-events="none">
+							{#if fieldSettings.showTenYardMarker}
+								{#each fieldLayout.tenYardXs as yards}
+									<text
+										x={xForYards(yards)}
+										y={fieldTop + fieldHeight / 2 + 7}
+										text-anchor="middle"
+										fill="rgba(255,255,255,0.9)"
+										font-size="24"
+										font-weight="900">×</text
+									>
+								{/each}
+							{/if}
+							{#if fieldSettings.showFourteenYardX}
+								{#each fieldLayout.fourteenYardXs as yards}
+									<text
+										x={xForYards(yards)}
+										y={fieldTop + fieldHeight / 2 + 7}
+										text-anchor="middle"
+										fill="rgba(255,255,255,0.9)"
+										font-size="24"
+										font-weight="900">×</text
+									>
+								{/each}
+							{/if}
+						</g>
+
+						{#each paths as path}
+							{@const start = pathStart(path)}
+							<g data-layer-type="path" data-layer-id={path.id} data-tutorial-kind={path.kind}>
+								{#if path.kind === 'pass' || path.kind === 'kick'}
 									<path
-										d={airShadowPath(start, path.end)}
+										data-field-element
+										data-field-type="path"
+										d={pathData(path.kind, start, path.end)}
+										fill="none"
+										stroke="transparent"
+										stroke-width="44"
+										role="button"
+										tabindex="0"
+										aria-label={`${path.kind} line`}
+										class="focus:outline-none"
+										class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
+										class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('path', path.id)}
+										on:pointerenter={() => (hoveringElement = tool !== 'event')}
+										on:pointerleave={() => (hoveringElement = false)}
+										on:pointerdown|stopPropagation={(event) => beginOnPath(event, path)}
+										on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
+										on:keydown={(event) => handlePathKeydown(event, path)}
+									/>
+									<g pointer-events="none">
+										<path
+											d={airShadowPath(start, path.end)}
+											fill="none"
+											stroke="#10291b"
+											stroke-width={path.kind === 'kick' ? 7 : 5}
+											opacity="0.24"
+											filter="url(#builder-air-shadow)"
+										/>
+										{#each airborneSegments(path.kind, start, path.end, path.style) as segment}
+											<path d={segment.d} fill="none" stroke={guideColor(path.color)} stroke-width={segment.width} stroke-linecap={segment.linecap} />
+										{/each}
+										<path
+											d={pathData(path.kind, start, path.end)}
+											fill="none"
+											stroke={guideColor(path.color)}
+											stroke-width="0.01"
+											marker-end={pathMarker(path.kind)}
+										/>
+									</g>
+								{:else}
+									<line
+										data-field-element
+										data-field-type="path"
+										x1={start.x}
+										y1={start.y}
+										x2={path.end.x}
+										y2={path.end.y}
+										stroke="transparent"
+										stroke-width="44"
+										role="button"
+										tabindex="0"
+										aria-label={`${path.kind} line`}
+										class="focus:outline-none"
+										class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
+										class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('path', path.id)}
+										on:pointerenter={() => (hoveringElement = tool !== 'event')}
+										on:pointerleave={() => (hoveringElement = false)}
+										on:pointerdown|stopPropagation={(event) => beginOnPath(event, path)}
+										on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
+										on:keydown={(event) => handlePathKeydown(event, path)}
+									/>
+									<line
+										x1={start.x}
+										y1={start.y}
+										x2={path.end.x}
+										y2={path.end.y}
+										stroke={guideColor(path.color)}
+										stroke-width={path.kind === 'line' ? plainLineStrokeWidth : pathStrokeWidth}
+										stroke-linecap={path.style === 'dotted' ? 'round' : 'square'}
+										stroke-dasharray={guideDash(path.style)}
+										marker-end={pathMarker(path.kind)}
+										pointer-events="none"
+									/>
+								{/if}
+								{#if isArrowPath(path.kind)}
+									{@const arrowTip = arrowHitTip(path.kind, start, path.end)}
+									<circle
+										data-field-element
+										data-field-type="path"
+										data-path-endpoint="start"
+										cx={start.x}
+										cy={start.y}
+										r="18"
+										fill="transparent"
+										pointer-events="all"
+										role="button"
+										tabindex="-1"
+										aria-label={`Move ${path.kind} origin`}
+										class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
+										class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('path', path.id)}
+										on:pointerenter={() => (hoveringElement = tool !== 'event')}
+										on:pointerleave={() => (hoveringElement = false)}
+										on:pointerdown|stopPropagation={(event) => beginOnPath(event, path, 'start')}
+										on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
+										on:keydown={(event) => handlePathKeydown(event, path)}
+									/>
+									<line
+										data-field-element
+										data-field-type="path"
+										data-path-endpoint="end"
+										x1={path.end.x}
+										y1={path.end.y}
+										x2={arrowTip.x}
+										y2={arrowTip.y}
+										stroke="transparent"
+										stroke-width="36"
+										pointer-events="all"
+										role="button"
+										tabindex="-1"
+										aria-label={`Move ${path.kind} destination`}
+										class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
+										class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('path', path.id)}
+										on:pointerenter={() => (hoveringElement = tool !== 'event')}
+										on:pointerleave={() => (hoveringElement = false)}
+										on:pointerdown|stopPropagation={(event) => beginOnPath(event, path, 'end')}
+										on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
+										on:keydown={(event) => handlePathKeydown(event, path)}
+									/>
+								{/if}
+							</g>
+						{/each}
+						{#if drawing}
+							{#if drawing.kind === 'pass' || drawing.kind === 'kick'}
+								<g opacity="0.65" pointer-events="none">
+									<path
+										d={airShadowPath(drawing.start, drawing.end)}
 										fill="none"
 										stroke="#10291b"
-										stroke-width={path.kind === 'kick' ? 7 : 5}
+										stroke-width={drawing.kind === 'kick' ? 7 : 5}
 										opacity="0.24"
 										filter="url(#builder-air-shadow)"
 									/>
-									{#each airborneSegments(path.kind, start, path.end, path.style) as segment}
-										<path d={segment.d} fill="none" stroke={guideColor(path.color)} stroke-width={segment.width} stroke-linecap={segment.linecap} />
+									{#each airborneSegments(drawing.kind, drawing.start, drawing.end, defaultPathStyle(drawing.kind)) as segment}
+										<path
+											d={segment.d}
+											fill="none"
+											stroke={defaultPathColor(drawing.kind)}
+											stroke-width={segment.width}
+											stroke-linecap={segment.linecap}
+										/>
 									{/each}
 									<path
-										d={pathData(path.kind, start, path.end)}
+										d={pathData(drawing.kind, drawing.start, drawing.end)}
 										fill="none"
-										stroke={guideColor(path.color)}
+										stroke={defaultPathColor(drawing.kind)}
 										stroke-width="0.01"
-										marker-end={pathMarker(path.kind)}
+										marker-end={pathMarker(drawing.kind)}
 									/>
 								</g>
 							{:else}
 								<line
-									data-field-element
-									data-field-type="path"
-									x1={start.x}
-									y1={start.y}
-									x2={path.end.x}
-									y2={path.end.y}
-									stroke="transparent"
-									stroke-width="44"
-									role="button"
-									tabindex="0"
-									aria-label={`${path.kind} line`}
-									class="focus:outline-none"
-									class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
-									class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('path', path.id)}
-									on:pointerenter={() => (hoveringElement = tool !== 'event')}
-									on:pointerleave={() => (hoveringElement = false)}
-									on:pointerdown|stopPropagation={(event) => beginOnPath(event, path)}
-									on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
-									on:keydown={(event) => handlePathKeydown(event, path)}
-								/>
-								<line
-									x1={start.x}
-									y1={start.y}
-									x2={path.end.x}
-									y2={path.end.y}
-									stroke={guideColor(path.color)}
-									stroke-width={path.kind === 'line' ? plainLineStrokeWidth : pathStrokeWidth}
-									stroke-linecap={path.style === 'dotted' ? 'round' : 'square'}
-									stroke-dasharray={guideDash(path.style)}
-									marker-end={pathMarker(path.kind)}
-									pointer-events="none"
-								/>
-							{/if}
-							{#if isArrowPath(path.kind)}
-								{@const arrowTip = arrowHitTip(path.kind, start, path.end)}
-								<circle
-									data-field-element
-									data-field-type="path"
-									data-path-endpoint="start"
-									cx={start.x}
-									cy={start.y}
-									r="18"
-									fill="transparent"
-									pointer-events="all"
-									role="button"
-									tabindex="-1"
-									aria-label={`Move ${path.kind} origin`}
-									class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
-									class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('path', path.id)}
-									on:pointerenter={() => (hoveringElement = tool !== 'event')}
-									on:pointerleave={() => (hoveringElement = false)}
-									on:pointerdown|stopPropagation={(event) => beginOnPath(event, path, 'start')}
-									on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
-									on:keydown={(event) => handlePathKeydown(event, path)}
-								/>
-								<line
-									data-field-element
-									data-field-type="path"
-									data-path-endpoint="end"
-									x1={path.end.x}
-									y1={path.end.y}
-									x2={arrowTip.x}
-									y2={arrowTip.y}
-									stroke="transparent"
-									stroke-width="36"
-									pointer-events="all"
-									role="button"
-									tabindex="-1"
-									aria-label={`Move ${path.kind} destination`}
-									class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
-									class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('path', path.id)}
-									on:pointerenter={() => (hoveringElement = tool !== 'event')}
-									on:pointerleave={() => (hoveringElement = false)}
-									on:pointerdown|stopPropagation={(event) => beginOnPath(event, path, 'end')}
-									on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
-									on:keydown={(event) => handlePathKeydown(event, path)}
-								/>
-							{/if}
-						</g>
-					{/each}
-					{#if drawing}
-						{#if drawing.kind === 'pass' || drawing.kind === 'kick'}
-							<g opacity="0.65" pointer-events="none">
-								<path
-									d={airShadowPath(drawing.start, drawing.end)}
-									fill="none"
-									stroke="#10291b"
-									stroke-width={drawing.kind === 'kick' ? 7 : 5}
-									opacity="0.24"
-									filter="url(#builder-air-shadow)"
-								/>
-								{#each airborneSegments(drawing.kind, drawing.start, drawing.end, defaultPathStyle(drawing.kind)) as segment}
-									<path
-										d={segment.d}
-										fill="none"
-										stroke={defaultPathColor(drawing.kind)}
-										stroke-width={segment.width}
-										stroke-linecap={segment.linecap}
-									/>
-								{/each}
-								<path
-									d={pathData(drawing.kind, drawing.start, drawing.end)}
-									fill="none"
+									x1={drawing.start.x}
+									y1={drawing.start.y}
+									x2={drawing.end.x}
+									y2={drawing.end.y}
 									stroke={defaultPathColor(drawing.kind)}
-									stroke-width="0.01"
+									stroke-width={drawing.kind === 'line' ? plainLineStrokeWidth : pathStrokeWidth}
+									stroke-linecap={defaultPathStyle(drawing.kind) === 'dotted' ? 'round' : 'square'}
+									stroke-dasharray={guideDash(defaultPathStyle(drawing.kind))}
 									marker-end={pathMarker(drawing.kind)}
+									opacity="0.65"
+									pointer-events="none"
 								/>
+							{/if}
+							{#if showYardLineCursorEnabled && isArrowPath(drawing.kind)}
+								{@const drawingArrowTip = arrowHitTip(drawing.kind, drawing.start, drawing.end)}
+								{#if isPointOnField(drawing.start)}
+									<text
+										data-yard-line-preview
+										x={drawing.start.x}
+										y={toolYardLinePreviewY(drawing.kind, drawing.start)}
+										text-anchor="middle"
+										fill="#fff"
+										stroke="#1c1917"
+										stroke-width="2"
+										paint-order="stroke"
+										font-size="8"
+										font-weight="900"
+										opacity="0.58"
+										pointer-events="none">{yardLinePreviewText(drawing.start.x)}</text
+									>
+								{/if}
+								{#if isPointOnField(drawingArrowTip)}
+									<text
+										data-yard-line-preview
+										x={drawingArrowTip.x}
+										y={toolYardLinePreviewY(drawing.kind, drawingArrowTip)}
+										text-anchor="middle"
+										fill="#fff"
+										stroke="#1c1917"
+										stroke-width="2"
+										paint-order="stroke"
+										font-size="8"
+										font-weight="900"
+										opacity="0.58"
+										pointer-events="none">{yardLinePreviewText(drawingArrowTip.x)}</text
+									>
+								{/if}
+							{/if}
+						{/if}
+
+						{#each markers as marker}
+							<g
+								data-layer-type="marker"
+								data-layer-id={marker.id}
+								data-tutorial-kind={marker.kind}
+								data-field-element
+								data-field-type="marker"
+								data-field-kind={marker.kind}
+								on:pointerdown|stopPropagation={(event) => beginOnMarker(event, marker)}
+								on:pointerenter={() =>
+									(hoveringElement =
+										tool === 'event' ? marker.kind === 'ball' || marker.kind === 'event' : !(isGuideTool(tool) && marker.kind === 'ball'))}
+								on:pointerleave={() => (hoveringElement = false)}
+								on:dblclick|stopPropagation={(event) => startEditingMarker(event, marker)}
+								on:keydown|stopPropagation={(event) => handleMarkerKeydown(event, marker)}
+								role="button"
+								tabindex={isEditableMarker(marker) ? 0 : -1}
+								aria-label={isTeamMarker(marker)
+									? `${marker.label}, double-click to rename`
+									: isOfficialMarker(marker)
+										? `${marker.label ? `${marker.label}, ` : ''}${officialNames[marker.kind]}, double-click to add official name`
+										: marker.kind === 'event'
+											? `${marker.label}, double-click to edit`
+											: marker.kind === 'flag'
+												? `${marker.label ? `${marker.label}, ` : ''}penalty flag, double-click to add penalty text`
+												: marker.kind === 'bean-bag'
+													? `${marker.label ? `${marker.label}, ` : ''}bean bag, double-click to add text`
+													: marker.kind === 'deflag'
+														? `${marker.label ? `${marker.label}, ` : ''}flag belt, double-click to add text or change color`
+														: marker.kind === 'ball'
+															? `${marker.label ? `${marker.label}, ` : ''}football, double-click to add text`
+															: marker.kind}
+								class:cursor-grab={tool !== 'free-draw' &&
+									(tool !== 'event' || marker.kind === 'ball' || marker.kind === 'event') &&
+									!isDragging('marker', marker.id)}
+								class:cursor-grabbing={tool !== 'free-draw' &&
+									(tool !== 'event' || marker.kind === 'ball' || marker.kind === 'event') &&
+									isDragging('marker', marker.id)}
+								class:focus:outline-none={isEditableMarker(marker)}
+							>
+								{#if isTeamMarker(marker) || isOfficialMarker(marker)}
+									<circle
+										cx={marker.x}
+										cy={marker.y}
+										r={(isOfficialMarker(marker) ? officialSize / 2 : playerRadius) + markerHitPadding}
+										fill="transparent"
+										pointer-events="all"
+									/>
+								{:else if marker.kind === 'ball'}
+									<ellipse cx={marker.x} cy={marker.y} rx={footballSize * 0.5} ry={footballSize * 0.34} fill="transparent" pointer-events="all" />
+								{:else if marker.kind === 'deflag'}
+									<rect
+										x={marker.x - deflagSize * 0.46}
+										y={marker.y - deflagSize * 0.38}
+										width={deflagSize * 0.92}
+										height={deflagSize * 0.76}
+										fill="transparent"
+										pointer-events="all"
+									/>
+								{:else if marker.kind === 'bean-bag'}
+									<rect
+										x={marker.x - beanBagSize * 0.45}
+										y={marker.y - beanBagSize * 0.45}
+										width={beanBagSize * 0.9}
+										height={beanBagSize * 0.9}
+										fill="transparent"
+										pointer-events="all"
+									/>
+								{:else if marker.kind === 'event'}
+									<rect
+										x={marker.x - eventWidth(marker.label) / 2 - markerHitPadding}
+										y={marker.y - eventTagHeight / 2 - markerHitPadding}
+										width={eventWidth(marker.label) + markerHitPadding * 2}
+										height={eventTagHeight + markerHitPadding * 2}
+										fill="transparent"
+										pointer-events="all"
+									/>
+								{:else}
+									<ellipse
+										cx={marker.x}
+										cy={marker.y}
+										rx={foulFlagSize * 0.42}
+										ry={foulFlagSize * 0.53}
+										transform={`rotate(-24 ${marker.x} ${marker.y})`}
+										fill="transparent"
+										pointer-events="all"
+									/>
+								{/if}
+								{#if marker.kind === 'team-a' || marker.kind === 'team-k'}
+									<circle cx={marker.x} cy={marker.y} r={playerRadius} fill="#1c1917" stroke="#fff" stroke-width={playerStrokeWidth} />
+									<text
+										x={marker.x}
+										y={marker.y + 3.4}
+										text-anchor="middle"
+										fill="#fff"
+										font-size={marker.label && marker.label.length >= 4 ? 7.65 : 8.925}
+										font-weight="900"
+										pointer-events="none">{marker.label}</text
+									>
+								{:else if marker.kind === 'team-b' || marker.kind === 'team-r'}
+									<circle cx={marker.x} cy={marker.y} r={playerRadius} fill="#fff" stroke="#1c1917" stroke-width={playerStrokeWidth} />
+									<text
+										x={marker.x}
+										y={marker.y + 3.4}
+										text-anchor="middle"
+										fill="#1c1917"
+										font-size={marker.label && marker.label.length >= 4 ? 7.65 : 8.925}
+										font-weight="900"
+										pointer-events="none">{marker.label}</text
+									>
+								{:else if isOfficialMarker(marker)}
+									<image
+										href={officialImages[marker.kind]}
+										x={marker.x - officialSize / 2}
+										y={marker.y - officialSize / 2}
+										width={officialSize}
+										height={officialSize}
+										pointer-events="none"
+									/>
+								{:else if marker.kind === 'ball'}
+									<image
+										href="/images/football.webp"
+										x={marker.x - footballSize / 2}
+										y={marker.y - footballSize / 2}
+										width={footballSize}
+										height={footballSize}
+										pointer-events="none"
+									/>
+								{:else if marker.kind === 'deflag'}
+									<image
+										href={deflagImage(marker.color)}
+										x={marker.x - deflagSize / 2}
+										y={marker.y - deflagSize / 2}
+										width={deflagSize}
+										height={deflagSize}
+										pointer-events="none"
+									/>
+								{:else if marker.kind === 'bean-bag'}
+									<image
+										href={beanBagImage(marker.color)}
+										x={marker.x - beanBagSize / 2}
+										y={marker.y - beanBagSize / 2}
+										width={beanBagSize}
+										height={beanBagSize}
+										pointer-events="none"
+									/>
+								{:else if marker.kind === 'event'}
+									<rect
+										x={marker.x - eventWidth(marker.label) / 2}
+										y={marker.y - eventTagHeight / 2}
+										width={eventWidth(marker.label)}
+										height={eventTagHeight}
+										fill="#fff"
+										stroke="#1c1917"
+										stroke-width="2.25"
+										pointer-events="none"
+									/>
+									<text x={marker.x} y={marker.y + 3.5} text-anchor="middle" fill="#1c1917" font-size="8.5" font-weight="900" pointer-events="none"
+										>{marker.label}</text
+									>
+								{:else}
+									<image
+										href="/images/penalty-flag.webp"
+										x={marker.x - foulFlagSize / 2}
+										y={marker.y - foulFlagSize / 2}
+										width={foulFlagSize}
+										height={foulFlagSize}
+										pointer-events="none"
+									/>
+								{/if}
+								{#if marker.label && (isOfficialMarker(marker) || ['ball', 'flag', 'bean-bag', 'deflag'].includes(marker.kind))}
+									{@const labelLines = penaltyLabelLines(marker.label)}
+									<text
+										x={marker.x}
+										y={markerDescriptionY(marker)}
+										text-anchor="middle"
+										fill="#fff"
+										stroke="#1c1917"
+										stroke-width="2"
+										paint-order="stroke"
+										font-size="8"
+										font-weight="900"
+										pointer-events="none"
+									>
+										{#each labelLines as line, lineIndex}
+											<tspan x={marker.x} dy={lineIndex === 0 ? 0 : 9}>{line}</tspan>
+										{/each}
+									</text>
+								{/if}
 							</g>
-						{:else}
-							<line
-								x1={drawing.start.x}
-								y1={drawing.start.y}
-								x2={drawing.end.x}
-								y2={drawing.end.y}
-								stroke={defaultPathColor(drawing.kind)}
-								stroke-width={drawing.kind === 'line' ? plainLineStrokeWidth : pathStrokeWidth}
-								stroke-linecap={defaultPathStyle(drawing.kind) === 'dotted' ? 'round' : 'square'}
-								stroke-dasharray={guideDash(defaultPathStyle(drawing.kind))}
-								marker-end={pathMarker(drawing.kind)}
-								opacity="0.65"
-								pointer-events="none"
-							/>
-						{/if}
-						{#if showYardLineCursorEnabled && isArrowPath(drawing.kind)}
-							{@const drawingArrowTip = arrowHitTip(drawing.kind, drawing.start, drawing.end)}
-							{#if isPointOnField(drawing.start)}
-								<text
-									data-yard-line-preview
-									x={drawing.start.x}
-									y={toolYardLinePreviewY(drawing.kind, drawing.start)}
-									text-anchor="middle"
-									fill="#fff"
-									stroke="#1c1917"
-									stroke-width="2"
-									paint-order="stroke"
-									font-size="8"
-									font-weight="900"
-									opacity="0.58"
-									pointer-events="none">{yardLinePreviewText(drawing.start.x)}</text
-								>
-							{/if}
-							{#if isPointOnField(drawingArrowTip)}
-								<text
-									data-yard-line-preview
-									x={drawingArrowTip.x}
-									y={toolYardLinePreviewY(drawing.kind, drawingArrowTip)}
-									text-anchor="middle"
-									fill="#fff"
-									stroke="#1c1917"
-									stroke-width="2"
-									paint-order="stroke"
-									font-size="8"
-									font-weight="900"
-									opacity="0.58"
-									pointer-events="none">{yardLinePreviewText(drawingArrowTip.x)}</text
-								>
-							{/if}
-						{/if}
-					{/if}
-
-					{#each markers as marker}
-						<g
-							data-layer-type="marker"
-							data-layer-id={marker.id}
-							data-tutorial-kind={marker.kind}
-							data-field-element
-							data-field-type="marker"
-							data-field-kind={marker.kind}
-							on:pointerdown|stopPropagation={(event) => beginOnMarker(event, marker)}
-							on:pointerenter={() =>
-								(hoveringElement =
-									tool === 'event' ? marker.kind === 'ball' || marker.kind === 'event' : !(isGuideTool(tool) && marker.kind === 'ball'))}
-							on:pointerleave={() => (hoveringElement = false)}
-							on:dblclick|stopPropagation={(event) => startEditingMarker(event, marker)}
-							on:keydown|stopPropagation={(event) => handleMarkerKeydown(event, marker)}
-							role="button"
-							tabindex={isEditableMarker(marker) ? 0 : -1}
-							aria-label={isTeamMarker(marker)
-								? `${marker.label}, double-click to rename`
-								: isOfficialMarker(marker)
-									? `${marker.label ? `${marker.label}, ` : ''}${officialNames[marker.kind]}, double-click to add official name`
-									: marker.kind === 'event'
-										? `${marker.label}, double-click to edit`
-										: marker.kind === 'flag'
-											? `${marker.label ? `${marker.label}, ` : ''}penalty flag, double-click to add penalty text`
-											: marker.kind === 'bean-bag'
-												? `${marker.label ? `${marker.label}, ` : ''}bean bag, double-click to add text`
-												: marker.kind === 'deflag'
-													? `${marker.label ? `${marker.label}, ` : ''}flag belt, double-click to add text or change color`
-													: marker.kind === 'ball'
-														? `${marker.label ? `${marker.label}, ` : ''}football, double-click to add text`
-														: marker.kind}
-							class:cursor-grab={tool !== 'free-draw' &&
-								(tool !== 'event' || marker.kind === 'ball' || marker.kind === 'event') &&
-								!isDragging('marker', marker.id)}
-							class:cursor-grabbing={tool !== 'free-draw' &&
-								(tool !== 'event' || marker.kind === 'ball' || marker.kind === 'event') &&
-								isDragging('marker', marker.id)}
-							class:focus:outline-none={isEditableMarker(marker)}
-						>
-							{#if isTeamMarker(marker) || isOfficialMarker(marker)}
-								<circle
-									cx={marker.x}
-									cy={marker.y}
-									r={(isOfficialMarker(marker) ? officialSize / 2 : playerRadius) + markerHitPadding}
-									fill="transparent"
-									pointer-events="all"
-								/>
-							{:else if marker.kind === 'ball'}
-								<ellipse cx={marker.x} cy={marker.y} rx={footballSize * 0.5} ry={footballSize * 0.34} fill="transparent" pointer-events="all" />
-							{:else if marker.kind === 'deflag'}
-								<rect
-									x={marker.x - deflagSize * 0.46}
-									y={marker.y - deflagSize * 0.38}
-									width={deflagSize * 0.92}
-									height={deflagSize * 0.76}
-									fill="transparent"
-									pointer-events="all"
-								/>
-							{:else if marker.kind === 'bean-bag'}
-								<rect
-									x={marker.x - beanBagSize * 0.45}
-									y={marker.y - beanBagSize * 0.45}
-									width={beanBagSize * 0.9}
-									height={beanBagSize * 0.9}
-									fill="transparent"
-									pointer-events="all"
-								/>
-							{:else if marker.kind === 'event'}
-								<rect
-									x={marker.x - eventWidth(marker.label) / 2 - markerHitPadding}
-									y={marker.y - eventTagHeight / 2 - markerHitPadding}
-									width={eventWidth(marker.label) + markerHitPadding * 2}
-									height={eventTagHeight + markerHitPadding * 2}
-									fill="transparent"
-									pointer-events="all"
-								/>
-							{:else}
-								<ellipse
-									cx={marker.x}
-									cy={marker.y}
-									rx={foulFlagSize * 0.42}
-									ry={foulFlagSize * 0.53}
-									transform={`rotate(-24 ${marker.x} ${marker.y})`}
-									fill="transparent"
-									pointer-events="all"
-								/>
-							{/if}
-							{#if marker.kind === 'team-a' || marker.kind === 'team-k'}
-								<circle cx={marker.x} cy={marker.y} r={playerRadius} fill="#1c1917" stroke="#fff" stroke-width={playerStrokeWidth} />
-								<text
-									x={marker.x}
-									y={marker.y + 3.4}
-									text-anchor="middle"
-									fill="#fff"
-									font-size={marker.label && marker.label.length >= 4 ? 7.65 : 8.925}
-									font-weight="900"
-									pointer-events="none">{marker.label}</text
-								>
-							{:else if marker.kind === 'team-b' || marker.kind === 'team-r'}
-								<circle cx={marker.x} cy={marker.y} r={playerRadius} fill="#fff" stroke="#1c1917" stroke-width={playerStrokeWidth} />
-								<text
-									x={marker.x}
-									y={marker.y + 3.4}
-									text-anchor="middle"
-									fill="#1c1917"
-									font-size={marker.label && marker.label.length >= 4 ? 7.65 : 8.925}
-									font-weight="900"
-									pointer-events="none">{marker.label}</text
-								>
-							{:else if isOfficialMarker(marker)}
-								<image
-									href={officialImages[marker.kind]}
-									x={marker.x - officialSize / 2}
-									y={marker.y - officialSize / 2}
-									width={officialSize}
-									height={officialSize}
-									pointer-events="none"
-								/>
-							{:else if marker.kind === 'ball'}
-								<image
-									href="/images/football.webp"
-									x={marker.x - footballSize / 2}
-									y={marker.y - footballSize / 2}
-									width={footballSize}
-									height={footballSize}
-									pointer-events="none"
-								/>
-							{:else if marker.kind === 'deflag'}
-								<image
-									href={deflagImage(marker.color)}
-									x={marker.x - deflagSize / 2}
-									y={marker.y - deflagSize / 2}
-									width={deflagSize}
-									height={deflagSize}
-									pointer-events="none"
-								/>
-							{:else if marker.kind === 'bean-bag'}
-								<image
-									href={beanBagImage(marker.color)}
-									x={marker.x - beanBagSize / 2}
-									y={marker.y - beanBagSize / 2}
-									width={beanBagSize}
-									height={beanBagSize}
-									pointer-events="none"
-								/>
-							{:else if marker.kind === 'event'}
-								<rect
-									x={marker.x - eventWidth(marker.label) / 2}
-									y={marker.y - eventTagHeight / 2}
-									width={eventWidth(marker.label)}
-									height={eventTagHeight}
-									fill="#fff"
-									stroke="#1c1917"
-									stroke-width="2.25"
-									pointer-events="none"
-								/>
-								<text x={marker.x} y={marker.y + 3.5} text-anchor="middle" fill="#1c1917" font-size="8.5" font-weight="900" pointer-events="none"
-									>{marker.label}</text
-								>
-							{:else}
-								<image
-									href="/images/penalty-flag.webp"
-									x={marker.x - foulFlagSize / 2}
-									y={marker.y - foulFlagSize / 2}
-									width={foulFlagSize}
-									height={foulFlagSize}
-									pointer-events="none"
-								/>
-							{/if}
-							{#if marker.label && (isOfficialMarker(marker) || ['ball', 'flag', 'bean-bag', 'deflag'].includes(marker.kind))}
-								{@const labelLines = penaltyLabelLines(marker.label)}
-								<text
-									x={marker.x}
-									y={markerDescriptionY(marker)}
-									text-anchor="middle"
-									fill="#fff"
-									stroke="#1c1917"
-									stroke-width="2"
-									paint-order="stroke"
-									font-size="8"
-									font-weight="900"
-									pointer-events="none"
-								>
-									{#each labelLines as line, lineIndex}
-										<tspan x={marker.x} dy={lineIndex === 0 ? 0 : 9}>{line}</tspan>
-									{/each}
-								</text>
-							{/if}
-						</g>
-					{/each}
-
-					{#if showYardLineCursorEnabled && draggedYardMarker && isPointOnField(draggedYardMarker)}
-						<text
-							data-yard-line-preview
-							x={draggedYardMarker.x}
-							y={markerYardLinePreviewY(draggedYardMarker)}
-							text-anchor="middle"
-							fill="#fff"
-							stroke="#1c1917"
-							stroke-width="2"
-							paint-order="stroke"
-							font-size="8"
-							font-weight="900"
-							opacity="0.58"
-							pointer-events="none">{yardLinePreviewText(draggedYardMarker.x)}</text
-						>
-					{:else if showYardLineCursorEnabled && draggedYardPath && isArrowPath(draggedYardPath.kind)}
-						{@const draggedArrowTip = arrowHitTip(draggedYardPath.kind, draggedYardPath.start, draggedYardPath.end)}
-						{#if isPointOnField(draggedYardPath.start)}
-							<text
-								data-yard-line-preview
-								x={draggedYardPath.start.x}
-								y={toolYardLinePreviewY(draggedYardPath.kind, draggedYardPath.start)}
-								text-anchor="middle"
-								fill="#fff"
-								stroke="#1c1917"
-								stroke-width="2"
-								paint-order="stroke"
-								font-size="8"
-								font-weight="900"
-								opacity="0.58"
-								pointer-events="none">{yardLinePreviewText(draggedYardPath.start.x)}</text
-							>
-						{/if}
-						{#if isPointOnField(draggedArrowTip)}
-							<text
-								data-yard-line-preview
-								x={draggedArrowTip.x}
-								y={toolYardLinePreviewY(draggedYardPath.kind, draggedArrowTip)}
-								text-anchor="middle"
-								fill="#fff"
-								stroke="#1c1917"
-								stroke-width="2"
-								paint-order="stroke"
-								font-size="8"
-								font-weight="900"
-								opacity="0.58"
-								pointer-events="none">{yardLinePreviewText(draggedArrowTip.x)}</text
-							>
-						{/if}
-					{/if}
-
-					<!-- Keep one Svelte-owned drawing layer above every field element. Moving individual strokes can detach them from keyed state. -->
-					<g data-free-drawing-layer pointer-events="none">
-						{#each freeStrokes as stroke (stroke.id)}
-							{#if stroke.points.length === 1}
-								<circle
-									data-free-drawing
-									cx={stroke.points[0].x}
-									cy={stroke.points[0].y}
-									r={(stroke.width ?? freeDrawStrokeWidth) * 0.85}
-									fill={drawingColor(stroke.color)}
-									filter="url(#builder-neon-glow)"
-								/>
-							{:else}
-								<path
-									data-free-drawing
-									d={freehandPath(stroke.points)}
-									fill="none"
-									stroke={drawingColor(stroke.color)}
-									stroke-width={stroke.width ?? freeDrawStrokeWidth}
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									filter="url(#builder-neon-glow)"
-								/>
-							{/if}
 						{/each}
-						{#if activeFreeStroke}
-							{#if activeFreeStroke.points.length === 1}
-								{#if activeFreeDrawShape === 'squiggle'}
+
+						{#if showYardLineCursorEnabled && draggedYardMarker && isPointOnField(draggedYardMarker)}
+							<text
+								data-yard-line-preview
+								x={draggedYardMarker.x}
+								y={markerYardLinePreviewY(draggedYardMarker)}
+								text-anchor="middle"
+								fill="#fff"
+								stroke="#1c1917"
+								stroke-width="2"
+								paint-order="stroke"
+								font-size="8"
+								font-weight="900"
+								opacity="0.58"
+								pointer-events="none">{yardLinePreviewText(draggedYardMarker.x)}</text
+							>
+						{:else if showYardLineCursorEnabled && draggedYardPath && isArrowPath(draggedYardPath.kind)}
+							{@const draggedArrowTip = arrowHitTip(draggedYardPath.kind, draggedYardPath.start, draggedYardPath.end)}
+							{#if isPointOnField(draggedYardPath.start)}
+								<text
+									data-yard-line-preview
+									x={draggedYardPath.start.x}
+									y={toolYardLinePreviewY(draggedYardPath.kind, draggedYardPath.start)}
+									text-anchor="middle"
+									fill="#fff"
+									stroke="#1c1917"
+									stroke-width="2"
+									paint-order="stroke"
+									font-size="8"
+									font-weight="900"
+									opacity="0.58"
+									pointer-events="none">{yardLinePreviewText(draggedYardPath.start.x)}</text
+								>
+							{/if}
+							{#if isPointOnField(draggedArrowTip)}
+								<text
+									data-yard-line-preview
+									x={draggedArrowTip.x}
+									y={toolYardLinePreviewY(draggedYardPath.kind, draggedArrowTip)}
+									text-anchor="middle"
+									fill="#fff"
+									stroke="#1c1917"
+									stroke-width="2"
+									paint-order="stroke"
+									font-size="8"
+									font-weight="900"
+									opacity="0.58"
+									pointer-events="none">{yardLinePreviewText(draggedArrowTip.x)}</text
+								>
+							{/if}
+						{/if}
+
+						<!-- Keep one Svelte-owned drawing layer above every field element. Moving individual strokes can detach them from keyed state. -->
+						<g data-free-drawing-layer pointer-events="none">
+							{#each freeStrokes as stroke (stroke.id)}
+								{#if stroke.points.length === 1}
 									<circle
 										data-free-drawing
-										cx={activeFreeStroke.points[0].x}
-										cy={activeFreeStroke.points[0].y}
-										r={(activeFreeStroke.width ?? freeDrawStrokeWidth) * 0.85}
-										fill={drawingColor(activeFreeStroke.color)}
+										cx={stroke.points[0].x}
+										cy={stroke.points[0].y}
+										r={(stroke.width ?? freeDrawStrokeWidth) * 0.85}
+										fill={drawingColor(stroke.color)}
+										filter="url(#builder-neon-glow)"
+									/>
+								{:else}
+									<path
+										data-free-drawing
+										d={freehandPath(stroke.points)}
+										fill="none"
+										stroke={drawingColor(stroke.color)}
+										stroke-width={stroke.width ?? freeDrawStrokeWidth}
+										stroke-linecap="round"
+										stroke-linejoin="round"
 										filter="url(#builder-neon-glow)"
 									/>
 								{/if}
-							{:else}
-								<path
-									data-free-drawing
-									d={freehandPath(activeFreeStroke.points)}
-									fill="none"
-									stroke={drawingColor(activeFreeStroke.color)}
-									stroke-width={activeFreeStroke.width ?? freeDrawStrokeWidth}
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									filter="url(#builder-neon-glow)"
-								/>
-							{/if}
-						{/if}
-					</g>
-
-					<g data-down-marker-layer>
-						{#if hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-to-gain' && fieldSettings.showDownMarker}
-							{@const previewGuideX = wholeYardLineToGainX(placementSnapX ?? hoverPoint.x)}
-							{@const previewDownMarker = downMarkerDisplay(currentLineToGain?.down ?? '1st', previewGuideX, lineOfScrimmageX)}
-							<g class="down-marker-graphic" opacity="0.72" pointer-events="none">
-								<rect x={previewGuideX - 32} y={fieldTop - 9} width="64" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
-								<text
-									x={previewGuideX - (previewDownMarker.half ? 3.5 : 0)}
-									y={fieldTop + 3.5}
-									text-anchor="middle"
-									fill="#ff5a1f"
-									font-size="10"
-									font-weight="900">{previewDownMarker.base}</text
-								>
-								{#if previewDownMarker.half}
-									{@const fractionX = previewGuideX + previewDownMarker.baseWidth / 2 - 1.5}
-									<g fill="#ff5a1f" font-size="5.5" font-weight="900" text-anchor="middle">
-										<text x={fractionX} y={fieldTop - 1.5}>1</text>
-										<line x1={fractionX - 2.5} y1={fieldTop + 0.25} x2={fractionX + 2.5} y2={fieldTop + 0.25} stroke="#ff5a1f" stroke-width="0.8" />
-										<text x={fractionX} y={fieldTop + 5.5}>2</text>
-									</g>
+							{/each}
+							{#if activeFreeStroke}
+								{#if activeFreeStroke.points.length === 1}
+									{#if activeFreeDrawShape === 'squiggle'}
+										<circle
+											data-free-drawing
+											cx={activeFreeStroke.points[0].x}
+											cy={activeFreeStroke.points[0].y}
+											r={(activeFreeStroke.width ?? freeDrawStrokeWidth) * 0.85}
+											fill={drawingColor(activeFreeStroke.color)}
+											filter="url(#builder-neon-glow)"
+										/>
+									{/if}
+								{:else}
+									<path
+										data-free-drawing
+										d={freehandPath(activeFreeStroke.points)}
+										fill="none"
+										stroke={drawingColor(activeFreeStroke.color)}
+										stroke-width={activeFreeStroke.width ?? freeDrawStrokeWidth}
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										filter="url(#builder-neon-glow)"
+									/>
 								{/if}
-							</g>
-						{/if}
-						{#if fieldSettings.showDownMarker}
-							{#each guides.filter((guide) => guide.kind === 'line-to-gain') as guide (guide.id)}
-								{@const markerDisplay = downMarkerDisplay(guide.down ?? '1st', guide.x, lineOfScrimmageX)}
-								<g
-									class="down-marker-graphic"
-									data-down-marker
-									data-hover-tooltip={editingDownGuideId === guide.id ? undefined : 'Click to Edit'}
-									data-export-down-marker
-									data-field-element
-									data-field-type="guide"
-									role="button"
-									tabindex="0"
-									aria-label={`${downMarkerText(guide.down ?? '1st', guide.x, lineOfScrimmageX)} down marker`}
-									on:pointerdown|stopPropagation={(event) => beginOnGuide(event, guide, true)}
-									on:click|stopPropagation={(event) => startEditingDownMarker(event, guide)}
-									on:dblclick|stopPropagation={(event) => startEditingDownMarker(event, guide)}
-									on:keydown|stopPropagation={(event) => {
-										if (event.key === 'Enter' || event.key === ' ') startEditingDownMarker(event, guide);
-									}}
-									class:cursor-grab={!isDragging('guide', guide.id)}
-									class:cursor-grabbing={isDragging('guide', guide.id)}
-								>
-									<rect x={guide.x - 32} y={fieldTop - 9} width="64" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
+							{/if}
+						</g>
+
+						<g data-down-marker-layer>
+							{#if hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-to-gain' && fieldSettings.showDownMarker}
+								{@const previewGuideX = wholeYardLineToGainX(placementSnapX ?? hoverPoint.x)}
+								{@const previewDownMarker = downMarkerDisplay(currentLineToGain?.down ?? '1st', previewGuideX, lineOfScrimmageX)}
+								<g class="down-marker-graphic" opacity="0.72" pointer-events="none">
+									<rect x={previewGuideX - 32} y={fieldTop - 9} width="64" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
 									<text
-										x={guide.x - (markerDisplay.half ? 3.5 : 0)}
+										x={previewGuideX - (previewDownMarker.half ? 3.5 : 0)}
 										y={fieldTop + 3.5}
 										text-anchor="middle"
 										fill="#ff5a1f"
 										font-size="10"
-										font-weight="900"
-										pointer-events="none">{markerDisplay.base}</text
+										font-weight="900">{previewDownMarker.base}</text
 									>
-									{#if markerDisplay.half}
-										{@const fractionX = guide.x + markerDisplay.baseWidth / 2 - 1.5}
-										<g fill="#ff5a1f" font-size="5.5" font-weight="900" text-anchor="middle" pointer-events="none">
+									{#if previewDownMarker.half}
+										{@const fractionX = previewGuideX + previewDownMarker.baseWidth / 2 - 1.5}
+										<g fill="#ff5a1f" font-size="5.5" font-weight="900" text-anchor="middle">
 											<text x={fractionX} y={fieldTop - 1.5}>1</text>
 											<line x1={fractionX - 2.5} y1={fieldTop + 0.25} x2={fractionX + 2.5} y2={fieldTop + 0.25} stroke="#ff5a1f" stroke-width="0.8" />
 											<text x={fractionX} y={fieldTop + 5.5}>2</text>
 										</g>
 									{/if}
 								</g>
-							{/each}
-						{/if}
-						{#if hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-of-scrimmage' && fieldSettings.showLineOfScrimmageMarker}
-							{@const previewGuideX = wholeYardLineOfScrimmageX(placementSnapX ?? hoverPoint.x)}
-							{@const previewLosMarker = lineOfScrimmageMarkerDisplay(previewGuideX)}
-							<g class="los-marker-graphic" opacity="0.72" pointer-events="none">
-								<rect x={previewGuideX - 26} y={fieldBottom - 9} width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
-								<text
-									x={previewGuideX - (previewLosMarker.half ? 3.5 : 0)}
-									y={fieldBottom + 3.5}
-									text-anchor="middle"
-									fill="#ffffff"
-									font-size="10"
-									font-weight="900">{previewLosMarker.base}</text
-								>
-								{#if previewLosMarker.half}
-									{@const fractionX = previewGuideX + previewLosMarker.baseWidth / 2 - 1.5}
-									<g fill="#ffffff" font-size="5.5" font-weight="900" text-anchor="middle">
-										<text x={fractionX} y={fieldBottom - 1.5}>1</text>
-										<line
-											x1={fractionX - 2.5}
-											y1={fieldBottom + 0.25}
-											x2={fractionX + 2.5}
-											y2={fieldBottom + 0.25}
-											stroke="#ffffff"
-											stroke-width="0.8"
-										/>
-										<text x={fractionX} y={fieldBottom + 5.5}>2</text>
+							{/if}
+							{#if fieldSettings.showDownMarker}
+								{#each guides.filter((guide) => guide.kind === 'line-to-gain') as guide (guide.id)}
+									{@const markerDisplay = downMarkerDisplay(guide.down ?? '1st', guide.x, lineOfScrimmageX)}
+									<g
+										class="down-marker-graphic"
+										data-down-marker
+										data-hover-tooltip={editingDownGuideId === guide.id ? undefined : 'Click to Edit'}
+										data-export-down-marker
+										data-field-element
+										data-field-type="guide"
+										role="button"
+										tabindex="0"
+										aria-label={`${downMarkerText(guide.down ?? '1st', guide.x, lineOfScrimmageX)} down marker`}
+										on:pointerdown|stopPropagation={(event) => beginOnGuide(event, guide, true)}
+										on:click|stopPropagation={(event) => startEditingDownMarker(event, guide)}
+										on:dblclick|stopPropagation={(event) => startEditingDownMarker(event, guide)}
+										on:keydown|stopPropagation={(event) => {
+											if (event.key === 'Enter' || event.key === ' ') startEditingDownMarker(event, guide);
+										}}
+										class:cursor-grab={!isDragging('guide', guide.id)}
+										class:cursor-grabbing={isDragging('guide', guide.id)}
+									>
+										<rect x={guide.x - 32} y={fieldTop - 9} width="64" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
+										<text
+											x={guide.x - (markerDisplay.half ? 3.5 : 0)}
+											y={fieldTop + 3.5}
+											text-anchor="middle"
+											fill="#ff5a1f"
+											font-size="10"
+											font-weight="900"
+											pointer-events="none">{markerDisplay.base}</text
+										>
+										{#if markerDisplay.half}
+											{@const fractionX = guide.x + markerDisplay.baseWidth / 2 - 1.5}
+											<g fill="#ff5a1f" font-size="5.5" font-weight="900" text-anchor="middle" pointer-events="none">
+												<text x={fractionX} y={fieldTop - 1.5}>1</text>
+												<line
+													x1={fractionX - 2.5}
+													y1={fieldTop + 0.25}
+													x2={fractionX + 2.5}
+													y2={fieldTop + 0.25}
+													stroke="#ff5a1f"
+													stroke-width="0.8"
+												/>
+												<text x={fractionX} y={fieldTop + 5.5}>2</text>
+											</g>
+										{/if}
 									</g>
-								{/if}
-							</g>
-						{/if}
-						{#if fieldSettings.showLineOfScrimmageMarker}
-							{#each guides.filter((guide) => guide.kind === 'line-of-scrimmage') as guide (guide.id)}
-								{@const markerDisplay = lineOfScrimmageMarkerDisplay(guide.x)}
-								<g
-									class="los-marker-graphic"
-									data-los-marker
-									data-hover-tooltip={editingGuideId === guide.id ? undefined : 'Click to Edit'}
-									data-export-los-marker
-									data-field-element
-									data-field-type="guide"
-									role="button"
-									tabindex="0"
-									aria-label={`Line of Scrimmage at the ${losYardLine(guide.x)} yard line`}
-									on:pointerdown|stopPropagation={(event) => beginOnGuide(event, guide, true)}
-									on:click|stopPropagation={(event) => startEditingLineOfScrimmageMarker(event, guide)}
-									on:dblclick|stopPropagation={(event) => startEditingGuide(event, guide)}
-									on:keydown|stopPropagation={(event) => {
-										if (event.key === 'Enter' || event.key === ' ') startEditingLineOfScrimmageMarker(event, guide);
-									}}
-									class:cursor-grab={!isDragging('guide', guide.id)}
-									class:cursor-grabbing={isDragging('guide', guide.id)}
-								>
-									<rect x={guide.x - 26} y={fieldBottom - 9} width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
+								{/each}
+							{/if}
+							{#if hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-of-scrimmage' && fieldSettings.showLineOfScrimmageMarker}
+								{@const previewGuideX = wholeYardLineOfScrimmageX(placementSnapX ?? hoverPoint.x)}
+								{@const previewLosMarker = lineOfScrimmageMarkerDisplay(previewGuideX)}
+								<g class="los-marker-graphic" opacity="0.72" pointer-events="none">
+									<rect x={previewGuideX - 26} y={fieldBottom - 9} width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
 									<text
-										x={guide.x - (markerDisplay.half ? 3.5 : 0)}
+										x={previewGuideX - (previewLosMarker.half ? 3.5 : 0)}
 										y={fieldBottom + 3.5}
 										text-anchor="middle"
 										fill="#ffffff"
 										font-size="10"
-										font-weight="900"
-										pointer-events="none">{markerDisplay.base}</text
+										font-weight="900">{previewLosMarker.base}</text
 									>
-									{#if markerDisplay.half}
-										{@const fractionX = guide.x + markerDisplay.baseWidth / 2 - 1.5}
-										<g fill="#ffffff" font-size="5.5" font-weight="900" text-anchor="middle" pointer-events="none">
+									{#if previewLosMarker.half}
+										{@const fractionX = previewGuideX + previewLosMarker.baseWidth / 2 - 1.5}
+										<g fill="#ffffff" font-size="5.5" font-weight="900" text-anchor="middle">
 											<text x={fractionX} y={fieldBottom - 1.5}>1</text>
 											<line
 												x1={fractionX - 2.5}
@@ -7684,169 +7639,218 @@
 										</g>
 									{/if}
 								</g>
-							{/each}
-						{/if}
-					</g>
-
-					{#if marqueeSelection}
-						{@const marqueeBounds = normalizedSelectionBounds(marqueeSelection.start, marqueeSelection.current)}
-						<rect
-							data-marquee-selection
-							x={marqueeBounds.left}
-							y={marqueeBounds.top}
-							width={marqueeBounds.right - marqueeBounds.left}
-							height={marqueeBounds.bottom - marqueeBounds.top}
-							fill="rgba(255,255,255,0.14)"
-							stroke="#ffffff"
-							stroke-width="1.5"
-							stroke-dasharray="7 5"
-							vector-effect="non-scaling-stroke"
-							pointer-events="none"
-						/>
-					{/if}
-
-					{#if selectedTargets.length > 1 && selectedGroupBounds}
-						<rect
-							data-selection-wireframe
-							x={selectedGroupBounds.left - 6}
-							y={selectedGroupBounds.top - 6}
-							width={selectedGroupBounds.right - selectedGroupBounds.left + 12}
-							height={selectedGroupBounds.bottom - selectedGroupBounds.top + 12}
-							rx="3"
-							fill="none"
-							stroke="#ffffff"
-							stroke-width="1.5"
-							stroke-dasharray="7 5"
-							vector-effect="non-scaling-stroke"
-							pointer-events="none"
-						/>
-					{/if}
-
-					{#if tool === 'laser' || laserTrail.length > 0 || laserDrawings.length > 0 || (activeLaserDrawing?.points.length ?? 0) > 1}
-						<g data-laser-pointer-layer pointer-events="none">
-							<defs>
-								<linearGradient
-									id="builder-rainbow-laser-gradient"
-									x1="0"
-									y1="0"
-									x2="180"
-									y2="0"
-									gradientUnits="userSpaceOnUse"
-									spreadMethod="repeat"
-								>
-									<stop offset="0%" stop-color="#ff1744" />
-									<stop offset="16.67%" stop-color="#ff9100" />
-									<stop offset="33.33%" stop-color="#ffea00" />
-									<stop offset="50%" stop-color="#00e676" />
-									<stop offset="66.67%" stop-color="#00e5ff" />
-									<stop offset="83.33%" stop-color="#2979ff" />
-									<stop offset="100%" stop-color="#d500f9" />
-									<animateTransform
-										attributeName="gradientTransform"
-										type="translate"
-										from="-180 0"
-										to="180 0"
-										dur="0.8s"
-										repeatCount="indefinite"
-									/>
-								</linearGradient>
-							</defs>
-							{#each laserDrawings as drawing}
-								{@const drawingFreshness = laserDrawingVisibility(drawing, laserTrailClock)}
-								<g
-									data-laser-drawing
-									data-laser-drawing-state={drawing.releasedAt !== null ? 'fading-out' : drawing.appearedAt != null ? 'fading-in' : 'persistent'}
-									opacity={Math.pow(drawingFreshness, 1.25)}
-								>
-									<path
-										d={laserDrawingPath(drawing.points)}
-										fill="none"
-										stroke={laserPaint(drawing.color)}
-										stroke-width="8"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										opacity="0.2"
-									/>
-									<path
-										d={laserDrawingPath(drawing.points)}
-										fill="none"
-										stroke={laserPaint(drawing.color)}
-										stroke-width="3.8"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										opacity="0.88"
-										filter="url(#builder-neon-glow)"
-									/>
-								</g>
-							{/each}
-							{#if activeLaserDrawing && activeLaserDrawing.points.length > 1}
-								<g data-laser-active-drawing>
-									<path
-										d={laserDrawingPath(activeLaserDrawing.points)}
-										fill="none"
-										stroke={laserPaint(activeLaserDrawing.color)}
-										stroke-width="8"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										opacity="0.2"
-									/>
-									<path
-										d={laserDrawingPath(activeLaserDrawing.points)}
-										fill="none"
-										stroke={laserPaint(activeLaserDrawing.color)}
-										stroke-width="3.8"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										opacity="0.88"
-										filter="url(#builder-neon-glow)"
-									/>
-								</g>
 							{/if}
-							{#if laserTrail.length > 1}
-								{@const trailStart = laserTrail[0]}
-								{@const trailEnd = laserTrail.at(-1)!}
-								{@const trailFreshness = Math.min(1, Math.max(0, 1 - (laserTrailClock - trailEnd.createdAt) / laserFadeDuration))}
-								<defs>
-									<linearGradient
-										id="builder-laser-trail-gradient"
-										x1={trailStart.x}
-										y1={trailStart.y}
-										x2={trailEnd.x}
-										y2={trailEnd.y}
-										gradientUnits="userSpaceOnUse"
+							{#if fieldSettings.showLineOfScrimmageMarker}
+								{#each guides.filter((guide) => guide.kind === 'line-of-scrimmage') as guide (guide.id)}
+									{@const markerDisplay = lineOfScrimmageMarkerDisplay(guide.x)}
+									<g
+										class="los-marker-graphic"
+										data-los-marker
+										data-hover-tooltip={editingGuideId === guide.id ? undefined : 'Click to Edit'}
+										data-export-los-marker
+										data-field-element
+										data-field-type="guide"
+										role="button"
+										tabindex="0"
+										aria-label={`Line of Scrimmage at the ${losYardLine(guide.x)} yard line`}
+										on:pointerdown|stopPropagation={(event) => beginOnGuide(event, guide, true)}
+										on:click|stopPropagation={(event) => startEditingLineOfScrimmageMarker(event, guide)}
+										on:dblclick|stopPropagation={(event) => startEditingGuide(event, guide)}
+										on:keydown|stopPropagation={(event) => {
+											if (event.key === 'Enter' || event.key === ' ') startEditingLineOfScrimmageMarker(event, guide);
+										}}
+										class:cursor-grab={!isDragging('guide', guide.id)}
+										class:cursor-grabbing={isDragging('guide', guide.id)}
 									>
-										<stop offset="0%" stop-color={laserColorValue(laserColor)} stop-opacity="0" />
-										<stop offset="30%" stop-color={laserColorValue(laserColor)} stop-opacity="0.18" />
-										<stop offset="70%" stop-color={laserColorValue(laserColor)} stop-opacity="0.55" />
-										<stop offset="100%" stop-color={laserColorValue(laserColor)} stop-opacity="0.82" />
-									</linearGradient>
-								</defs>
-								<path
-									d={laserTrailPath(laserTrail, laserTrailClock)}
-									fill={rainbowLaserEnabled ? 'url(#builder-rainbow-laser-gradient)' : 'url(#builder-laser-trail-gradient)'}
-									opacity={Math.pow(trailFreshness, 1.25)}
-									filter="url(#builder-neon-glow)"
-								/>
-							{/if}
-							{#if tool === 'laser' && laserPointer && pointerOnField}
-								<circle
-									cx={laserPointer.x}
-									cy={laserPointer.y}
-									r="7"
-									fill={laserPaint(rainbowLaserEnabled ? 'rainbow' : laserColor)}
-									opacity="0.2"
-								/>
-								<circle
-									cx={laserPointer.x}
-									cy={laserPointer.y}
-									r="3"
-									fill={laserPaint(rainbowLaserEnabled ? 'rainbow' : laserColor)}
-									filter="url(#builder-neon-glow)"
-								/>
+										<rect x={guide.x - 26} y={fieldBottom - 9} width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
+										<text
+											x={guide.x - (markerDisplay.half ? 3.5 : 0)}
+											y={fieldBottom + 3.5}
+											text-anchor="middle"
+											fill="#ffffff"
+											font-size="10"
+											font-weight="900"
+											pointer-events="none">{markerDisplay.base}</text
+										>
+										{#if markerDisplay.half}
+											{@const fractionX = guide.x + markerDisplay.baseWidth / 2 - 1.5}
+											<g fill="#ffffff" font-size="5.5" font-weight="900" text-anchor="middle" pointer-events="none">
+												<text x={fractionX} y={fieldBottom - 1.5}>1</text>
+												<line
+													x1={fractionX - 2.5}
+													y1={fieldBottom + 0.25}
+													x2={fractionX + 2.5}
+													y2={fieldBottom + 0.25}
+													stroke="#ffffff"
+													stroke-width="0.8"
+												/>
+												<text x={fractionX} y={fieldBottom + 5.5}>2</text>
+											</g>
+										{/if}
+									</g>
+								{/each}
 							{/if}
 						</g>
-					{/if}
-				</svg>
+
+						{#if marqueeSelection}
+							{@const marqueeBounds = normalizedSelectionBounds(marqueeSelection.start, marqueeSelection.current)}
+							<rect
+								data-marquee-selection
+								x={marqueeBounds.left}
+								y={marqueeBounds.top}
+								width={marqueeBounds.right - marqueeBounds.left}
+								height={marqueeBounds.bottom - marqueeBounds.top}
+								fill="rgba(255,255,255,0.14)"
+								stroke="#ffffff"
+								stroke-width="1.5"
+								stroke-dasharray="7 5"
+								vector-effect="non-scaling-stroke"
+								pointer-events="none"
+							/>
+						{/if}
+
+						{#if selectedTargets.length > 1 && selectedGroupBounds}
+							<rect
+								data-selection-wireframe
+								x={selectedGroupBounds.left - 6}
+								y={selectedGroupBounds.top - 6}
+								width={selectedGroupBounds.right - selectedGroupBounds.left + 12}
+								height={selectedGroupBounds.bottom - selectedGroupBounds.top + 12}
+								rx="3"
+								fill="none"
+								stroke="#ffffff"
+								stroke-width="1.5"
+								stroke-dasharray="7 5"
+								vector-effect="non-scaling-stroke"
+								pointer-events="none"
+							/>
+						{/if}
+
+						{#if tool === 'laser' || laserTrail.length > 0 || laserDrawings.length > 0 || (activeLaserDrawing?.points.length ?? 0) > 1}
+							<g data-laser-pointer-layer pointer-events="none">
+								<defs>
+									<linearGradient
+										id="builder-rainbow-laser-gradient"
+										x1="0"
+										y1="0"
+										x2="180"
+										y2="0"
+										gradientUnits="userSpaceOnUse"
+										spreadMethod="repeat"
+									>
+										<stop offset="0%" stop-color="#ff1744" />
+										<stop offset="16.67%" stop-color="#ff9100" />
+										<stop offset="33.33%" stop-color="#ffea00" />
+										<stop offset="50%" stop-color="#00e676" />
+										<stop offset="66.67%" stop-color="#00e5ff" />
+										<stop offset="83.33%" stop-color="#2979ff" />
+										<stop offset="100%" stop-color="#d500f9" />
+										<animateTransform
+											attributeName="gradientTransform"
+											type="translate"
+											from="-180 0"
+											to="180 0"
+											dur="0.8s"
+											repeatCount="indefinite"
+										/>
+									</linearGradient>
+								</defs>
+								{#each laserDrawings as drawing}
+									{@const drawingFreshness = laserDrawingVisibility(drawing, laserTrailClock)}
+									<g
+										data-laser-drawing
+										data-laser-drawing-state={drawing.releasedAt !== null ? 'fading-out' : drawing.appearedAt != null ? 'fading-in' : 'persistent'}
+										opacity={Math.pow(drawingFreshness, 1.25)}
+									>
+										<path
+											d={laserDrawingPath(drawing.points)}
+											fill="none"
+											stroke={laserPaint(drawing.color)}
+											stroke-width="8"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											opacity="0.2"
+										/>
+										<path
+											d={laserDrawingPath(drawing.points)}
+											fill="none"
+											stroke={laserPaint(drawing.color)}
+											stroke-width="3.8"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											opacity="0.88"
+											filter="url(#builder-neon-glow)"
+										/>
+									</g>
+								{/each}
+								{#if activeLaserDrawing && activeLaserDrawing.points.length > 1}
+									<g data-laser-active-drawing>
+										<path
+											d={laserDrawingPath(activeLaserDrawing.points)}
+											fill="none"
+											stroke={laserPaint(activeLaserDrawing.color)}
+											stroke-width="8"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											opacity="0.2"
+										/>
+										<path
+											d={laserDrawingPath(activeLaserDrawing.points)}
+											fill="none"
+											stroke={laserPaint(activeLaserDrawing.color)}
+											stroke-width="3.8"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											opacity="0.88"
+											filter="url(#builder-neon-glow)"
+										/>
+									</g>
+								{/if}
+								{#if laserTrail.length > 1}
+									{@const trailStart = laserTrail[0]}
+									{@const trailEnd = laserTrail.at(-1)!}
+									{@const trailFreshness = Math.min(1, Math.max(0, 1 - (laserTrailClock - trailEnd.createdAt) / laserFadeDuration))}
+									<defs>
+										<linearGradient
+											id="builder-laser-trail-gradient"
+											x1={trailStart.x}
+											y1={trailStart.y}
+											x2={trailEnd.x}
+											y2={trailEnd.y}
+											gradientUnits="userSpaceOnUse"
+										>
+											<stop offset="0%" stop-color={laserColorValue(laserColor)} stop-opacity="0" />
+											<stop offset="30%" stop-color={laserColorValue(laserColor)} stop-opacity="0.18" />
+											<stop offset="70%" stop-color={laserColorValue(laserColor)} stop-opacity="0.55" />
+											<stop offset="100%" stop-color={laserColorValue(laserColor)} stop-opacity="0.82" />
+										</linearGradient>
+									</defs>
+									<path
+										d={laserTrailPath(laserTrail, laserTrailClock)}
+										fill={rainbowLaserEnabled ? 'url(#builder-rainbow-laser-gradient)' : 'url(#builder-laser-trail-gradient)'}
+										opacity={Math.pow(trailFreshness, 1.25)}
+										filter="url(#builder-neon-glow)"
+									/>
+								{/if}
+								{#if tool === 'laser' && laserPointer && pointerOnField}
+									<circle
+										cx={laserPointer.x}
+										cy={laserPointer.y}
+										r="7"
+										fill={laserPaint(rainbowLaserEnabled ? 'rainbow' : laserColor)}
+										opacity="0.2"
+									/>
+									<circle
+										cx={laserPointer.x}
+										cy={laserPointer.y}
+										r="3"
+										fill={laserPaint(rainbowLaserEnabled ? 'rainbow' : laserColor)}
+										filter="url(#builder-neon-glow)"
+									/>
+								{/if}
+							</g>
+						{/if}
+					</svg>
 				</HoverTooltip>
 
 				{#if editingDownGuide}
@@ -7881,58 +7885,58 @@
 						</div>
 						<div class="flex gap-px bg-stone-900 p-px shadow-xl ring-2 ring-stone-950">
 							{#if !isAtMidfieldX(editingDownGuide.x)}
-							<HoverTooltip
-								text={`Flip to ${downGuideSide === 'a' ? 'B' : 'A'}'s Side`}
-								placement="above"
-								minWidthPx={0}
-								wrapperClass="flex h-7 w-7 shrink-0"
-							>
-								<button
-									type="button"
-									aria-label={`Field side ${downGuideSide.toUpperCase()}; switch to ${downGuideSide === 'a' ? 'B' : 'A'}`}
-									on:click={() => {
-										pinInlineGuideEditorUnderPointer();
-										setDownGuideSide(downGuideSide === 'a' ? 'b' : 'a');
-									}}
-									class="h-7 w-7 shrink-0 cursor-pointer text-[11px] font-black"
-									class:bg-stone-900={downGuideSide === 'a'}
-									class:text-white={downGuideSide === 'a'}
-									class:bg-white={downGuideSide === 'b'}
-									class:text-stone-950={downGuideSide === 'b'}>{downGuideSide.toUpperCase()}</button
+								<HoverTooltip
+									text={`Flip to ${downGuideSide === 'a' ? 'B' : 'A'}'s Side`}
+									placement="above"
+									minWidthPx={0}
+									wrapperClass="flex h-7 w-7 shrink-0"
 								>
-							</HoverTooltip>
+									<button
+										type="button"
+										aria-label={`Field side ${downGuideSide.toUpperCase()}; switch to ${downGuideSide === 'a' ? 'B' : 'A'}`}
+										on:click={() => {
+											pinInlineGuideEditorUnderPointer();
+											setDownGuideSide(downGuideSide === 'a' ? 'b' : 'a');
+										}}
+										class="h-7 w-7 shrink-0 cursor-pointer text-[11px] font-black"
+										class:bg-stone-900={downGuideSide === 'a'}
+										class:text-white={downGuideSide === 'a'}
+										class:bg-white={downGuideSide === 'b'}
+										class:text-stone-950={downGuideSide === 'b'}>{downGuideSide.toUpperCase()}</button
+									>
+								</HoverTooltip>
 							{/if}
 							<label class="sr-only" for="custom-down-yardage">Custom yardage</label>
 							<input
-							bind:this={guideYardageInput}
-							id="custom-down-yardage"
-							type="text"
-							min="0"
-							max={maximumDownMarkerYardage(editingDownGuide.x, lineOfScrimmageX)}
-							step="0.5"
-							inputmode="decimal"
-							pattern="[0-9]*[.]?[0-9]*"
-							bind:value={downYardageValue}
-							aria-label="Custom yardage"
-							title="Custom yardage"
-							class="down-yardage-input h-7 w-10 border-0 bg-stone-100 px-1 text-center text-[10px] font-black text-stone-800 outline-none hover:bg-orange-100 focus:bg-white focus:ring-2 focus:ring-[#ff5a1f] focus:ring-inset"
-							on:focus={(event) => (event.currentTarget as HTMLInputElement).select()}
-							on:input={updateDownMarkerYardage}
-							on:keydown|stopPropagation={(event) => {
-								if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+								bind:this={guideYardageInput}
+								id="custom-down-yardage"
+								type="text"
+								min="0"
+								max={maximumDownMarkerYardage(editingDownGuide.x, lineOfScrimmageX)}
+								step="0.5"
+								inputmode="decimal"
+								pattern="[0-9]*[.]?[0-9]*"
+								bind:value={downYardageValue}
+								aria-label="Custom yardage"
+								title="Custom yardage"
+								class="down-yardage-input h-7 w-9 border-0 bg-stone-100 px-1 text-center text-[10px] font-black text-stone-800 outline-none hover:bg-orange-100 focus:bg-white focus:ring-2 focus:ring-[#ff5a1f] focus:ring-inset"
+								on:focus={(event) => (event.currentTarget as HTMLInputElement).select()}
+								on:input={updateDownMarkerYardage}
+								on:keydown|stopPropagation={(event) => {
+									if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+										event.preventDefault();
+										moveEditingDownGuideByYard(event.key === 'ArrowLeft' ? -1 : 1);
+										return;
+									}
+									if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+										event.preventDefault();
+										stepDownMarkerYardageInput(event.currentTarget, event.key === 'ArrowUp' ? 1 : -1);
+										return;
+									}
+									if (event.key !== 'Enter' && event.key !== 'Escape') return;
 									event.preventDefault();
-									moveEditingDownGuideByYard(event.key === 'ArrowLeft' ? -1 : 1);
-									return;
-								}
-								if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-									event.preventDefault();
-									stepDownMarkerYardageInput(event.currentTarget, event.key === 'ArrowUp' ? 1 : -1);
-									return;
-								}
-								if (event.key !== 'Enter' && event.key !== 'Escape') return;
-								event.preventDefault();
-								commitDownMarkerEditor();
-							}}
+									commitDownMarkerEditor();
+								}}
 							/>
 						</div>
 					</div>
@@ -8063,12 +8067,7 @@
 					>
 						<div class="flex items-center gap-px bg-stone-950 p-px shadow-xl ring-2 ring-stone-950">
 							{#each [3, 5, 14, 20, 30] as yardLine}
-								<HoverTooltip
-									text={`Jump to ${yardLine} Yard Line`}
-									placement="above"
-									minWidthPx={0}
-									wrapperClass="flex h-7 min-w-8 shrink-0"
-								>
+								<HoverTooltip text={`Jump to ${yardLine} Yard Line`} placement="above" minWidthPx={0} wrapperClass="flex h-7 min-w-8 shrink-0">
 									<button
 										type="button"
 										aria-label={`Move line of scrimmage to the ${yardLine} yard line`}
@@ -8077,7 +8076,7 @@
 											pinInlineGuideEditorUnderPointer();
 											setEditingLosYardLine(yardLine);
 										}}
-										class="h-7 min-w-8 w-full cursor-pointer bg-white px-2 text-[10px] font-black text-stone-950 hover:bg-green-100 aria-pressed:bg-stone-950 aria-pressed:text-green-400"
+										class="h-7 w-full min-w-8 cursor-pointer bg-white px-2 text-[10px] font-black text-stone-950 hover:bg-green-100 aria-pressed:bg-stone-950 aria-pressed:text-green-400"
 									>
 										{yardLine}
 									</button>
@@ -8086,58 +8085,58 @@
 						</div>
 						<div class="flex items-center gap-px bg-stone-950 p-px shadow-xl ring-2 ring-stone-950">
 							<HoverTooltip
-							text={`Flip to ${editingGuideSide === 'a' ? 'B' : 'A'}'s Side`}
-							placement="above"
-							minWidthPx={0}
-							wrapperClass="flex h-7 w-8 shrink-0"
-						>
-							<button
-								type="button"
-								aria-label={`Field side ${editingGuideSide.toUpperCase()}; switch to ${editingGuideSide === 'a' ? 'B' : 'A'}`}
-								on:click={() => {
-									pinInlineGuideEditorUnderPointer();
-									setEditingGuideSide(editingGuideSide === 'a' ? 'b' : 'a');
-								}}
-								class="h-7 w-8 cursor-pointer text-[10px] font-black"
-								class:bg-stone-950={editingGuideSide === 'a'}
-								class:text-white={editingGuideSide === 'a'}
-								class:bg-white={editingGuideSide === 'b'}
-								class:text-stone-950={editingGuideSide === 'b'}
+								text={`Flip to ${editingGuideSide === 'a' ? 'B' : 'A'}'s Side`}
+								placement="above"
+								minWidthPx={0}
+								wrapperClass="flex h-7 w-7 shrink-0"
 							>
-								{editingGuideSide.toUpperCase()}
-							</button>
+								<button
+									type="button"
+									aria-label={`Field side ${editingGuideSide.toUpperCase()}; switch to ${editingGuideSide === 'a' ? 'B' : 'A'}`}
+									on:click={() => {
+										pinInlineGuideEditorUnderPointer();
+										setEditingGuideSide(editingGuideSide === 'a' ? 'b' : 'a');
+									}}
+									class="h-7 w-7 cursor-pointer text-[11px] font-black"
+									class:bg-stone-950={editingGuideSide === 'a'}
+									class:text-white={editingGuideSide === 'a'}
+									class:bg-white={editingGuideSide === 'b'}
+									class:text-stone-950={editingGuideSide === 'b'}
+								>
+									{editingGuideSide.toUpperCase()}
+								</button>
 							</HoverTooltip>
 							<label class="sr-only" for="los-marker-yardage">Line of Scrimmage yard line</label>
 							<input
-							bind:this={guideYardageInput}
-							id="los-marker-yardage"
-							type="number"
-							min="0.5"
-							max={maximumLosYardLine()}
-							step="0.5"
-							inputmode="decimal"
-							bind:value={losYardageValue}
-							aria-label="Line of Scrimmage yard line"
-							class="down-yardage-input h-7 w-10 border-0 bg-white px-1 text-center text-[10px] font-black text-stone-950 outline-none hover:bg-green-100 focus:ring-2 focus:ring-green-600 focus:ring-inset"
-							on:focus={(event) => (event.currentTarget as HTMLInputElement).select()}
-							on:input={updateGuideYardage}
-							on:keydown|stopPropagation={(event) => {
-								if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+								bind:this={guideYardageInput}
+								id="los-marker-yardage"
+								type="number"
+								min="0.5"
+								max={maximumLosYardLine()}
+								step="0.5"
+								inputmode="decimal"
+								bind:value={losYardageValue}
+								aria-label="Line of Scrimmage yard line"
+								class="down-yardage-input h-7 w-9 border-0 bg-white px-1 text-center text-[10px] font-black text-stone-950 outline-none hover:bg-green-100 focus:ring-2 focus:ring-green-600 focus:ring-inset"
+								on:focus={(event) => (event.currentTarget as HTMLInputElement).select()}
+								on:input={updateGuideYardage}
+								on:keydown|stopPropagation={(event) => {
+									if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+										event.preventDefault();
+										moveEditingGuideByYard(event.key === 'ArrowLeft' ? -1 : 1);
+										return;
+									}
+									if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+										event.preventDefault();
+										if (event.key === 'ArrowUp') event.currentTarget.stepUp();
+										else event.currentTarget.stepDown();
+										updateGuideYardage(event);
+										return;
+									}
+									if (event.key !== 'Enter' && event.key !== 'Escape') return;
 									event.preventDefault();
-									moveEditingGuideByYard(event.key === 'ArrowLeft' ? -1 : 1);
-									return;
-								}
-								if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-									event.preventDefault();
-									if (event.key === 'ArrowUp') event.currentTarget.stepUp();
-									else event.currentTarget.stepDown();
-									updateGuideYardage(event);
-									return;
-								}
-								if (event.key !== 'Enter' && event.key !== 'Escape') return;
-								event.preventDefault();
-								commitGuideEditor();
-							}}
+									commitGuideEditor();
+								}}
 							/>
 						</div>
 					</div>
@@ -8191,7 +8190,7 @@
 								bind:value={losYardageValue}
 								aria-label={editingLos ? 'Line of Scrimmage yard line' : 'Line to Gain distance'}
 								title={editingLos ? 'L.O.S. yard line' : 'L.T.G. distance'}
-								class="down-yardage-input h-5 w-7 border-0 bg-stone-100 px-1 text-center text-[10px] leading-none font-black text-stone-800 outline-none hover:bg-stone-200 focus:bg-white focus:ring-1 focus:ring-stone-700 focus:ring-inset"
+								class="down-yardage-input h-5 w-7 border border-stone-900 bg-stone-100 px-1 text-center text-[10px] leading-none font-black text-stone-800 outline-none hover:bg-stone-200 focus:bg-white focus:ring-1 focus:ring-stone-700 focus:ring-inset"
 								on:focus={(event) => (event.currentTarget as HTMLInputElement).select()}
 								on:input={updateGuideYardage}
 								on:keydown|stopPropagation={(event) => {
@@ -8920,9 +8919,7 @@
 							</span>
 							<span class="min-w-0">
 								<strong class="block text-xs font-black">Auto-Save</strong>
-								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600">
-									Batch nearby changes and save after you pause, with database writes limited to at most one every 15 seconds.
-								</span>
+								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600"> Automatically save after you make changes.</span>
 							</span>
 						</button>
 						<button
@@ -8992,9 +8989,7 @@
 							</span>
 							<span class="min-w-0">
 								<strong class="block text-xs font-black">Show Yard Line Under Cursor</strong>
-								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600">
-									Show the nearest half-yard line beneath placeable element previews and single elements while they are moved.
-								</span>
+								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600"> Show the yard line beneath an element before you place it. </span>
 							</span>
 						</button>
 					</div>
@@ -9165,8 +9160,8 @@
 						{@render helpToolCard(helpDrawTool)}
 						<ul class="list-square space-y-2 border border-stone-300 bg-white p-4 pl-8 text-sm leading-relaxed">
 							<li>
-								<strong>Squiggle</strong> draws freehand and allows a single click to place a solid dot. <strong>Straight</strong> creates a precise
-								segment only after the pointer moves a visible distance.
+								<strong>Squiggle</strong> draws freehand and allows a single click to place a solid dot. <strong>Straight</strong> creates a precise segment
+								only after the pointer moves a visible distance.
 							</li>
 							<li>Choose one of ten colors or press <kbd>1</kbd>–<kbd>0</kbd>. Left/right arrows cycle the palette while Draw is open.</li>
 							<li>The line slider controls thickness. Every new dot or stroke keeps the selected color and thickness.</li>
@@ -9176,8 +9171,8 @@
 							</li>
 							<li>
 								<strong>Surface/stylus eraser:</strong> Flip a supported pen over and press its eraser end against the builder. Dragging removes drawing
-								strokes only while Draw is selected, and laser drawings only while Laser Pointer is selected. Outside those modes, it can remove any
-								touched drawing, player, field element, route, or cross-field line. One continuous eraser gesture is one Undo action.
+								strokes only while Draw is selected, and laser drawings only while Laser Pointer is selected. Outside those modes, it can remove any touched
+								drawing, player, field element, route, or cross-field line. One continuous eraser gesture is one Undo action.
 							</li>
 							<li>
 								<strong>Surface Pen barrel button:</strong> Hold the side/right-click button while using Straight to lock the stroke to the nearest
@@ -9242,10 +9237,10 @@
 							the diagram and settings. Revert to Defaults restores the default details and green grass without changing the selected field type.
 						</p>
 						<p>
-							<strong>Play builder-wide:</strong> Auto-Save, Enable Snapping, High Contrast Mode, and Show Yard Line Under Cursor apply to every play
-							builder in this browser rather than an individual play. Auto-Save batches nearby edits, waits until the current interaction is complete,
-							and limits database writes to at most one every 15 seconds. Yard-line cursor labels appear only while placing or moving eligible elements;
-							they are not saved or exported.
+							<strong>Play builder-wide:</strong> Auto-Save, Enable Snapping, High Contrast Mode, and Show Yard Line Under Cursor apply to every play builder
+							in this browser rather than an individual play. Auto-Save batches nearby edits, waits until the current interaction is complete, and limits
+							database writes to at most one every 15 seconds. Yard-line cursor labels appear only while placing or moving eligible elements; they are not
+							saved or exported.
 						</p>
 						<p>
 							<strong>Field types:</strong> Traditional is the 100 × 40-yard NIRSA field. 4v4 uses the 60 × 30-yard layout with a single midfield hash.
