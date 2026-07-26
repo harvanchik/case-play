@@ -97,7 +97,7 @@ Two notable residual risks remain:
 
 - Severity: Low
 - Status: Fixed
-- Location: `pnpm-workspace.yaml:8`, `pnpm-lock.yaml`
+- Location: `package.json:52`, `pnpm-lock.yaml`
 - Evidence: The initial audit found advisories through older `esbuild` and `cookie` transitive versions. Overrides now resolve `@esbuild-kit/core-utils` to `esbuild` 0.25.12 and `cookie` to 0.7.2. `pnpm audit --audit-level low` reports no known vulnerabilities.
 - Impact: Development-server request exposure and older cookie parsing behavior could weaken the dependency baseline.
 - Resolution: Pinned safe transitive versions and verified Drizzle Kit and `tsx` still start correctly.

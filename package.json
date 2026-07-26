@@ -48,7 +48,13 @@
 		"vite": "^8.1.5"
 	},
 	"type": "module",
-	"packageManager": "pnpm@11.17.0",
+	"packageManager": "pnpm@9.15.9",
+	"pnpm": {
+		"overrides": {
+			"@esbuild-kit/core-utils>esbuild": "0.25.12",
+			"cookie": "0.7.2"
+		}
+	},
 	"dependencies": {
 		"@resvg/resvg-js": "^2.6.2",
 		"@sveltejs/vite-plugin-svelte": "7.2.0",
