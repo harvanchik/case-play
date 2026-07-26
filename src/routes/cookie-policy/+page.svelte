@@ -33,11 +33,23 @@
 
 		<h2 class="mt-7 text-xl font-bold">Advertising choices</h2>
 		<p class="mt-2 leading-7">
-			AdSense is blocked until you choose <strong>Accept All Cookies</strong>. Google Privacy &amp; Messaging then presents additional advertising
-			choices where required and communicates them to AdSense using its certified consent framework. Depending on location and choice, Google may
-			serve personalized, non-personalized, or limited ads. Learn more from
+			Choosing <strong>Accept All Cookies</strong> permits Google AdSense to request personalized ads and use optional advertising storage where
+			allowed. Choosing <strong>Essential Cookies Only</strong> tells AdSense to disable personalization; ads may still appear as non-personalized or
+			limited ads. Google Privacy &amp; Messaging is a Google-certified consent management platform that presents and records the additional choices
+			required in the EEA, UK, Switzerland, and other supported regions. Its regional consent signals take precedence over less restrictive site
+			settings.
+		</p>
+		<p class="mt-2 leading-7">
+			Privacy-restricted advertising still processes technical information needed to deliver an ad, such as an IP address, and Google’s ad code may be
+			cached by the browser. If programmatic limited ads are enabled, Google may use narrowly limited storage for invalid-traffic detection where it
+			determines consent is not required. These uses do not enable personalized advertising. Learn more from
 			<a class="font-semibold underline" href="https://policies.google.com/technologies/ads" rel="noreferrer" target="_blank"
 				>Google advertising technologies</a
+			> and <a
+				class="font-semibold underline"
+				href="https://support.google.com/adsense/answer/14210870"
+				rel="noreferrer"
+				target="_blank">Google’s limited ads documentation</a
 			>.
 		</p>
 
@@ -49,9 +61,9 @@
 
 		<h2 class="mt-7 text-xl font-bold">Change your choice</h2>
 		<p class="mt-2 leading-7">
-			Use <strong>Use of Cookies</strong> in the footer or the <a class="font-semibold underline" href="/privacy">Privacy</a> page to accept or withdraw
-			optional advertising consent at any time. Global Privacy Control is treated as an advertising opt-out. You can also clear existing site data in
-			your browser.
+			Use <strong>Use of Cookies</strong> in the footer or the <a class="font-semibold underline" href="/privacy">Privacy</a> page to change your
+			advertising choice at any time. In regions handled by Google Privacy &amp; Messaging, this opens Google’s certified consent controls. Global
+			Privacy Control is treated as an advertising-personalization opt-out. You can also clear existing site data in your browser.
 		</p>
 	</article>
 	<PublicSiteFooter />

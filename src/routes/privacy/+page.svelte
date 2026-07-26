@@ -46,9 +46,12 @@
 		<h2 class="mt-7 text-xl font-bold">Advertising</h2>
 		<p class="mt-2 leading-7">
 			Google AdSense ads help fund the domain, hosting, and database. Google Privacy &amp; Messaging, a Google-certified consent management platform,
-			presents additional advertising choices where required. AdSense does not load until you choose <strong>Accept All Cookies</strong>. Depending on
-			your location and choices, Google and approved partners may then use cookies and activity data for personalized advertising and measurement. See
-			the
+			handles consent requirements in the EEA, UK, Switzerland, and other supported regions. If you choose <strong>Accept All Cookies</strong>, Google
+			and approved partners may use permitted cookies and activity data for personalized advertising and measurement. If you choose
+			<strong>Essential Cookies Only</strong>, CasePlay.org requests ads with personalization disabled. Google may then serve non-personalized or
+			limited ads, depending on your location and the choices recorded by its certified consent platform. Limited advertising still requires technical
+			processing such as using an IP address to deliver an ad, and Google may use narrowly limited storage for security and invalid-traffic prevention
+			where permitted. See the
 			<a class="font-semibold underline" href="/cookie-policy">Cookie Policy</a> and
 			<a class="font-semibold underline" href="https://policies.google.com/privacy" rel="noreferrer" target="_blank">Google Privacy Policy</a>.
 		</p>

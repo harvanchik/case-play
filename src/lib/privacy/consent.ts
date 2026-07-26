@@ -13,7 +13,13 @@ type ConsentRecord = {
 };
 
 type ConsentWindow = Window & {
-	adsbygoogle?: Record<string, unknown>[];
+	adsbygoogle?: Record<string, unknown>[] & {
+		requestNonPersonalizedAds?: number;
+	};
+	googlefc?: {
+		callbackQueue?: Array<() => void>;
+		showRevocationMessage?: () => void;
+	};
 };
 
 let adsenseLoadPromise: Promise<void> | null = null;
@@ -113,13 +119,44 @@ export const initializeConsent = () => {
 };
 
 export const openConsentChoices = () => {
-	if (typeof window !== 'undefined') window.dispatchEvent(new Event(OPEN_CONSENT_EVENT));
+	if (typeof window === 'undefined') return;
+	if (googleCmpHandlesRegion()) {
+		const consentWindow = window as ConsentWindow;
+		(consentWindow.googlefc ??= {}).callbackQueue ??= [];
+		consentWindow.googlefc.callbackQueue.push(() => consentWindow.googlefc?.showRevocationMessage?.());
+		return;
+	}
+	window.dispatchEvent(new Event(OPEN_CONSENT_EVENT));
 };
 
-export const canLoadAdvertising = () => readConsent() === 'all' && !hasGlobalPrivacyControl();
+const googleCmpHandlesRegion = () =>
+	typeof document !== 'undefined' &&
+	document.querySelector<HTMLMetaElement>('meta[name="caseplay-google-cmp-required"]')?.content === 'true';
+
+export const canLoadAdvertising = () => googleCmpHandlesRegion() || readConsent() !== null;
+
+const configureAdPrivacy = () => {
+	if (typeof window === 'undefined') return;
+	const choice = readConsent();
+	const adsbygoogle = ((window as ConsentWindow).adsbygoogle ??= []);
+	if (choice === 'essential' || hasGlobalPrivacyControl()) adsbygoogle.requestNonPersonalizedAds = 1;
+	else if (choice === 'all') adsbygoogle.requestNonPersonalizedAds = 0;
+};
+
+export const requestAd = () => {
+	if (typeof window === 'undefined' || !canLoadAdvertising()) return;
+	configureAdPrivacy();
+	const choice = readConsent();
+	const request =
+		choice === 'essential' || hasGlobalPrivacyControl()
+			? { params: { google_privacy_treatments: 'disablePersonalization' } }
+			: {};
+	((window as ConsentWindow).adsbygoogle ??= []).push(request);
+};
 
 export const loadAdSense = () => {
 	if (typeof window === 'undefined' || !canLoadAdvertising()) return Promise.resolve();
+	configureAdPrivacy();
 	if (adsenseLoadPromise) return adsenseLoadPromise;
 
 	adsenseLoadPromise = new Promise<void>((resolve, reject) => {

@@ -4,15 +4,12 @@
 		ADSENSE_PUBLISHER_ID,
 		CONSENT_EVENT,
 		canLoadAdvertising,
-		loadAdSense
+		loadAdSense,
+		requestAd
 	} from '$lib/privacy/consent';
 
 	const adSlot = '5024456887';
 	export let orientation: 'vertical' | 'horizontal' = 'vertical';
-
-	type AdSenseWindow = Window & {
-		adsbygoogle?: Record<string, never>[];
-	};
 
 	let initialized = false;
 	let initializing = false;
@@ -24,8 +21,7 @@
 		try {
 			await loadAdSense();
 			if (!canLoadAdvertising()) return;
-			const adsenseWindow = window as AdSenseWindow;
-			(adsenseWindow.adsbygoogle ??= []).push({});
+			requestAd();
 			initialized = true;
 		} catch {
 			// Ad blockers and network restrictions may prevent an ad from loading.

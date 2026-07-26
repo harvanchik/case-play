@@ -16,7 +16,8 @@
 	<meta property="og:site_name" content="CasePlay.org" />
 	<meta property="og:url" content={canonicalUrl} />
 	<meta property="og:locale" content="en_US" />
+	<meta name="caseplay-google-cmp-required" content={data?.googleCmpRequired ? 'true' : 'false'} />
 </svelte:head>
 
 <slot />
-<CookieConsent />
+<CookieConsent googleCmpRequired={data?.googleCmpRequired ?? false} />
