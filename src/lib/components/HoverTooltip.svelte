@@ -13,6 +13,7 @@
 		cursorOffsetYPx = 18,
 		paddingPx = 8,
 		minWidthPx = 180,
+		placement = 'right',
 		panelClass = '',
 		maxWidthClass = 'max-w-72',
 		wrapperClass = 'relative inline-flex shrink-0',
@@ -24,6 +25,7 @@
 		cursorOffsetYPx?: number;
 		paddingPx?: number;
 		minWidthPx?: number;
+		placement?: 'right' | 'above';
 		panelClass?: string;
 		maxWidthClass?: string;
 		wrapperClass?: string;
@@ -46,15 +48,21 @@
 	const positionPanel = async () => {
 		await tick();
 		if (!panel) return;
-		const position = cursorFloatingPosition({
-			cursorX,
-			cursorY,
-			panelWidth: panel.offsetWidth,
-			panelHeight: panel.offsetHeight,
-			offsetX: cursorOffsetXPx,
-			offsetY: cursorOffsetYPx,
-			padding: paddingPx
-		});
+		const position =
+			placement === 'above'
+				? {
+						left: Math.max(paddingPx, Math.min(cursorX - panel.offsetWidth / 2, window.innerWidth - panel.offsetWidth - paddingPx)),
+						top: Math.max(paddingPx, Math.min(cursorY - panel.offsetHeight - cursorOffsetYPx, window.innerHeight - panel.offsetHeight - paddingPx))
+					}
+				: cursorFloatingPosition({
+						cursorX,
+						cursorY,
+						panelWidth: panel.offsetWidth,
+						panelHeight: panel.offsetHeight,
+						offsetX: cursorOffsetXPx,
+						offsetY: cursorOffsetYPx,
+						padding: paddingPx
+					});
 		left = position.left;
 		top = position.top;
 	};
@@ -75,8 +83,8 @@
 	const openAtFocus = (event: FocusEvent) => {
 		window.dispatchEvent(new CustomEvent('case-play-tooltip-open', { detail: tooltipId }));
 		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-		cursorX = rect.right;
-		cursorY = rect.top + rect.height / 2;
+		cursorX = placement === 'above' ? rect.left + rect.width / 2 : rect.right;
+		cursorY = placement === 'above' ? rect.top : rect.top + rect.height / 2;
 		isOpen = true;
 		positionPanel();
 	};

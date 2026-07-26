@@ -98,11 +98,12 @@
 	type Scene = PlayBuilderScene;
 	type ArrowKind = Extract<PathKind, 'run' | 'pass' | 'kick'>;
 	type LaserColor = Extract<GuideColor, 'red' | 'green' | 'blue' | 'purple'>;
+	type LaserRenderColor = LaserColor | 'rainbow';
 	type ToolbarPresetTool = 'deflag' | 'bean-bag' | 'laser' | ArrowKind | 'line-of-scrimmage' | 'line-to-gain';
 	type FieldSide = 'a' | 'b';
 	type ExportBackground = 'transparent' | 'grass' | 'color';
-	type LaserDrawing = { points: Point[]; color: LaserColor; releasedAt: number | null; appearedAt?: number | null };
-	type ActiveLaserDrawing = { points: Point[]; color: LaserColor };
+	type LaserDrawing = { points: Point[]; color: LaserRenderColor; releasedAt: number | null; appearedAt?: number | null };
+	type ActiveLaserDrawing = { points: Point[]; color: LaserRenderColor };
 	type StoredDraft = { document: SerializedPlayBuilderDocument; updatedAt: number };
 	const exportBackgroundOptions: { id: ExportBackground; label: string; description: string }[] = [
 		{ id: 'transparent', label: 'Transparent', description: 'Field is surrounded by a transparent background.' },
@@ -111,9 +112,15 @@
 	];
 	const exportSettingsStorageKey = 'caseplay-play-builder-export-settings-v1';
 	const toolPreferencesStorageKey = 'caseplay-play-builder-tool-preferences-v1';
+	const builderPreferencesStorageKey = 'caseplay-play-builder-settings-v1';
+	const saveLabelFeedbackStorageKey = 'caseplay-play-builder-save-label-feedback-v1';
 	const editTokensStorageKey = 'caseplay-play-builder-edit-tokens-v1';
 	const draftStoragePrefix = 'caseplay-play-builder-draft-v1:';
 	const laserFadeDuration = 500;
+	const autoSaveIdleDelay = 3_000;
+	const autoSaveMinimumInterval = 15_000;
+	const yardLinePreviewGap = 12;
+	const minimumStraightDrawingLength = 4;
 
 	export let initialDocument: SerializedPlayBuilderDocument | null = null;
 	export let savedPlayId: string | null = null;
@@ -177,7 +184,7 @@
 		],
 		[{ id: 'ball', label: 'Football', symbol: '', shortcut: 'o', shortcutKeys: ['O'], caption: 'Football', image: '/images/football.webp' }],
 		[{ id: 'flag', label: 'Penalty Flag', symbol: '', shortcut: 'f', shortcutKeys: ['F'], caption: 'Penalty', image: '/images/penalty-flag.webp' }],
-		[{ id: 'bean-bag', label: 'Bean Bag', symbol: '', shortcut: '', shortcutKeys: [], caption: 'Bean Bag', image: '/images/bean-bag-blue.webp' }],
+		[{ id: 'bean-bag', label: 'Bean Bag', symbol: '', shortcut: 't', shortcutKeys: ['T'], caption: 'Bean Bag', image: '/images/bean-bag-blue.webp' }],
 		[{ id: 'deflag', label: 'Flag Belt', symbol: '', shortcut: 'l', shortcutKeys: ['L'], caption: 'Flag Belt', image: '/images/flag-belt.webp' }],
 		[{ id: 'event', label: 'Event Tag', symbol: '', shortcut: 'e', shortcutKeys: ['E'], caption: 'Event Tag', icon: 'event' }],
 		[
@@ -254,13 +261,13 @@
 		{ id: 'black', label: 'Black', value: '#000000' }
 	];
 	const freeDrawColors: { id: GuideColor; label: string; value: string }[] = [
-		{ id: 'red', label: 'Neon red', value: '#ff1744' },
-		{ id: 'orange', label: 'Neon orange', value: '#ff6d00' },
-		{ id: 'yellow', label: 'Neon yellow', value: '#ffea00' },
-		{ id: 'green', label: 'Neon green', value: '#00ff66' },
-		{ id: 'cyan', label: 'Neon cyan', value: '#00e5ff' },
-		{ id: 'blue', label: 'Neon blue', value: '#2979ff' },
-		{ id: 'purple', label: 'Neon purple', value: '#d500f9' },
+		{ id: 'red', label: 'Red', value: '#ff1744' },
+		{ id: 'orange', label: 'Orange', value: '#ff6d00' },
+		{ id: 'yellow', label: 'Yellow', value: '#ffea00' },
+		{ id: 'green', label: 'Green', value: '#00ff66' },
+		{ id: 'cyan', label: 'Cyan', value: '#00e5ff' },
+		{ id: 'blue', label: 'Blue', value: '#2979ff' },
+		{ id: 'purple', label: 'Purple', value: '#d500f9' },
 		{ id: 'white', label: 'White', value: '#ffffff' },
 		{ id: 'gray', label: 'Gray', value: '#9ca3af' },
 		{ id: 'black', label: 'Black', value: '#000000' }
@@ -327,8 +334,17 @@
 	let actionMessageTimer: ReturnType<typeof setTimeout> | null = null;
 	let canEditSavedPlay = savedPlayId === null;
 	let ownershipResolved = savedPlayId === null;
+	let saveFeedbackState: 'idle' | 'saved' = 'idle';
 	let saveActionLabel = '';
-	$: saveActionLabel = ownershipResolved ? (savedPlayId && !canEditSavedPlay ? 'Make Copy' : 'Save') : '';
+	$: saveActionLabel = !ownershipResolved
+		? ''
+		: actionInProgress === 'save'
+			? 'Saving'
+			: saveFeedbackState === 'saved'
+				? 'Saved'
+				: savedPlayId && !canEditSavedPlay
+					? 'Make Copy'
+					: 'Save';
 	let showShare = false;
 	let shareUrl = '';
 	let shareQrDataUrl = '';
@@ -369,6 +385,13 @@
 	let exportColorPicker: 'background' | 'border' | null = null;
 	let exportSettingsHydrated = false;
 	let toolPreferencesHydrated = false;
+	let builderPreferencesHydrated = false;
+	let autoSaveEnabled = false;
+	let snappingEnabled = true;
+	let highContrastEnabled = false;
+	let showYardLineCursorEnabled = false;
+	let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+	let lastSaveAttemptAt = 0;
 	let exportSettingsTop = 8;
 	let exportSettingsRight = 8;
 	let showNewPrompt = false;
@@ -388,6 +411,7 @@
 	let freeDrawThickness = 5;
 	let erasingFreeStrokes = false;
 	let stylusEraserActive = false;
+	let stylusEraserPointerId: number | null = null;
 	let eraseHistorySaved = false;
 	let lastErasePoint: Point | null = null;
 	let deflagPlacementColor: GuideColor = 'red';
@@ -397,6 +421,9 @@
 	let guidePlacementColors: Record<'line-of-scrimmage' | 'line-to-gain', GuideColor> = { 'line-of-scrimmage': 'white', 'line-to-gain': 'yellow' };
 	let guidePlacementStyles: Record<'line-of-scrimmage' | 'line-to-gain', GuideStyle> = { 'line-of-scrimmage': 'dashed', 'line-to-gain': 'solid' };
 	let laserColor: LaserColor = 'red';
+	let rainbowLaserEnabled = false;
+	let laserToolbarClickTimes: number[] = [];
+	let suppressLaserPresetOpenUntil = 0;
 	let toolbarEditorTool: ToolbarPresetTool | null = null;
 	let toolbarEditorTop = 0;
 	let toolbarEditorElement: HTMLElement;
@@ -405,12 +432,21 @@
 	let toolbarGuideHistorySaved = false;
 	let toolbarGuideYardageInput: HTMLInputElement;
 	let dragTarget: DragTarget | null = null;
+	let draggedYardMarker: FieldMarker | undefined;
+	let draggedYardPath: FieldPath | undefined;
+	$: {
+		const target = dragTarget;
+		draggedYardMarker =
+			target?.type === 'marker' && target.moved ? markers.find((marker) => marker.id === target.id) : undefined;
+		draggedYardPath = target?.type === 'path' && target.moved ? paths.find((path) => path.id === target.id) : undefined;
+	}
 	let editingMarkerId: number | null = null;
 	let editingMarker: FieldMarker | undefined;
 	let editValue = '';
 	let editInput: HTMLInputElement;
 	let editingGuideId: number | null = null;
 	let editingGuide: FieldGuide | undefined;
+	let editingGuideFromLosMarker = false;
 	let editingPathId: number | null = null;
 	let editingPath: FieldPath | undefined;
 	let editingTeamBoxY: number | null = null;
@@ -435,7 +471,11 @@
 	let lineEditorPoint: Point | null = null;
 	let guideEditColor: GuideColor = 'yellow';
 	let guideEditStyle: GuideStyle = 'solid';
+	let editingLineFormatDefault: { color: GuideColor; style: GuideStyle } | null = null;
+	let showLineFormatReset = false;
 	let editorElement: Element;
+	let inlineGuideEditorPinnedLeft: number | null = null;
+	let fieldControlTooltip = '';
 	let selectedTargets: SelectedTarget[] = [];
 	let selectedGroupBounds: SelectionBounds | null = null;
 	let marqueeSelection: MarqueeSelection | null = null;
@@ -492,8 +532,14 @@
 	const tutorialSeenKey = 'caseplay-play-builder-tutorial-seen-v1';
 	$: editingMarker = markers.find((marker) => marker.id === editingMarkerId);
 	$: editingGuide = guides.find((guide) => guide.id === editingGuideId);
+	$: if (editingGuideId === null && editingGuideFromLosMarker) editingGuideFromLosMarker = false;
 	$: editingPath = paths.find((path) => path.id === editingPathId);
+	$: editingLineFormatDefault = lineFormatDefaultFor(editingGuide, editingPath);
+	$: showLineFormatReset =
+		editingLineFormatDefault !== null &&
+		(guideEditColor !== editingLineFormatDefault.color || guideEditStyle !== editingLineFormatDefault.style);
 	$: editingDownGuide = guides.find((guide) => guide.id === editingDownGuideId && guide.kind === 'line-to-gain');
+	$: if (editingGuideId === null && editingDownGuideId === null && inlineGuideEditorPinnedLeft !== null) inlineGuideEditorPinnedLeft = null;
 	$: lineOfScrimmageX = guides.find((guide) => guide.kind === 'line-of-scrimmage')?.x ?? null;
 	$: currentLineToGain = guides.find((guide) => guide.kind === 'line-to-gain');
 	$: if (exportSettingsHydrated) {
@@ -533,6 +579,21 @@
 			// Keep the current in-memory preferences if browser storage is unavailable.
 		}
 	}
+	$: if (builderPreferencesHydrated) {
+		try {
+			localStorage.setItem(
+				builderPreferencesStorageKey,
+				JSON.stringify({
+					autoSave: autoSaveEnabled,
+					snapping: snappingEnabled,
+					highContrast: highContrastEnabled,
+					showYardLineCursor: showYardLineCursorEnabled
+				})
+			);
+		} catch {
+			// Keep the current in-memory settings if browser storage is unavailable.
+		}
+	}
 	$: lineEditorPoint = editingGuide
 		? { x: editingGuide.x, y: fieldTop + fieldHeight / 2 }
 		: editingPath
@@ -552,6 +613,33 @@
 		})
 	);
 	$: hasUnsavedChanges = currentSceneKey !== savedSceneKey;
+	$: if (saveFeedbackState === 'saved' && hasUnsavedChanges) {
+		saveFeedbackState = 'idle';
+	}
+	$: autoSaveInteractionActive = Boolean(
+		drawing ||
+		dragTarget ||
+		activeFreeStroke ||
+		editingMarkerId !== null ||
+		editingGuideId !== null ||
+		editingPathId !== null ||
+		editingTeamBoxIndex !== null ||
+		editingScoreboard !== null ||
+		editingDownGuideId !== null ||
+		editingPlayId !== null ||
+		toolbarEditorTool !== null
+	);
+	$: if (builderPreferencesHydrated) {
+		scheduleAutoSave(
+			currentSceneKey,
+			hasUnsavedChanges,
+			autoSaveEnabled,
+			ownershipResolved,
+			actionInProgress,
+			autoSaveInteractionActive,
+			tutorialActive
+		);
+	}
 
 	const fieldMaxWidth = 960;
 	const fieldMaxHeight = 384;
@@ -937,6 +1025,19 @@
 		const base = isAtMidfieldX(x) ? String(yardLine) : half && wholeYards === 0 ? `${side}'s` : `${side}'s ${half ? wholeYards : yardLine}`;
 		return { base, half, baseWidth: base.length * 5.8 };
 	};
+	const yardLinePreviewText = (x: number) => {
+		const yards = yardsForX(x);
+		const leftGoal = leftGoalYards();
+		const rightGoal = rightGoalYards();
+		if (Math.abs(yards - leftGoal) < 0.5) return "A's Goal Line";
+		if (Math.abs(yards - rightGoal) < 0.5) return "B's Goal Line";
+		if (yards < leftGoal) return "A's End Zone";
+		if (yards > rightGoal) return "B's End Zone";
+		const yardLine = Math.round(Math.min(yards - leftGoal, rightGoal - yards) * 2) / 2;
+		const side = fieldSideForX(x).toUpperCase();
+		if (yardLine === maximumLosYardLine()) return String(yardLine);
+		return `${side}'s ${Number.isInteger(yardLine) ? yardLine : yardLine.toFixed(1)}`;
+	};
 	$: fieldSnapXs = [
 		...fieldLayout.zoneLines,
 		...fieldLayout.threeYardMarkers,
@@ -1019,7 +1120,7 @@
 	};
 	const beginLaserDrawing = (event: PointerEvent, point: Point) => {
 		updateLaserPointer(point);
-		activeLaserDrawing = { points: [point], color: laserColor };
+		activeLaserDrawing = { points: [point], color: rainbowLaserEnabled ? 'rainbow' : laserColor };
 		laserDrawingPointerId = event.pointerId;
 		svg.setPointerCapture(event.pointerId);
 	};
@@ -1099,10 +1200,20 @@
 		const distance = Math.hypot(dx, dy);
 		if (distance === 0) return point;
 
+		const diagonal = Math.SQRT1_2;
+		const directions: Point[] = [
+			{ x: 1, y: 0 },
+			{ x: diagonal, y: diagonal },
+			{ x: 0, y: 1 },
+			{ x: -diagonal, y: diagonal },
+			{ x: -1, y: 0 },
+			{ x: -diagonal, y: -diagonal },
+			{ x: 0, y: -1 },
+			{ x: diagonal, y: -diagonal }
+		];
 		const angleStep = Math.PI / 4;
-		const angle = Math.round(Math.atan2(dy, dx) / angleStep) * angleStep;
-		const directionX = Math.cos(angle);
-		const directionY = Math.sin(angle);
+		const directionIndex = (Math.round(Math.atan2(dy, dx) / angleStep) + directions.length) % directions.length;
+		const { x: directionX, y: directionY } = directions[directionIndex];
 		let maximumDistance = Number.POSITIVE_INFINITY;
 		if (directionX > 0) maximumDistance = Math.min(maximumDistance, (1000 - start.x) / directionX);
 		else if (directionX < 0) maximumDistance = Math.min(maximumDistance, -start.x / directionX);
@@ -1125,6 +1236,7 @@
 	const clearEditorState = () => {
 		editingMarkerId = null;
 		editingGuideId = null;
+		editingGuideFromLosMarker = false;
 		editingPathId = null;
 		editingTeamBoxY = null;
 		editingTeamBoxIndex = null;
@@ -1138,6 +1250,7 @@
 		toolbarEditorTool = null;
 		toolbarGuideYardage = '';
 		toolbarGuideHistorySaved = false;
+		inlineGuideEditorPinnedLeft = null;
 	};
 	const hideDeleteButton = () => {
 		if (deleteTargetTimer) {
@@ -1161,6 +1274,8 @@
 		dragTarget = null;
 		erasingFreeStrokes = false;
 		eraseHistorySaved = false;
+		stylusEraserActive = false;
+		stylusEraserPointerId = null;
 		lastErasePoint = null;
 		markers = scene.markers.map((marker) => ({ ...marker }));
 		paths = scene.paths.map((path) => ({ ...path, start: { ...path.start }, end: { ...path.end } }));
@@ -1282,8 +1397,8 @@
 		if (dismissEditorForAction() || suppressNextClick) return;
 		const nextIndex = playEntries.findIndex((play) => play.id === playId);
 		if (nextIndex < 0 || nextIndex === activePlayIndex) return;
+		if (editingPlayId !== null) renamePlay();
 		storeActivePlayState();
-		editingPlayId = null;
 		loadPlayAtIndex(nextIndex);
 	};
 	const uniquePlayName = (base: string) => {
@@ -1338,24 +1453,24 @@
 		playNameInput?.focus();
 		playNameInput?.select();
 	};
-	const renamePlay = () => {
-		const name = playNameValue.trim();
-		if (editingPlayId === null || !name) return;
-		const renamedValue = name.slice(0, PLAY_BUILDER_PLAY_NAME_MAX_LENGTH);
-		const existingPlay = playEntries.find((play) => play.id === editingPlayId);
-		if (!existingPlay || existingPlay.name === renamedValue) {
-			editingPlayId = null;
-			return;
+	const renamePlay = (closeMenu = true) => {
+		const playId = editingPlayId;
+		if (playId === null) return null;
+		const renamedValue = playNameValue.trim().slice(0, PLAY_BUILDER_PLAY_NAME_MAX_LENGTH);
+		const existingPlay = playEntries.find((play) => play.id === playId);
+		if (existingPlay && renamedValue && existingPlay.name !== renamedValue) {
+			saveHistory();
+			playEntries = playEntries.map((play) => (play.id === playId ? { ...play, name: renamedValue } : play));
 		}
-		saveHistory();
-		playEntries = playEntries.map((play) => (play.id === editingPlayId ? { ...play, name: renamedValue } : play));
-		editingPlayId = null;
+		if (closeMenu) editingPlayId = null;
+		return playId;
 	};
 	const duplicatePlay = () => {
-		if (editingPlayId === null || playEntries.length >= PLAY_BUILDER_MAX_PLAYS) return;
+		const sourcePlayId = renamePlay(false);
+		if (sourcePlayId === null || playEntries.length >= PLAY_BUILDER_MAX_PLAYS) return;
 		saveHistory();
 		storeActivePlayState();
-		const sourceIndex = playEntries.findIndex((play) => play.id === editingPlayId);
+		const sourceIndex = playEntries.findIndex((play) => play.id === sourcePlayId);
 		const source = playEntries[sourceIndex];
 		if (!source) return;
 		const duplicate: PlayEntry = {
@@ -1414,6 +1529,7 @@
 		erasingFreeStrokes = false;
 		eraseHistorySaved = false;
 		stylusEraserActive = false;
+		stylusEraserPointerId = null;
 		lastErasePoint = null;
 	};
 	const clearFreeDrawings = () => {
@@ -1542,20 +1658,26 @@
 		if (sessionToken) storeEditToken(playId, sessionToken);
 		return sessionToken;
 	};
-	const createSavedPlay = async () => {
+	const createSavedPlay = async (document: SerializedPlayBuilderDocument) => {
 		const response = await fetch('/api/play-builders', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ document: currentSerializedDocument() })
+			body: JSON.stringify({ document })
 		});
 		const result = (await response.json()) as { id?: string; editToken?: string; message?: string };
 		if (!response.ok || !result.id || !result.editToken) throw new Error(result.message || 'Unable to save play.');
 		storeEditToken(result.id, result.editToken);
 		return result.id;
 	};
+	const showSavedLabel = () => {
+		saveFeedbackState = 'saved';
+	};
 	const savePlay = async (): Promise<boolean> => {
 		if (actionInProgress || !ownershipResolved || !hasUnsavedChanges) return false;
+		const documentToSave = currentSerializedDocument();
+		const savedDocumentKey = JSON.stringify(documentToSave);
 		actionInProgress = 'save';
+		lastSaveAttemptAt = Date.now();
 		showPendingActionMessage(canEditSavedPlay ? 'Saving…' : 'Making copy…');
 		try {
 			const editToken = savedPlayId ? editTokenForPlay(savedPlayId) : null;
@@ -1563,12 +1685,13 @@
 				const response = await fetch(`/api/play-builders/${savedPlayId}`, {
 					method: 'PUT',
 					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify({ document: currentSerializedDocument(), editToken })
+					body: JSON.stringify({ document: documentToSave, editToken })
 				});
 				if (response.ok) {
 					canEditSavedPlay = true;
-					savedSceneKey = JSON.stringify(currentSerializedDocument());
+					savedSceneKey = savedDocumentKey;
 					clearLocalDraft();
+					showSavedLabel();
 					showActionMessage('Saved');
 					return true;
 				}
@@ -1577,13 +1700,15 @@
 					throw new Error(result.message || 'Unable to save play.');
 				}
 			}
-			const id = await createSavedPlay();
+			const id = await createSavedPlay(documentToSave);
 			canEditSavedPlay = true;
-			savedSceneKey = JSON.stringify(currentSerializedDocument());
+			savedSceneKey = savedDocumentKey;
 			clearLocalDraft();
+			showSavedLabel();
 			const confirmation = savedPlayId ? 'Copy created' : 'Saved';
 			showActionMessage(confirmation);
 			sessionStorage.setItem('play-builder-action-message', JSON.stringify({ message: confirmation, expiresAt: Date.now() + 10_000 }));
+			sessionStorage.setItem(saveLabelFeedbackStorageKey, 'saved');
 			const playQuery = playEntries.length > 1 ? `?play=${activePlayIndex + 1}` : '';
 			await goto(`/play-builder/${id}${playQuery}`, { replaceState: true, keepFocus: true, noScroll: true });
 			return true;
@@ -1593,6 +1718,39 @@
 		} finally {
 			actionInProgress = null;
 		}
+	};
+	const scheduleAutoSave = (
+		sceneKey: string,
+		unsaved: boolean,
+		enabled: boolean,
+		ownershipReady: boolean,
+		currentAction: typeof actionInProgress,
+		interactionActive: boolean,
+		inTutorial: boolean
+	) => {
+		if (autoSaveTimer !== null) clearTimeout(autoSaveTimer);
+		autoSaveTimer = null;
+		if (!enabled || !unsaved || !ownershipReady || currentAction !== null || interactionActive || inTutorial || showDraftRestore) return;
+		const millisecondsSinceLastSave = Date.now() - lastSaveAttemptAt;
+		const writeThrottleDelay = Math.max(0, autoSaveMinimumInterval - millisecondsSinceLastSave);
+		autoSaveTimer = setTimeout(
+			() => {
+				autoSaveTimer = null;
+				if (
+					!autoSaveEnabled ||
+					!hasUnsavedChanges ||
+					currentSceneKey !== sceneKey ||
+					!ownershipResolved ||
+					actionInProgress !== null ||
+					autoSaveInteractionActive ||
+					tutorialActive ||
+					showDraftRestore
+				)
+					return;
+				void savePlay();
+			},
+			Math.max(autoSaveIdleDelay, writeThrottleDelay)
+		);
 	};
 	const darkerExportColor = (hex: string) => {
 		const value = Number.parseInt(hex.slice(1), 16);
@@ -1999,6 +2157,7 @@
 	const guideColor = (color: GuideColor) => (color === 'gold' ? '#d4a017' : (guideColors.find((option) => option.id === color)?.value ?? '#facc15'));
 	const drawingColor = (color: GuideColor) => freeDrawColors.find((option) => option.id === color)?.value ?? guideColor(color);
 	const laserColorValue = (color: LaserColor) => laserColors.find((option) => option.id === color)?.value ?? '#ff1744';
+	const laserPaint = (color: LaserRenderColor) => (color === 'rainbow' ? 'url(#builder-rainbow-laser-gradient)' : laserColorValue(color));
 	const isArrowKind = (kind: PathKind | Tool): kind is ArrowKind => kind === 'run' || kind === 'pass' || kind === 'kick';
 	const arrowPlacementColor = (kind: ArrowKind) => arrowPlacementColors[kind];
 	const toolbarArrowColor = (kind: ArrowKind, color: GuideColor, selected: boolean) => {
@@ -2017,7 +2176,7 @@
 		if (kind === 'pass') return 'M31 25 L23.1 21.8 L27.6 16.7 Z';
 		return 'M30.5 27 L24.4 21.2 L30.7 18.8 Z';
 	};
-	const toolbarArrowDash = (style: GuideStyle) => (style === 'dashed' ? '4 2.5' : style === 'dotted' ? '1 3' : undefined);
+	const toolbarArrowDash = (style: GuideStyle) => (style === 'dashed' ? '4 2.5' : style === 'dotted' ? '0.01 3.5' : undefined);
 	const deflagColors = freeDrawColors.filter((option) => !['white', 'gray', 'black'].includes(option.id));
 	const deflagImage = (color: GuideColor | undefined) =>
 		color && color !== 'red' && deflagColors.some((option) => option.id === color) ? `/images/flag-belt-${color}.webp` : '/images/flag-belt.webp';
@@ -2030,14 +2189,14 @@
 	const beanBagImage = (color: GuideColor | undefined) =>
 		`/images/bean-bag-${color === 'white' || color === 'black' || color === 'pink' ? color : 'blue'}.webp`;
 	const toolbarAsset = (path: string) => path.replace('/images/', '/images/toolbar/');
-	const toolbarToolImage = (item: ToolOption) =>
+	const toolbarToolImage = (item: ToolOption, selectedDeflagColor = deflagPlacementColor, selectedBeanBagColor = beanBagPlacementColor) =>
 		item.id === 'laser'
 			? (item.image ?? '/images/laser-pointer.png')
 			: toolbarAsset(
 					item.id === 'deflag'
-						? deflagImage(deflagPlacementColor)
+						? deflagImage(selectedDeflagColor)
 						: item.id === 'bean-bag'
-							? beanBagImage(beanBagPlacementColor)
+							? beanBagImage(selectedBeanBagColor)
 							: (item.image ?? '/images/football.webp')
 				);
 	const eventWidth = (label = 'EVENT') => Math.max(eventTagWidth, Math.min(154, label.length * 6.6 + 16));
@@ -2105,13 +2264,54 @@
 						: foulFlagSize) /
 			2 +
 		9;
-	const guideDash = (style: GuideStyle) => (style === 'dashed' ? '16 10' : style === 'dotted' ? '2 10' : undefined);
+	const markerYardLinePreviewY = (marker: FieldMarker) => {
+		if (isTeamMarker(marker)) return marker.y + playerRadius + yardLinePreviewGap;
+		if (marker.kind === 'event') return marker.y + eventTagHeight / 2 + yardLinePreviewGap;
+		const descriptionY = markerDescriptionY(marker);
+		const descriptionLines = marker.label ? penaltyLabelLines(marker.label).length : 0;
+		return descriptionLines > 0
+			? descriptionY + (descriptionLines - 1) * 9 + yardLinePreviewGap
+			: descriptionY - 9 + yardLinePreviewGap;
+	};
+	const toolYardLinePreviewY = (activeTool: ActiveTool, point: Point) => {
+		if (isPathTool(activeTool)) return point.y + yardLinePreviewGap;
+		if (playerKinds.includes(activeTool as PlayerKind)) return point.y + playerRadius + yardLinePreviewGap;
+		if (isOfficialKind(activeTool)) return point.y + officialSize / 2 + yardLinePreviewGap;
+		if (activeTool === 'ball') return point.y + footballSize / 2 + yardLinePreviewGap;
+		if (activeTool === 'deflag') return point.y + deflagSize / 2 + yardLinePreviewGap;
+		if (activeTool === 'bean-bag') return point.y + beanBagSize / 2 + yardLinePreviewGap;
+		if (activeTool === 'flag') return point.y + foulFlagSize / 2 + yardLinePreviewGap;
+		if (activeTool === 'event') return point.y + eventTagHeight / 2 + yardLinePreviewGap;
+		return point.y + yardLinePreviewGap;
+	};
+	const guideDash = (style: GuideStyle) => (style === 'dashed' ? '16 10' : style === 'dotted' ? '0.01 12' : undefined);
 	const renderedGuideColor = (guide: FieldGuide) => guideColor(guide.color);
 	const renderedGuideDash = (guide: FieldGuide) => guideDash(guide.style);
 	const guideLabel = (guide: FieldGuide) =>
 		guide.kind === 'line-of-scrimmage' ? 'Line of Scrimmage' : guide.kind === 'line-to-gain' ? 'Line to Gain' : 'Custom cross-field line';
 	const defaultGuideColor = (guideTool: 'line-of-scrimmage' | 'line-to-gain'): GuideColor => guidePlacementColors[guideTool];
 	const defaultGuideStyle = (guideTool: 'line-of-scrimmage' | 'line-to-gain'): GuideStyle => guidePlacementStyles[guideTool];
+	const lineFormatDefaultFor = (guide: FieldGuide | undefined, path: FieldPath | undefined) => {
+		if (guide?.kind === 'line-of-scrimmage') return { color: 'white' as GuideColor, style: 'dashed' as GuideStyle };
+		if (guide?.kind === 'line-to-gain') return { color: 'yellow' as GuideColor, style: 'solid' as GuideStyle };
+		if (guide) return { color: 'yellow' as GuideColor, style: 'solid' as GuideStyle };
+		if (path?.kind === 'run') return { color: 'white' as GuideColor, style: 'solid' as GuideStyle };
+		if (path?.kind === 'pass') return { color: 'cyan' as GuideColor, style: 'dashed' as GuideStyle };
+		if (path?.kind === 'kick') return { color: 'blue' as GuideColor, style: 'dashed' as GuideStyle };
+		return null;
+	};
+	const toolbarLineFormatDefaultFor = (selectedTool: ToolbarPresetTool | null) => {
+		if (selectedTool === 'line-of-scrimmage') return { color: 'white' as GuideColor, style: 'dashed' as GuideStyle };
+		if (selectedTool === 'line-to-gain') return { color: 'yellow' as GuideColor, style: 'solid' as GuideStyle };
+		if (selectedTool === 'run') return { color: 'white' as GuideColor, style: 'solid' as GuideStyle };
+		if (selectedTool === 'pass') return { color: 'cyan' as GuideColor, style: 'dashed' as GuideStyle };
+		if (selectedTool === 'kick') return { color: 'blue' as GuideColor, style: 'dashed' as GuideStyle };
+		return null;
+	};
+	const updateFieldControlTooltip = (event: PointerEvent) => {
+		const target = event.target instanceof Element ? event.target.closest('[data-hover-tooltip]') : null;
+		fieldControlTooltip = target?.getAttribute('data-hover-tooltip') ?? '';
+	};
 	const syncLayerDom = async () => {
 		await tick();
 		if (!svg) return;
@@ -2284,7 +2484,7 @@
 		const guide = guides.find((item) => item.id === target.id);
 		return guide ? { left: guide.x - 5, top: fieldTop, right: guide.x + 5, bottom: fieldBottom } : null;
 	};
-	const refreshSelectionUi = () => {
+	const refreshSelectionUi = (selectionPoint?: Point) => {
 		selectedTargets = selectedTargets.filter(targetExists);
 		const bounds = selectedTargets.map(targetBounds).filter((value): value is SelectionBounds => value !== null);
 		if (bounds.length === 0) {
@@ -2299,6 +2499,16 @@
 			bottom: Math.max(...bounds.map((item) => item.bottom))
 		};
 		deleteTarget = selectedTargets.at(-1) ?? null;
+		if (selectionPoint && selectedTargets.length === 1 && selectedTargets[0].type === 'guide') {
+			const guide = guides.find((item) => item.id === selectedTargets[0].id);
+			if (guide) {
+				deletePosition = {
+					x: Math.max(8, Math.min(958, guide.x + 10)),
+					y: Math.max(18, Math.min(476, selectionPoint.y - 10))
+				};
+				return;
+			}
+		}
 		deletePosition = {
 			x: Math.max(8, Math.min(958, selectedGroupBounds.right + 10)),
 			y: Math.max(18, Math.min(476, selectedGroupBounds.top))
@@ -2311,19 +2521,17 @@
 		point.x <= selectedGroupBounds.right + 6 &&
 		point.y >= selectedGroupBounds.top - 6 &&
 		point.y <= selectedGroupBounds.bottom + 6;
-	const selectTarget = (target: SelectedTarget, additive: boolean) => {
+	const selectTarget = (target: SelectedTarget, additive: boolean, selectionPoint?: Point) => {
 		const selected = selectedTargets.some((item) => sameTarget(item, target));
 		if (additive) selectedTargets = selected ? selectedTargets.filter((item) => !sameTarget(item, target)) : [...selectedTargets, target];
 		else if (!selected) selectedTargets = [target];
-		refreshSelectionUi();
+		refreshSelectionUi(selectionPoint);
 		return selectedTargets.some((item) => sameTarget(item, target));
 	};
 	const targetKey = (target: SelectedTarget) => `${target.type}:${target.id}`;
 	const orderedTargets = (targets: SelectedTarget[]) => {
 		const requested = new Map(targets.map((target) => [targetKey(target), target]));
-		const ordered = layerOrder
-			.map((layer) => requested.get(targetKey(layer)))
-			.filter((target): target is SelectedTarget => target !== undefined);
+		const ordered = layerOrder.map((layer) => requested.get(targetKey(layer))).filter((target): target is SelectedTarget => target !== undefined);
 		const included = new Set(ordered.map(targetKey));
 		return [...ordered, ...targets.filter((target) => !included.has(targetKey(target)))];
 	};
@@ -2342,9 +2550,7 @@
 	const targetMatchesMarquee = (target: SelectedTarget, bounds: SelectionBounds) => {
 		if (target.type === 'marker') {
 			const marker = markers.find((item) => item.id === target.id);
-			return Boolean(
-				marker && marker.x >= bounds.left && marker.x <= bounds.right && marker.y >= bounds.top && marker.y <= bounds.bottom
-			);
+			return Boolean(marker && marker.x >= bounds.left && marker.x <= bounds.right && marker.y >= bounds.top && marker.y <= bounds.bottom);
 		}
 		if (target.type === 'guide') {
 			const guide = guides.find((item) => item.id === target.id);
@@ -2353,10 +2559,10 @@
 		const targetBox = targetBounds(target);
 		return Boolean(
 			targetBox &&
-				targetBox.right >= bounds.left &&
-				targetBox.left <= bounds.right &&
-				targetBox.bottom >= bounds.top &&
-				targetBox.top <= bounds.bottom
+			targetBox.right >= bounds.left &&
+			targetBox.left <= bounds.right &&
+			targetBox.bottom >= bounds.top &&
+			targetBox.top <= bounds.bottom
 		);
 	};
 	const beginMarqueeSelection = (event: PointerEvent) => {
@@ -2379,17 +2585,13 @@
 		if (selectedTargets.length === 0 || !selectedGroupBounds) return false;
 		const canMoveVertically = selectedTargets.some((target) => target.type !== 'guide');
 		const dx = Math.max(-selectedGroupBounds.left, Math.min(1000 - selectedGroupBounds.right, requestedDx));
-		const dy = canMoveVertically
-			? Math.max(-selectedGroupBounds.top, Math.min(484 - selectedGroupBounds.bottom, requestedDy))
-			: 0;
+		const dy = canMoveVertically ? Math.max(-selectedGroupBounds.top, Math.min(484 - selectedGroupBounds.bottom, requestedDy)) : 0;
 		if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) return false;
 		saveHistory();
 		const selectedMarkerIds = new Set(selectedTargets.filter((target) => target.type === 'marker').map((target) => target.id));
 		const selectedPathIds = new Set(selectedTargets.filter((target) => target.type === 'path').map((target) => target.id));
 		const selectedGuideIds = new Set(selectedTargets.filter((target) => target.type === 'guide').map((target) => target.id));
-		const selectedPathStarts = new Map(
-			paths.filter((path) => selectedPathIds.has(path.id)).map((path) => [path.id, { ...pathStart(path) }])
-		);
+		const selectedPathStarts = new Map(paths.filter((path) => selectedPathIds.has(path.id)).map((path) => [path.id, { ...pathStart(path) }]));
 		markers = markers.map((marker) => (selectedMarkerIds.has(marker.id) ? { ...marker, x: marker.x + dx, y: marker.y + dy } : marker));
 		paths = paths.map((path) => {
 			if (selectedPathIds.has(path.id)) {
@@ -2454,8 +2656,7 @@
 			id: idMap.get(targetKey({ type: 'path', id: path.id }))!,
 			start: { x: path.start.x + dx, y: path.start.y + dy },
 			end: { x: path.end.x + dx, y: path.end.y + dy },
-			startMarkerId:
-				path.startMarkerId === undefined ? undefined : idMap.get(targetKey({ type: 'marker', id: path.startMarkerId }))
+			startMarkerId: path.startMarkerId === undefined ? undefined : idMap.get(targetKey({ type: 'marker', id: path.startMarkerId }))
 		}));
 		const pastedGuides = elementClipboard.guides.map((guide) => ({
 			...guide,
@@ -2560,8 +2761,19 @@
 	};
 	const commitGuideEditor = () => {
 		editingGuideId = null;
+		editingGuideFromLosMarker = false;
 		losYardageValue = '';
 		losYardageHistorySaved = false;
+		inlineGuideEditorPinnedLeft = null;
+	};
+	const pinInlineGuideEditorUnderPointer = () => {
+		if (!(editorElement instanceof HTMLElement) || !(editorElement.offsetParent instanceof HTMLElement)) return;
+		const parentWidth = editorElement.offsetParent.clientWidth;
+		if (parentWidth <= 0) return;
+		inlineGuideEditorPinnedLeft = (editorElement.offsetLeft / parentWidth) * 100;
+	};
+	const releaseInlineGuideEditorPin = () => {
+		inlineGuideEditorPinnedLeft = null;
 	};
 	const moveGuideToFieldSide = (guide: FieldGuide, side: FieldSide, saveOnce: () => void) => {
 		if (guide.kind !== 'line-of-scrimmage' && guide.kind !== 'line-to-gain') return guide.x;
@@ -2702,6 +2914,12 @@
 		}
 		guides = guides.map((guide) => (guide.id === editingDownGuideId ? { ...guide, x: nextX } : guide));
 	};
+	const stepDownMarkerYardageInput = (input: HTMLInputElement, direction: -1 | 1) => {
+		const currentValue = Number(input.value);
+		const baseValue = Number.isFinite(currentValue) ? currentValue : 0;
+		input.value = String(Math.round((baseValue + direction * 0.5) * 2) / 2);
+		updateDownMarkerYardage({ currentTarget: input } as unknown as Event);
+	};
 	const updateGuideYardage = (event: Event) => {
 		if (!editingGuide || (editingGuide.kind !== 'line-of-scrimmage' && editingGuide.kind !== 'line-to-gain')) return;
 		const rawValue = (event.currentTarget as HTMLInputElement).value;
@@ -2733,6 +2951,18 @@
 		guides = guides.map((guide) => (guide.id === editingGuideId ? { ...guide, x: nextX } : guide));
 		editingGuideSide = fieldSideForX(nextX);
 	};
+	const setEditingLosYardLine = (requestedYards: number) => {
+		if (!editingGuide || editingGuide.kind !== 'line-of-scrimmage') return;
+		const yardLine = Math.max(0.5, Math.min(maximumLosYardLine(), Math.round(requestedYards * 2) / 2));
+		const nextX = xForFieldSideYardLine(editingGuideSide, yardLine, 'line-of-scrimmage');
+		losYardageValue = yardLine;
+		if (Math.abs(nextX - editingGuide.x) <= 0.01) return;
+		if (!losYardageHistorySaved) {
+			saveHistory();
+			losYardageHistorySaved = true;
+		}
+		guides = guides.map((guide) => (guide.id === editingGuideId ? { ...guide, x: nextX } : guide));
+	};
 	const moveEditingGuideByYard = (direction: -1 | 1) => {
 		if (!editingGuide || (editingGuide.kind !== 'line-of-scrimmage' && editingGuide.kind !== 'line-to-gain')) return;
 		const yardWidth = fieldWidth / fieldLayout.totalYards;
@@ -2749,10 +2979,24 @@
 		editingGuideSide = fieldSideForX(nextX);
 		losYardageValue = editingGuide.kind === 'line-of-scrimmage' ? losYardLine(nextX) : (guideDistanceYards(nextX, lineOfScrimmageX) ?? '');
 	};
+	const moveEditingDownGuideByYard = (direction: -1 | 1) => {
+		if (!editingDownGuide || lineOfScrimmageX === null) return;
+		const yardWidth = fieldWidth / fieldLayout.totalYards;
+		const nextX = clampLineToGainX(editingDownGuide.x + direction * yardWidth);
+		if (Math.abs(nextX - editingDownGuide.x) <= 0.01) return;
+		if (!downYardageHistorySaved) {
+			saveHistory();
+			downYardageHistorySaved = true;
+		}
+		guides = guides.map((guide) => (guide.id === editingDownGuideId ? { ...guide, x: nextX } : guide));
+		downGuideSide = fieldSideForX(nextX);
+		downYardageValue = guideDistanceYards(nextX, lineOfScrimmageX) ?? '';
+	};
 	const commitDownMarkerEditor = () => {
 		editingDownGuideId = null;
 		downYardageValue = '';
 		downYardageHistorySaved = false;
+		inlineGuideEditorPinnedLeft = null;
 	};
 	const selectDownMarkerValue = (down: DownMarkerValue) => {
 		if (!editingDownGuide) return;
@@ -2787,6 +3031,24 @@
 		if (editingGuide) guides = guides.map((guide) => (guide.id === editingGuideId ? { ...guide, style } : guide));
 		if (editingPath) paths = paths.map((path) => (path.id === editingPathId ? { ...path, style } : path));
 	};
+	const resetEditingLineFormat = () => {
+		if (!editingLineFormatDefault || (!editingGuide && !editingPath)) return;
+		const { color, style } = editingLineFormatDefault;
+		if (guideEditColor === color && guideEditStyle === style) return;
+		saveHistory();
+		guideEditColor = color;
+		guideEditStyle = style;
+		if (editingGuide) {
+			guides = guides.map((guide) => (guide.id === editingGuideId ? { ...guide, color, style } : guide));
+		}
+		if (editingPath) {
+			paths = paths.map((path) => (path.id === editingPathId ? { ...path, color, style } : path));
+			if (isArrowKind(editingPath.kind)) {
+				arrowPlacementColors = { ...arrowPlacementColors, [editingPath.kind]: color };
+				arrowPlacementStyles = { ...arrowPlacementStyles, [editingPath.kind]: style };
+			}
+		}
+	};
 	const commitActiveEditor = () => {
 		if (editingMarkerId !== null) commitMarkerEditor();
 		else if (editingGuideId !== null) commitGuideEditor();
@@ -2802,11 +3064,12 @@
 		editingTeamBoxY !== null ||
 		editingScoreboard !== null ||
 		editingDownGuideId !== null;
-	const startEditingDownMarker = (event: Event, guide: FieldGuide) => {
+	const startEditingDownMarker = async (event: Event, guide: FieldGuide) => {
 		if (viewOnly) return;
 		if (guide.kind !== 'line-to-gain' || suppressDownMarkerClick || tool === 'event' || tool === 'free-draw' || tool === 'laser') return;
 		event.preventDefault();
 		event.stopPropagation();
+		inlineGuideEditorPinnedLeft = null;
 		clearDeleteState();
 		editingMarkerId = null;
 		editingGuideId = null;
@@ -2817,7 +3080,11 @@
 		downYardageValue = guideDistanceYards(guide.x, lineOfScrimmageX) ?? '';
 		downGuideSide = fieldSideForX(guide.x);
 		downYardageHistorySaved = false;
+		fieldControlTooltip = '';
 		editingDownGuideId = guide.id;
+		await tick();
+		guideYardageInput?.focus();
+		guideYardageInput?.select();
 	};
 	const startEditingGameClock = async (event: Event) => {
 		if (viewOnly || tool === 'laser') return;
@@ -2894,13 +3161,15 @@
 		editingMarkerId = null;
 		completeTutorialAction('label:ball');
 	};
-	const startEditingGuide = async (event: Event, guide: FieldGuide) => {
+	const startEditingGuide = async (event: Event, guide: FieldGuide, fromLosMarker = false) => {
 		if (viewOnly) return;
 		if (tool === 'event' || tool === 'laser') return;
 		event.preventDefault();
+		inlineGuideEditorPinnedLeft = null;
 		clearDeleteState();
 		editingMarkerId = null;
 		editingGuideId = guide.id;
+		editingGuideFromLosMarker = fromLosMarker;
 		editingPathId = null;
 		editingDownGuideId = null;
 		guideEditColor = guide.color;
@@ -2923,7 +3192,8 @@
 	const startEditingLineOfScrimmageMarker = async (event: Event, guide: FieldGuide) => {
 		if (viewOnly) return;
 		if (guide.kind !== 'line-of-scrimmage' || suppressDownMarkerClick || tool === 'event' || tool === 'free-draw' || tool === 'laser') return;
-		await startEditingGuide(event, guide);
+		fieldControlTooltip = '';
+		await startEditingGuide(event, guide, true);
 	};
 	const startEditingPath = (event: Event, path: FieldPath) => {
 		if (viewOnly) return;
@@ -2947,6 +3217,7 @@
 		value === 'line-to-gain';
 	const openToolbarPresetEditor = async (event: MouseEvent, selectedTool: Tool) => {
 		if (!isToolbarPresetTool(selectedTool)) return;
+		if (selectedTool === 'laser' && performance.now() < suppressLaserPresetOpenUntil) return;
 		event.preventDefault();
 		event.stopPropagation();
 		clearEditorState();
@@ -2990,7 +3261,14 @@
 			return;
 		}
 		if (toolbarEditorTool === 'laser') {
-			if (laserColors.some((option) => option.id === color)) laserColor = color as LaserColor;
+			if (laserColors.some((option) => option.id === color)) {
+				laserColor = color as LaserColor;
+				rainbowLaserEnabled = false;
+				laserDrawings = laserDrawings.map((drawing) =>
+					drawing.color === 'rainbow' ? { ...drawing, color: laserColor } : drawing
+				);
+				if (activeLaserDrawing?.color === 'rainbow') activeLaserDrawing = { ...activeLaserDrawing, color: laserColor };
+			}
 			toolbarEditorTool = null;
 			return;
 		}
@@ -3019,6 +3297,26 @@
 			toolbarGuideHistorySaved = true;
 			guides = guides.map((guide) => (guide.id === existing.id ? { ...guide, style } : guide));
 		}
+	};
+	const resetToolbarLineFormat = () => {
+		const selectedTool = toolbarEditorTool;
+		const defaultFormat = toolbarLineFormatDefaultFor(selectedTool);
+		if (!selectedTool || !defaultFormat) return;
+		const { color, style } = defaultFormat;
+		if (isArrowKind(selectedTool)) {
+			arrowPlacementColors = { ...arrowPlacementColors, [selectedTool]: color };
+			arrowPlacementStyles = { ...arrowPlacementStyles, [selectedTool]: style };
+			return;
+		}
+		if (selectedTool !== 'line-of-scrimmage' && selectedTool !== 'line-to-gain') return;
+		const existing = guides.find((guide) => guide.kind === selectedTool);
+		if (existing && (existing.color !== color || existing.style !== style)) {
+			if (!toolbarGuideHistorySaved) saveHistory();
+			toolbarGuideHistorySaved = true;
+			guides = guides.map((guide) => (guide.id === existing.id ? { ...guide, color, style } : guide));
+		}
+		guidePlacementColors = { ...guidePlacementColors, [selectedTool]: color };
+		guidePlacementStyles = { ...guidePlacementStyles, [selectedTool]: style };
 	};
 	const setToolbarGuideSide = (side: FieldSide) => {
 		if (toolbarEditorTool !== 'line-of-scrimmage' && toolbarEditorTool !== 'line-to-gain') return;
@@ -3085,8 +3383,7 @@
 		if (viewOnly) return;
 		const target = event.target as HTMLElement | null;
 		const isEditableTarget = target?.matches('input, textarea, select, [contenteditable="true"]') ?? false;
-		const isShareShortcut =
-			(event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'l';
+		const isShareShortcut = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'l';
 		if (isShareShortcut) {
 			event.preventDefault();
 			const interfaceIsBusy =
@@ -3126,7 +3423,7 @@
 			const key = event.key.toLowerCase();
 			const isBlockedBuilderShortcut =
 				((event.ctrlKey || event.metaKey) && ['s', 'c', 'v', 'l', 'z', 'y'].includes(key)) ||
-				(!event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey && key === 'n') ||
+				(!event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey && ['f', 'n'].includes(key)) ||
 				(!event.ctrlKey && !event.metaKey && event.altKey && !event.shiftKey && key === 'n');
 			if (!isEditableTarget && isBlockedBuilderShortcut) {
 				event.preventDefault();
@@ -3189,7 +3486,7 @@
 		if (editingPlayId !== null) {
 			if (event.key === 'Escape') {
 				event.preventDefault();
-				editingPlayId = null;
+				renamePlay();
 			}
 			return;
 		}
@@ -3227,6 +3524,11 @@
 		if (!event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey && event.key.toLowerCase() === 'n') {
 			event.preventDefault();
 			if (actionInProgress === null) void requestNewBoard();
+			return;
+		}
+		if (!event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey && event.key.toLowerCase() === 'f') {
+			event.preventDefault();
+			flipFieldDirection();
 			return;
 		}
 		if (!event.ctrlKey && !event.metaKey && event.altKey && !event.shiftKey && event.key.toLowerCase() === 'n') {
@@ -3370,7 +3672,7 @@
 	const handleWindowPointerDown = (event: PointerEvent) => {
 		if (viewOnly) return;
 		const target = event.target as Node;
-		if (editingPlayId !== null && !playMenuElement?.contains(target)) editingPlayId = null;
+		if (editingPlayId !== null && !playMenuElement?.contains(target)) renamePlay();
 		const clickedFieldElement = target instanceof Element && Boolean(target.closest('[data-field-element]'));
 		const clickedBuilderCanvas = target instanceof Element && Boolean(target.closest('svg[role="application"]'));
 		if (selectedTargets.length > 0 && !deleteButtonElement?.contains(target) && !clickedFieldElement && !clickedBuilderCanvas) clearDeleteState();
@@ -3847,6 +4149,16 @@
 		}
 		selectTool(nextTool);
 	};
+	const registerLaserToolbarClick = (nextTool: Tool) => {
+		if (nextTool !== 'laser') return;
+		const now = performance.now();
+		laserToolbarClickTimes = [...laserToolbarClickTimes.filter((clickedAt) => now - clickedAt <= 5000), now];
+		if (laserToolbarClickTimes.length < 10) return;
+		laserToolbarClickTimes = [];
+		rainbowLaserEnabled = true;
+		toolbarEditorTool = null;
+		suppressLaserPresetOpenUntil = now + 500;
+	};
 	const updateDiagramModalPosition = () => {
 		if (typeof window === 'undefined' || !builderRoot) return;
 		const bounds = builderRoot.getBoundingClientRect();
@@ -4160,9 +4472,49 @@
 			eraseFreeStrokeAt({ x: start.x + (end.x - start.x) * amount, y: start.y + (end.y - start.y) * amount });
 		}
 	};
+	const laserDrawingContainsPoint = (drawing: LaserDrawing, point: Point) => {
+		const hitDistance = 12;
+		if (drawing.points.length === 0) return false;
+		if (drawing.points.length === 1) return Math.hypot(point.x - drawing.points[0].x, point.y - drawing.points[0].y) <= hitDistance;
+		for (let index = 1; index < drawing.points.length; index += 1) {
+			if (distanceToSegment(point, drawing.points[index - 1], drawing.points[index]) <= hitDistance) return true;
+		}
+		return false;
+	};
+	const eraseLaserDrawingAt = (point: Point) => {
+		const hitDrawings = new Set(
+			laserDrawings.filter((drawing) => drawing.releasedAt === null && laserDrawingContainsPoint(drawing, point))
+		);
+		if (hitDrawings.size === 0) return;
+		if (!eraseHistorySaved) {
+			saveHistory();
+			eraseHistorySaved = true;
+		}
+		const now = performance.now();
+		laserTrailClock = now;
+		laserDrawings = laserDrawings.map((drawing) => {
+			if (!hitDrawings.has(drawing)) return drawing;
+			const visibility = laserDrawingVisibility(drawing, now);
+			return {
+				...drawing,
+				appearedAt: null,
+				releasedAt: now - (1 - visibility) * laserFadeDuration
+			};
+		});
+		startLaserAnimationFrame();
+	};
+	const eraseLaserDrawingsAlong = (start: Point, end: Point) => {
+		const distance = Math.hypot(end.x - start.x, end.y - start.y);
+		const steps = Math.max(1, Math.ceil(distance / 5));
+		for (let step = 0; step <= steps; step += 1) {
+			const amount = step / steps;
+			eraseLaserDrawingAt({ x: start.x + (end.x - start.x) * amount, y: start.y + (end.y - start.y) * amount });
+		}
+	};
 	const isStylusEraserEvent = (event: PointerEvent) => event.pointerType === 'pen' && (event.button === 5 || (event.buttons & 32) === 32);
 	const isStylusBarrelButtonActive = (event: PointerEvent) => event.pointerType === 'pen' && (event.button === 2 || (event.buttons & 2) === 2);
-	const shouldSnapStraightDrawing = (event: PointerEvent) => event.shiftKey || isStylusBarrelButtonActive(event);
+	const shouldSnapElements = (event: PointerEvent) => snappingEnabled || event.shiftKey;
+	const shouldSnapStraightDrawing = (event: PointerEvent) => shouldSnapElements(event) || isStylusBarrelButtonActive(event);
 	const selectedTargetAtClientPoint = (clientX: number, clientY: number): SelectedTarget | null => {
 		const hit = document.elementFromPoint(clientX, clientY);
 		const layer = hit?.closest<SVGElement>('[data-layer-type][data-layer-id]');
@@ -4182,8 +4534,36 @@
 		}
 		removeElementTarget(target);
 	};
+	const resetStylusEraser = (pointerId: number | null = stylusEraserPointerId) => {
+		if (pointerId !== null && svg?.hasPointerCapture(pointerId)) svg.releasePointerCapture(pointerId);
+		stylusEraserActive = false;
+		stylusEraserPointerId = null;
+		eraseHistorySaved = false;
+		lastErasePoint = null;
+	};
+	const eraseWithStylusAt = (point: Point, clientX: number, clientY: number) => {
+		if (tool === 'laser') {
+			eraseLaserDrawingAt(point);
+			return;
+		}
+		eraseFreeStrokeAt(point);
+		if (tool === 'free-draw') return;
+		eraseLaserDrawingAt(point);
+		eraseElementAtClientPoint(clientX, clientY);
+	};
+	const eraseWithStylusAlong = (start: Point, end: Point, clientX: number, clientY: number) => {
+		if (tool === 'laser') {
+			eraseLaserDrawingsAlong(start, end);
+			return;
+		}
+		eraseFreeStrokesAlong(start, end);
+		if (tool === 'free-draw') return;
+		eraseLaserDrawingsAlong(start, end);
+		eraseElementAtClientPoint(clientX, clientY);
+	};
 	const beginStylusEraser = (event: PointerEvent) => {
 		if (viewOnly) return;
+		if (event.pointerType === 'pen' && stylusEraserActive && !isStylusEraserEvent(event)) resetStylusEraser();
 		if (event.button === 0 && selectedTargets.length > 1 && selectedGroupBounds && !isStylusEraserEvent(event)) {
 			const point = canvasPointFromEvent(event);
 			const insideSelection = isPointInSelectedGroup(point);
@@ -4218,11 +4598,11 @@
 		clearDeleteState();
 		clearPlacementSnap();
 		stylusEraserActive = true;
+		stylusEraserPointerId = event.pointerId;
 		eraseHistorySaved = false;
 		const point = canvasPointFromEvent(event);
 		lastErasePoint = point;
-		eraseFreeStrokeAt(point);
-		if (tool !== 'free-draw') eraseElementAtClientPoint(event.clientX, event.clientY);
+		eraseWithStylusAt(point, event.clientX, event.clientY);
 		try {
 			svg.setPointerCapture(event.pointerId);
 		} catch {
@@ -4246,7 +4626,11 @@
 		activeFreeDrawShape = freeDrawShape;
 		activeFreeStroke = { id: nextId++, color: freeDrawColor, width: freeDrawThickness, points: [point] };
 		syncLayerDom();
-		svg.setPointerCapture(event.pointerId);
+		try {
+			svg.setPointerCapture(event.pointerId);
+		} catch {
+			// Some pen drivers do not allow capture for every tip transition.
+		}
 	};
 	const placeGuide = (kind: 'line-of-scrimmage' | 'line-to-gain', x: number) => {
 		saveHistory();
@@ -4483,23 +4867,30 @@
 			beginFreeDrawing(event);
 			return;
 		}
+		const pointerStart = pointFromEvent(event);
 		if (!fromDownMarker) {
-			const selected = selectTarget({ type: 'guide', id: guide.id }, event.shiftKey);
+			const selected = selectTarget({ type: 'guide', id: guide.id }, event.shiftKey, pointerStart);
 			if (!selected) return;
 			if (selectedTargets.length > 1) {
 				beginGroupDrag(event);
 				return;
 			}
 		}
-		dragTarget = { type: 'guide', id: guide.id, pointerStart: pointFromEvent(event), xStart: guide.x, moved: false, fromDownMarker };
+		dragTarget = { type: 'guide', id: guide.id, pointerStart, xStart: guide.x, moved: false, fromDownMarker };
 	};
 	const continuePointer = (event: PointerEvent) => {
 		if (viewOnly) return;
-		if (stylusEraserActive) {
+		if (
+			stylusEraserActive &&
+			event.pointerType === 'pen' &&
+			(event.pointerId !== stylusEraserPointerId || !isStylusEraserEvent(event))
+		) {
+			resetStylusEraser();
+		}
+		if (stylusEraserActive && event.pointerId === stylusEraserPointerId) {
 			event.preventDefault();
 			const point = canvasPointFromEvent(event);
-			eraseFreeStrokesAlong(lastErasePoint ?? point, point);
-			if (tool !== 'free-draw') eraseElementAtClientPoint(event.clientX, event.clientY);
+			eraseWithStylusAlong(lastErasePoint ?? point, point, event.clientX, event.clientY);
 			lastErasePoint = point;
 			return;
 		}
@@ -4551,18 +4942,28 @@
 		const placementPointerMoved =
 			!lastPlacementHoverPoint || Math.hypot(point.x - lastPlacementHoverPoint.x, point.y - lastPlacementHoverPoint.y) > 0.1;
 		if (groupSelectionActive || drawing || activeFreeStroke || (dragTarget && placementPointerMoved)) clearPlacementSnap();
-		else if (!dragTarget && placementPointerMoved) schedulePlacementSnap(point, event.shiftKey);
+		else if (!dragTarget && placementPointerMoved) {
+			if (shouldSnapElements(event)) schedulePlacementSnap(point, true);
+			else clearPlacementSnap();
+		}
 		lastPlacementHoverPoint = groupSelectionActive ? null : point;
 		if (activeFreeStroke) {
 			const strokePoint =
 				activeFreeDrawShape === 'straight' && shouldSnapStraightDrawing(event)
 					? snapStraightDrawPoint(activeFreeStroke.points[0], canvasPoint)
 					: canvasPoint;
+			if (activeFreeDrawShape === 'straight') {
+				const first = activeFreeStroke.points[0];
+				if (Math.hypot(strokePoint.x - first.x, strokePoint.y - first.y) >= minimumStraightDrawingLength) {
+					activeFreeStroke = { ...activeFreeStroke, points: [first, strokePoint] };
+				}
+				return;
+			}
 			const last = activeFreeStroke.points.at(-1)!;
 			if (Math.hypot(strokePoint.x - last.x, strokePoint.y - last.y) >= 1.5) {
 				activeFreeStroke = {
 					...activeFreeStroke,
-					points: activeFreeDrawShape === 'straight' ? [activeFreeStroke.points[0], strokePoint] : [...activeFreeStroke.points, strokePoint]
+					points: [...activeFreeStroke.points, strokePoint]
 				};
 			}
 			return;
@@ -4622,11 +5023,14 @@
 			const unclampedCandidate = { x: target.elementStart.x + rawDx, y: target.elementStart.y + rawDy };
 			const candidate =
 				draggedMarker && isSidelineMarkerKind(draggedMarker.kind) ? clampSidelineMarkerPoint(unclampedCandidate) : clampPoint(unclampedCandidate);
-			const snappedMarker = event.shiftKey && dragTarget.snapToMarkers ? nearestMarkerToPoint(candidate, dragTarget.id) : null;
+			const snappedMarker = shouldSnapElements(event) && dragTarget.snapToMarkers ? nearestMarkerToPoint(candidate, dragTarget.id) : null;
 			const next = snappedMarker ? { x: snappedMarker.x, y: snappedMarker.y } : candidate;
 			markers = markers.map((marker) => (marker.id === target.id ? { ...marker, ...next } : marker));
 			paths = paths.map((path) => (path.startMarkerId === target.id ? { ...path, start: { ...next } } : path));
-			if (!snappedMarker && placementPointerMoved) scheduleDragSnap(target, next.x, event.shiftKey);
+			if (!snappedMarker && placementPointerMoved) {
+				if (shouldSnapElements(event)) scheduleDragSnap(target, next.x, true);
+				else clearPlacementSnap();
+			}
 		}
 		if (dragTarget.type === 'guide') {
 			const target = dragTarget;
@@ -4639,7 +5043,10 @@
 						? wholeYardLineOfScrimmageX(rawX)
 						: rawX;
 			guides = guides.map((guide) => (guide.id === target.id ? { ...guide, x } : guide));
-			if (placementPointerMoved) scheduleDragSnap(target, x, event.shiftKey);
+			if (placementPointerMoved) {
+				if (shouldSnapElements(event)) scheduleDragSnap(target, x, true);
+				else clearPlacementSnap();
+			}
 		}
 		if (dragTarget.type === 'path') {
 			const target = dragTarget;
@@ -4651,7 +5058,7 @@
 			}
 			if (target.mode === 'start') {
 				const candidate = clampPoint({ x: target.start.x + rawDx, y: target.start.y + rawDy });
-				const snappedMarker = event.shiftKey ? nearestMarkerToPoint(candidate) : null;
+				const snappedMarker = shouldSnapElements(event) ? nearestMarkerToPoint(candidate) : null;
 				const start = snappedMarker ? { x: snappedMarker.x, y: snappedMarker.y } : pointWithMinimumDistance(target.end, candidate, target.start);
 				paths = paths.map((path) => (path.id === target.id ? { ...path, start, startMarkerId: snappedMarker?.id } : path));
 				return;
@@ -4682,18 +5089,14 @@
 			if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
 			return;
 		}
-		if (tool === 'laser') {
-			if (laserDrawingPointerId === event.pointerId) finishLaserDrawing();
-			if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+		if (stylusEraserActive && event.pointerId === stylusEraserPointerId) {
+			const point = canvasPointFromEvent(event);
+			eraseWithStylusAlong(lastErasePoint ?? point, point, event.clientX, event.clientY);
+			resetStylusEraser(event.pointerId);
 			return;
 		}
-		if (stylusEraserActive) {
-			const point = canvasPointFromEvent(event);
-			eraseFreeStrokesAlong(lastErasePoint ?? point, point);
-			if (tool !== 'free-draw') eraseElementAtClientPoint(event.clientX, event.clientY);
-			stylusEraserActive = false;
-			eraseHistorySaved = false;
-			lastErasePoint = null;
+		if (tool === 'laser') {
+			if (laserDrawingPointerId === event.pointerId) finishLaserDrawing();
 			if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
 			return;
 		}
@@ -4706,18 +5109,29 @@
 			if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
 			return;
 		}
-		if (event.pointerType === 'pen' && event.button === 2) return;
 		if (activeFreeStroke) {
 			const first = activeFreeStroke.points[0];
 			const rawFinalPoint = canvasPointFromEvent(event);
-			const finalPoint =
+			const eventFinalPoint =
 				activeFreeDrawShape === 'straight' && shouldSnapStraightDrawing(event) ? snapStraightDrawPoint(first, rawFinalPoint) : rawFinalPoint;
+			const trackedFinalPoint = activeFreeStroke.points.length > 1 ? activeFreeStroke.points.at(-1)! : null;
+			// Pen drivers can report a stale coordinate or barrel-button value as the
+			// tip lifts. Preserve the last valid move sample instead of collapsing a
+			// completed horizontal or vertical stroke at pointerup.
+			const finalPoint = activeFreeDrawShape === 'straight' && trackedFinalPoint ? trackedFinalPoint : eventFinalPoint;
+			if (
+				activeFreeDrawShape === 'straight' &&
+				Math.hypot(finalPoint.x - first.x, finalPoint.y - first.y) < minimumStraightDrawingLength
+			) {
+				activeFreeStroke = null;
+				activeFreeDrawShape = freeDrawShape;
+				if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+				return;
+			}
 			const last = activeFreeStroke.points.at(-1)!;
 			const points =
 				activeFreeDrawShape === 'straight'
-					? Math.hypot(finalPoint.x - first.x, finalPoint.y - first.y) >= 1.5
-						? [first, finalPoint]
-						: [first]
+					? [first, finalPoint]
 					: Math.hypot(finalPoint.x - last.x, finalPoint.y - last.y) >= 1.5
 						? [...activeFreeStroke.points, finalPoint]
 						: activeFreeStroke.points;
@@ -4730,6 +5144,7 @@
 			if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
 			return;
 		}
+		if (event.pointerType === 'pen' && event.button === 2) return;
 		const draggedDownMarker = dragTarget?.type === 'guide' && dragTarget.fromDownMarker && dragTarget.moved;
 		let droppedTargets: SelectedTarget[] = [];
 		if (dragTarget?.moved) {
@@ -4777,9 +5192,7 @@
 		dragTarget = null;
 		marqueeSelection = null;
 		erasingFreeStrokes = false;
-		stylusEraserActive = false;
-		eraseHistorySaved = false;
-		lastErasePoint = null;
+		resetStylusEraser();
 		clearPlacementSnap();
 		clearDeleteState();
 	};
@@ -4864,6 +5277,19 @@
 				exportBackgroundOpacity = Math.max(0, Math.min(1, stored.backgroundOpacity));
 			if (typeof stored.fieldBorderOpacity === 'number' && Number.isFinite(stored.fieldBorderOpacity))
 				exportFieldBorderOpacity = Math.max(0, Math.min(1, stored.fieldBorderOpacity));
+		} catch {
+			// Ignore malformed settings left by an older browser session.
+		}
+	};
+	const restoreBuilderPreferences = () => {
+		try {
+			const raw = localStorage.getItem(builderPreferencesStorageKey);
+			if (!raw) return;
+			const stored = JSON.parse(raw) as Record<string, unknown>;
+			if (typeof stored.autoSave === 'boolean') autoSaveEnabled = stored.autoSave;
+			if (typeof stored.snapping === 'boolean') snappingEnabled = stored.snapping;
+			if (typeof stored.highContrast === 'boolean') highContrastEnabled = stored.highContrast;
+			if (typeof stored.showYardLineCursor === 'boolean') showYardLineCursorEnabled = stored.showYardLineCursor;
 		} catch {
 			// Ignore malformed settings left by an older browser session.
 		}
@@ -4957,6 +5383,8 @@
 		exportSettingsHydrated = true;
 		restoreToolPreferences();
 		toolPreferencesHydrated = true;
+		restoreBuilderPreferences();
+		builderPreferencesHydrated = true;
 		tutorialButtonBouncing = localStorage.getItem(tutorialSeenKey) !== '1';
 		const browserNavigator = navigator as Navigator & { userAgentData?: { platform?: string } };
 		const usesAppleShortcuts = /Mac|iPhone|iPad|iPod/i.test(browserNavigator.userAgentData?.platform ?? navigator.platform ?? navigator.userAgent);
@@ -4973,6 +5401,11 @@
 				// Ignore malformed transient feedback from an older session.
 			}
 		}
+		const storedSaveFeedback = sessionStorage.getItem(saveLabelFeedbackStorageKey);
+		if (storedSaveFeedback) {
+			sessionStorage.removeItem(saveLabelFeedbackStorageKey);
+			showSavedLabel();
+		}
 		document.addEventListener('pointerdown', handleWindowPointerDown, true);
 		document.addEventListener('click', handleWindowClick, true);
 		window.addEventListener('resize', updateDiagramModalPosition);
@@ -4986,6 +5419,7 @@
 			clearPlacementSnap();
 			clearActionMessageTimer();
 			if (draftSaveTimer) clearTimeout(draftSaveTimer);
+			if (autoSaveTimer) clearTimeout(autoSaveTimer);
 			if (copyFeedbackTimer) clearTimeout(copyFeedbackTimer);
 			if (deleteTargetTimer) clearTimeout(deleteTargetTimer);
 			if (laserTrailFrame !== null) cancelAnimationFrame(laserTrailFrame);
@@ -5005,6 +5439,7 @@
 	on:pointerdown={markTutorialSeen}
 	class="relative border-2 border-stone-900 bg-stone-800 shadow-lg select-none"
 	class:view-only={viewOnly}
+	class:high-contrast-mode={highContrastEnabled}
 	aria-label={viewOnly ? 'Shared flag football play diagram' : 'Flag football play builder'}
 >
 	<div data-tutorial="draw-workspace" class="flex gap-2 p-2" aria-hidden={viewOnly}>
@@ -5035,7 +5470,10 @@
 									data-tutorial-tool={item.id}
 									aria-label={item.label}
 									aria-pressed={tool === item.id}
-									on:pointerdown={() => activateToolbarTool(item.id)}
+									on:pointerdown={() => {
+										registerLaserToolbarClick(item.id);
+										activateToolbarTool(item.id);
+									}}
 									on:click={(event) => event.detail === 0 && activateToolbarTool(item.id)}
 									on:dblclick|stopPropagation={(event) => openToolbarPresetEditor(event, item.id)}
 									class="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-0 bg-stone-100 text-xs font-bold text-stone-600 transition-colors hover:bg-white hover:text-stone-900 sm:text-sm"
@@ -5060,7 +5498,7 @@
 										</svg>
 									{:else if item.image}
 										<img
-											src={toolbarToolImage(item)}
+											src={toolbarToolImage(item, deflagPlacementColor, beanBagPlacementColor)}
 											alt=""
 											class="h-8 w-8 object-contain"
 											class:!h-7={item.id === 'free-draw'}
@@ -5120,8 +5558,13 @@
 						: isArrowKind(toolbarEditorTool)
 							? arrowPlacementStyles[toolbarEditorTool]
 							: guidePlacementStyles[toolbarEditorTool]}
+				{@const toolbarDefaultFormat = toolbarLineFormatDefaultFor(toolbarEditorTool)}
+				{@const showToolbarLineFormatReset =
+					toolbarDefaultFormat !== null &&
+					(toolbarPresetColor !== toolbarDefaultFormat.color || toolbarPresetStyle !== toolbarDefaultFormat.style)}
 				<div
 					bind:this={toolbarEditorElement}
+					data-line-format-editor
 					class="absolute left-full z-50 ml-px flex items-center gap-2 bg-white p-2 shadow-xl ring-2 ring-stone-900"
 					style:top={`${toolbarEditorTop}px`}
 					role="dialog"
@@ -5136,7 +5579,7 @@
 								aria-label={`Field side ${toolbarGuideSide.toUpperCase()}; switch to ${toolbarGuideSide === 'a' ? 'B' : 'A'}`}
 								title={`${toolbarGuideSide.toUpperCase()} Side`}
 								on:click={() => setToolbarGuideSide(toolbarGuideSide === 'a' ? 'b' : 'a')}
-								class="h-7 w-7 shrink-0 cursor-pointer border border-stone-900 text-[11px] font-black"
+								class="h-5 w-7 shrink-0 cursor-pointer border border-stone-900 text-[10px] leading-none font-black"
 								class:bg-stone-900={toolbarGuideSide === 'a'}
 								class:text-white={toolbarGuideSide === 'a'}
 								class:bg-white={toolbarGuideSide === 'b'}
@@ -5158,7 +5601,7 @@
 							disabled={!toolbarEditingLos && lineOfScrimmageX === null}
 							aria-label={toolbarEditingLos ? 'Line of Scrimmage yard line' : 'Line to Gain distance'}
 							title={toolbarEditingLos ? 'L.O.S. yard line' : 'L.T.G. distance'}
-							class="down-yardage-input h-7 border-0 bg-stone-100 px-1 text-center text-[10px] font-black text-stone-800 outline-none hover:bg-stone-200 focus:bg-white focus:ring-1 focus:ring-stone-700 focus:ring-inset disabled:opacity-40"
+							class="down-yardage-input h-5 border-0 bg-stone-100 px-1 text-center text-[10px] leading-none font-black text-stone-800 outline-none hover:bg-stone-200 focus:bg-white focus:ring-1 focus:ring-stone-700 focus:ring-inset disabled:opacity-40"
 							class:w-8={toolbarEditingLos}
 							class:w-10={!toolbarEditingLos}
 							on:focus={(event) => event.currentTarget.select()}
@@ -5172,47 +5615,76 @@
 					{/if}
 					<div class="flex gap-1" aria-label="Preset color">
 						{#each toolbarEditorTool === 'deflag' ? deflagColors : toolbarEditorTool === 'bean-bag' ? beanBagColors : toolbarEditorTool === 'laser' ? laserColors : guideColors as option}
-							<button
-								type="button"
-								title={option.label}
-								aria-label={option.label}
-								aria-pressed={toolbarPresetColor === option.id}
-								on:click={() => updateToolbarPresetColor(option.id)}
-								class="h-5 w-5 cursor-pointer border-2 border-white shadow-sm ring-1 ring-stone-400"
-								class:!ring-2={toolbarPresetColor === option.id}
-								class:!ring-stone-950={toolbarPresetColor === option.id}
-								style:background-color={option.value}
-							></button>
+							<HoverTooltip text={option.label} placement="above" minWidthPx={0} wrapperClass="flex h-5 w-5 shrink-0">
+								<button
+									type="button"
+									aria-label={option.label}
+									aria-pressed={toolbarPresetColor === option.id}
+									on:click={() => updateToolbarPresetColor(option.id)}
+									class="h-5 w-5 cursor-pointer border-2 border-white shadow-sm ring-1 ring-stone-400"
+									class:!ring-2={toolbarPresetColor === option.id}
+									class:!ring-stone-950={toolbarPresetColor === option.id}
+									style:background-color={option.value}
+								></button>
+							</HoverTooltip>
 						{/each}
 					</div>
 					{#if toolbarPresetStyle}
 						<div class="flex gap-px bg-stone-400 p-px" aria-label="Preset line type">
 							{#each guideStyles as styleOption}
-								<button
-									type="button"
-									title={styleOption}
-									aria-label={`${styleOption} line`}
-									aria-pressed={toolbarPresetStyle === styleOption}
-									on:click={() => updateToolbarPresetStyle(styleOption)}
-									class="flex h-5 w-8 cursor-pointer items-center justify-center bg-stone-100 text-stone-700 hover:bg-white"
-									class:!bg-stone-900={toolbarPresetStyle === styleOption}
-									class:!text-white={toolbarPresetStyle === styleOption}
+								<HoverTooltip
+									text={styleOption.charAt(0).toUpperCase() + styleOption.slice(1)}
+									placement="above"
+									minWidthPx={0}
+									wrapperClass="flex h-5 w-8 shrink-0"
 								>
-									<svg viewBox="0 0 24 6" class="h-2 w-6" aria-hidden="true">
-										<line
-											x1="1"
-											y1="3"
-											x2="23"
-											y2="3"
-											stroke="currentColor"
-											stroke-width="2"
-											stroke-dasharray={styleOption === 'dashed' ? '6 3' : styleOption === 'dotted' ? '1 3' : undefined}
-											stroke-linecap={styleOption === 'dotted' ? 'round' : 'square'}
-										/>
-									</svg>
-								</button>
+									<button
+										type="button"
+										aria-label={`${styleOption} line`}
+										aria-pressed={toolbarPresetStyle === styleOption}
+										on:click={() => updateToolbarPresetStyle(styleOption)}
+										class="flex h-5 w-8 cursor-pointer items-center justify-center bg-stone-100 text-stone-700 hover:bg-white"
+										class:!bg-stone-900={toolbarPresetStyle === styleOption}
+										class:!text-white={toolbarPresetStyle === styleOption}
+									>
+										<svg viewBox="0 0 24 6" class="h-2 w-6" aria-hidden="true">
+											<line
+												x1="1"
+												y1="3"
+												x2="23"
+												y2="3"
+												stroke="currentColor"
+												stroke-width="2"
+												stroke-dasharray={styleOption === 'dashed' ? '6 3' : styleOption === 'dotted' ? '0.01 4' : undefined}
+												stroke-linecap={styleOption === 'dotted' ? 'round' : 'square'}
+											/>
+										</svg>
+									</button>
+								</HoverTooltip>
 							{/each}
 						</div>
+					{/if}
+					{#if showToolbarLineFormatReset}
+						<HoverTooltip text="Reset to Default" placement="above" minWidthPx={0} wrapperClass="flex h-5 w-6 shrink-0">
+							<button
+								type="button"
+								data-toolbar-line-format-reset
+								aria-label="Reset to Default"
+								on:click={resetToolbarLineFormat}
+								class="flex h-5 w-6 cursor-pointer items-center justify-center border border-stone-400 bg-stone-100 p-0.5 text-stone-800 hover:border-stone-900 hover:bg-stone-900 hover:text-white"
+							>
+								<svg viewBox="0 0 24 24" class="h-3.5 w-3.5" aria-hidden="true">
+									<path
+										d="M21 12a9 9 0 1 1-2.64-6.36L21 8M21 3v5h-5"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2.5"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									/>
+								</svg>
+							</button>
+						</HoverTooltip>
 					{/if}
 				</div>
 			{/if}
@@ -5225,48 +5697,52 @@
 					aria-label="Drawing options"
 				>
 					<div class="draw-options-line-types grid grid-cols-2 gap-px" role="group" aria-label="Drawing line type">
-						<button
-							type="button"
-							aria-label="Draw squiggle lines"
-							aria-pressed={freeDrawShape === 'squiggle' && freeDrawMode === 'draw'}
-							on:pointerdown|stopPropagation={() => {
-								freeDrawShape = 'squiggle';
-								freeDrawMode = 'draw';
-							}}
-							on:click|stopPropagation={() => {
-								freeDrawShape = 'squiggle';
-								freeDrawMode = 'draw';
-							}}
-							class="flex h-7 cursor-pointer items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-							class:!bg-stone-600={freeDrawShape === 'squiggle' && freeDrawMode === 'draw'}
-							class:!text-white={freeDrawShape === 'squiggle' && freeDrawMode === 'draw'}
-						>
-							<svg viewBox="0 0 24 12" class="h-3 w-4" aria-hidden="true">
-								<path d="M2 8c4-8 6 8 10 0s6 8 10 0" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-							</svg>
-							<span class="sr-only">Squiggle</span>
-						</button>
-						<button
-							type="button"
-							aria-label="Draw straight lines"
-							aria-pressed={freeDrawShape === 'straight' && freeDrawMode === 'draw'}
-							on:pointerdown|stopPropagation={() => {
-								freeDrawShape = 'straight';
-								freeDrawMode = 'draw';
-							}}
-							on:click|stopPropagation={() => {
-								freeDrawShape = 'straight';
-								freeDrawMode = 'draw';
-							}}
-							class="flex h-7 cursor-pointer items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-							class:!bg-stone-600={freeDrawShape === 'straight' && freeDrawMode === 'draw'}
-							class:!text-white={freeDrawShape === 'straight' && freeDrawMode === 'draw'}
-						>
-							<svg viewBox="0 0 24 12" class="h-3 w-4" aria-hidden="true">
-								<path d="M2 10 22 2" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-							</svg>
-							<span class="sr-only">Straight</span>
-						</button>
+						<HoverTooltip text="Free Draw" minWidthPx={0} wrapperClass="flex h-7 min-w-0">
+							<button
+								type="button"
+								aria-label="Draw squiggle lines"
+								aria-pressed={freeDrawShape === 'squiggle' && freeDrawMode === 'draw'}
+								on:pointerdown|stopPropagation={() => {
+									freeDrawShape = 'squiggle';
+									freeDrawMode = 'draw';
+								}}
+								on:click|stopPropagation={() => {
+									freeDrawShape = 'squiggle';
+									freeDrawMode = 'draw';
+								}}
+								class="flex h-7 w-full cursor-pointer items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
+								class:!bg-stone-600={freeDrawShape === 'squiggle' && freeDrawMode === 'draw'}
+								class:!text-white={freeDrawShape === 'squiggle' && freeDrawMode === 'draw'}
+							>
+								<svg viewBox="0 0 24 12" class="h-3 w-4" aria-hidden="true">
+									<path d="M2 8c4-8 6 8 10 0s6 8 10 0" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+								</svg>
+								<span class="sr-only">Squiggle</span>
+							</button>
+						</HoverTooltip>
+						<HoverTooltip text="Straight Line" minWidthPx={0} wrapperClass="flex h-7 min-w-0">
+							<button
+								type="button"
+								aria-label="Draw straight lines"
+								aria-pressed={freeDrawShape === 'straight' && freeDrawMode === 'draw'}
+								on:pointerdown|stopPropagation={() => {
+									freeDrawShape = 'straight';
+									freeDrawMode = 'draw';
+								}}
+								on:click|stopPropagation={() => {
+									freeDrawShape = 'straight';
+									freeDrawMode = 'draw';
+								}}
+								class="flex h-7 w-full cursor-pointer items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
+								class:!bg-stone-600={freeDrawShape === 'straight' && freeDrawMode === 'draw'}
+								class:!text-white={freeDrawShape === 'straight' && freeDrawMode === 'draw'}
+							>
+								<svg viewBox="0 0 24 12" class="h-3 w-4" aria-hidden="true">
+									<path d="M2 10 22 2" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+								</svg>
+								<span class="sr-only">Straight</span>
+							</button>
+						</HoverTooltip>
 					</div>
 
 					<label class="draw-options-thickness mt-px block bg-stone-100 px-0.5 py-0.5 text-[7px] font-bold text-stone-800">
@@ -5285,28 +5761,34 @@
 
 					<div class="draw-options-colors mt-px grid grid-cols-2 gap-px" role="group" aria-label="Drawing color">
 						{#each freeDrawColors as option, colorIndex}
-							<button
-								data-draw-color
-								type="button"
-								title={`${colorIndex === 9 ? 0 : colorIndex + 1}: ${option.label}`}
-								aria-label={`${option.label} drawing color`}
-								aria-pressed={freeDrawColor === option.id}
-								on:pointerdown|stopPropagation={() => {
-									freeDrawColor = option.id;
-									freeDrawMode = 'draw';
-								}}
-								on:keydown={(event) => handleDrawColorKeydown(event, colorIndex)}
-								on:click|stopPropagation={() => {
-									freeDrawColor = option.id;
-									freeDrawMode = 'draw';
-								}}
-								class="flex aspect-square min-h-0 cursor-pointer items-center justify-center border border-stone-500 text-[8px] font-black outline-none ring-inset hover:ring-1 hover:ring-white"
-								class:ring-2={freeDrawColor === option.id}
-								class:ring-white={freeDrawColor === option.id}
-								class:text-white={!['yellow', 'white', 'gray'].includes(option.id)}
-								class:text-stone-900={['yellow', 'white', 'gray'].includes(option.id)}
-								style:background={option.value}>{colorIndex === 9 ? 0 : colorIndex + 1}</button
+							<HoverTooltip
+								text={option.label}
+								shortcutKeys={[String(colorIndex === 9 ? 0 : colorIndex + 1)]}
+								minWidthPx={0}
+								wrapperClass="flex aspect-square min-h-0 min-w-0"
 							>
+								<button
+									data-draw-color
+									type="button"
+									aria-label={`${option.label} drawing color`}
+									aria-pressed={freeDrawColor === option.id}
+									on:pointerdown|stopPropagation={() => {
+										freeDrawColor = option.id;
+										freeDrawMode = 'draw';
+									}}
+									on:keydown={(event) => handleDrawColorKeydown(event, colorIndex)}
+									on:click|stopPropagation={() => {
+										freeDrawColor = option.id;
+										freeDrawMode = 'draw';
+									}}
+									class="flex h-full w-full cursor-pointer items-center justify-center border border-stone-500 text-[8px] font-black outline-none ring-inset hover:ring-1 hover:ring-white"
+									class:ring-2={freeDrawColor === option.id}
+									class:ring-white={freeDrawColor === option.id}
+									class:text-white={!['yellow', 'white', 'gray'].includes(option.id)}
+									class:text-stone-900={['yellow', 'white', 'gray'].includes(option.id)}
+									style:background={option.value}>{colorIndex === 9 ? 0 : colorIndex + 1}</button
+								>
+							</HoverTooltip>
 						{/each}
 					</div>
 
@@ -5433,11 +5915,15 @@
 						<button
 							type="button"
 							aria-label={ownershipResolved
-								? saveActionLabel === 'Make Copy'
-									? 'Make a copy of this play builder'
-									: 'Save play'
+								? actionInProgress === 'save'
+									? 'Saving play'
+									: saveFeedbackState === 'saved'
+										? 'Play saved'
+										: saveActionLabel === 'Make Copy'
+											? 'Make a copy of this play builder'
+											: 'Save play'
 								: 'Determining save access'}
-							aria-busy={!ownershipResolved}
+							aria-busy={!ownershipResolved || actionInProgress === 'save'}
 							disabled={!ownershipResolved || !hasUnsavedChanges || tutorialActive || actionInProgress !== null}
 							on:click={savePlay}
 							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -5547,18 +6033,19 @@
 				<div bind:this={playStripElement} class="play-tabs-scroll absolute right-0 bottom-0 left-0 overflow-x-auto overflow-y-hidden">
 					<div class="flex w-max items-stretch gap-1">
 						{#each playEntries as play, index (play.id)}
+							<HoverTooltip text={editingPlayId === play.id ? '' : 'Double Click for Options'} minWidthPx={0} wrapperClass="flex h-9 min-w-20 shrink-0">
 							<button
 								data-play-id={play.id}
 								type="button"
 								aria-label={`Open ${play.name}`}
 								aria-pressed={index === activePlayIndex}
-								title={`${play.name} — double-click for play options`}
 								on:click={() => switchPlay(play.id)}
 								on:dblclick={(event) => openPlayMenu(event, play.id)}
 								class="flex h-9 min-w-20 shrink-0 cursor-pointer items-center justify-center border border-stone-500 bg-stone-100 px-3 text-[10px] font-black whitespace-nowrap text-stone-800 hover:bg-white aria-pressed:border-stone-950 aria-pressed:bg-stone-900 aria-pressed:text-white"
 							>
 								{play.name}
 							</button>
+							</HoverTooltip>
 						{/each}
 						<HoverTooltip
 							text={playEntries.length >= PLAY_BUILDER_MAX_PLAYS ? 'Play Limit Reached' : 'Add Play'}
@@ -5584,45 +6071,48 @@
 						class="absolute bottom-12 w-44 border-2 border-stone-900 bg-stone-50 p-2 text-stone-800 shadow-xl"
 						style:left={`${playMenuLeft}px`}
 					>
-						<label for={`play-name-${editingPlayId}`} class="mb-1 block text-[9px] font-black tracking-wide text-stone-600 uppercase">Play Name</label
-						>
-						<div class="flex">
+						<div class="flex gap-1">
 							<input
 								bind:this={playNameInput}
 								bind:value={playNameValue}
 								id={`play-name-${editingPlayId}`}
+								aria-label="Play name"
 								maxlength={PLAY_BUILDER_PLAY_NAME_MAX_LENGTH}
 								on:keydown={(event) => {
-									if (event.key === 'Enter') renamePlay();
-									if (event.key === 'Escape') editingPlayId = null;
+									if (event.key === 'Enter' || event.key === 'Escape') {
+										event.preventDefault();
+										renamePlay();
+									}
 								}}
 								class="h-8 min-w-0 flex-1 border border-stone-500 bg-white px-2 text-xs font-semibold outline-none focus:border-stone-950"
 							/>
-							<button
-								type="button"
-								on:click={renamePlay}
-								class="h-8 cursor-pointer bg-stone-900 px-2 text-[9px] font-black text-white uppercase hover:bg-stone-700"
-							>
-								Rename
-							</button>
-						</div>
-						<div class="mt-2 grid grid-cols-2 gap-1">
-							<button
-								type="button"
-								disabled={playEntries.length >= PLAY_BUILDER_MAX_PLAYS}
-								on:click={duplicatePlay}
-								class="h-8 cursor-pointer border border-stone-500 bg-white text-[9px] font-black uppercase hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40"
-							>
-								Duplicate
-							</button>
-							<button
-								type="button"
-								disabled={playEntries.length <= 1}
-								on:click={deletePlay}
-								class="h-8 cursor-pointer border border-red-700 bg-white text-[9px] font-black text-red-700 uppercase hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-							>
-								Delete
-							</button>
+							<HoverTooltip text="Duplicate Play" placement="above" minWidthPx={0} wrapperClass="flex h-8 w-8 shrink-0">
+								<button
+									type="button"
+									aria-label="Duplicate play"
+									disabled={playEntries.length >= PLAY_BUILDER_MAX_PLAYS}
+									on:click={duplicatePlay}
+									class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center border border-stone-500 bg-white text-stone-800 hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40"
+								>
+									<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+										<rect x="9" y="9" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" />
+										<path d="M15 9V5H5v10h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+									</svg>
+								</button>
+							</HoverTooltip>
+							<HoverTooltip text="Delete Play" placement="above" minWidthPx={0} wrapperClass="flex h-8 w-8 shrink-0">
+								<button
+									type="button"
+									aria-label="Delete play"
+									disabled={playEntries.length <= 1}
+									on:click={deletePlay}
+									class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center border border-red-700 bg-white text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+								>
+									<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+										<path d="M4 7h16M10 11v6M14 11v6M9 7V4h6v3M6 7l1 13h10l1-13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+									</svg>
+								</button>
+							</HoverTooltip>
 						</div>
 					</div>
 				{/if}
@@ -5641,10 +6131,11 @@
 					</span>
 				{/if}
 				<div class="flex gap-1.5" aria-label="Field setup controls">
-					<HoverTooltip text="Flip Field Direction" minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
+					<HoverTooltip text="Flip Field Direction" shortcutKeys={['Shift', 'F']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
 						<button
 							type="button"
 							aria-label="Flip field direction"
+							aria-keyshortcuts="Shift+F"
 							on:click={flipFieldDirection}
 							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
 						>
@@ -5752,6 +6243,7 @@
 				</div>
 			</div>
 			<div class="field-canvas relative my-auto w-full shrink-0">
+				<HoverTooltip text={fieldControlTooltip} minWidthPx={0} wrapperClass="contents">
 				<svg
 					bind:this={svg}
 					data-tutorial="field"
@@ -5771,8 +6263,7 @@
 					class:group-selection-outside={selectedTargets.length > 1 && !pointerInsideSelectedGroup}
 					class:group-selection-inside={selectedTargets.length > 1 && pointerInsideSelectedGroup && !dragTarget?.moved}
 					class:laser-cursor={tool === 'laser' && pointerOnField}
-					class:cursor-crosshair={!dragTarget?.moved &&
-						(Boolean(marqueeSelection) || ((isGuideTool(tool) || isPathTool(tool)) && pointerOnField))}
+					class:cursor-crosshair={!dragTarget?.moved && (Boolean(marqueeSelection) || ((isGuideTool(tool) || isPathTool(tool)) && pointerOnField))}
 					class:drawing-cursor={tool === 'free-draw' && freeDrawMode === 'draw'}
 					class:erasing-cursor={tool === 'free-draw' && freeDrawMode === 'erase'}
 					class:!cursor-grabbing={dragTarget?.moved}
@@ -5783,7 +6274,10 @@
 					aria-disabled={viewOnly}
 					on:pointerdown|capture={beginStylusEraser}
 					on:pointerdown={beginOnField}
-					on:pointermove={continuePointer}
+					on:pointermove={(event) => {
+						updateFieldControlTooltip(event);
+						continuePointer(event);
+					}}
 					on:contextmenu|preventDefault
 					on:pointerenter={(event) => {
 						hoveringElement = false;
@@ -5795,10 +6289,11 @@
 						hoverPoint = !groupSelectionActive && (pointerOnField || tool === 'free-draw') ? point : null;
 						if (tool === 'laser' && pointerOnField) updateLaserPointer(point);
 						lastPlacementHoverPoint = !groupSelectionActive && pointerOnField ? point : null;
-						if (!groupSelectionActive && pointerOnField) schedulePlacementSnap(point, event.shiftKey);
+						if (!groupSelectionActive && pointerOnField && shouldSnapElements(event)) schedulePlacementSnap(point, true);
 						else clearPlacementSnap();
 					}}
 					on:pointerleave={() => {
+						fieldControlTooltip = '';
 						hoverPoint = null;
 						pointerOnField = false;
 						pointerInsideSelectedGroup = false;
@@ -5882,6 +6377,7 @@
 									<rect
 										data-field-element
 										data-field-type="team-box-text"
+										data-hover-tooltip="Double Click to Edit"
 										role="button"
 										tabindex="0"
 										aria-label={`${teamBoxLabel}, double-click to rename team box`}
@@ -5987,6 +6483,7 @@
 									<rect
 										data-field-element
 										data-scoreboard-control={scoreboardItem.kind}
+										data-hover-tooltip={scoreboardItem.kind === 'quarter' ? 'Cycle Through Downs' : 'Set Game Time'}
 										role="button"
 										tabindex={tool === 'laser' ? -1 : 0}
 										aria-label={scoreboardItem.label}
@@ -6439,6 +6936,46 @@
 								<text x={hoverPoint.x} y={hoverPoint.y + 3.5} text-anchor="middle" fill="#1c1917" font-size="9" font-weight="900">EVENT</text>
 							</g>
 						{/if}
+						{#if showYardLineCursorEnabled && (isMarkerTool(tool) || isPathTool(tool))}
+							{@const yardPreviewX = tool === 'ball' ? (placementSnapX ?? hoverPoint.x) : hoverPoint.x}
+							{@const yardPreviewPoint = { x: yardPreviewX, y: hoverPoint.y }}
+							{#if isPointOnField(yardPreviewPoint)}
+								<text
+									data-yard-line-preview
+									x={yardPreviewX}
+									y={toolYardLinePreviewY(tool, yardPreviewPoint)}
+									text-anchor="middle"
+									fill="#fff"
+									stroke="#1c1917"
+									stroke-width="2"
+									paint-order="stroke"
+									font-size="8"
+									font-weight="900"
+									opacity="0.58"
+									pointer-events="none">{yardLinePreviewText(yardPreviewX)}</text
+								>
+							{/if}
+							{#if isPathTool(tool)}
+								{@const arrowPreview = previewPathFrom(hoverPoint)}
+								{@const arrowPreviewTip = arrowHitTip(tool, arrowPreview.start, arrowPreview.end)}
+								{#if isPointOnField(arrowPreviewTip)}
+									<text
+										data-yard-line-preview
+										x={arrowPreviewTip.x}
+										y={toolYardLinePreviewY(tool, arrowPreviewTip)}
+										text-anchor="middle"
+										fill="#fff"
+										stroke="#1c1917"
+										stroke-width="2"
+										paint-order="stroke"
+										font-size="8"
+										font-weight="900"
+										opacity="0.58"
+										pointer-events="none">{yardLinePreviewText(arrowPreviewTip.x)}</text
+									>
+								{/if}
+							{/if}
+						{/if}
 					{/if}
 
 					{#each guides as guide}
@@ -6670,6 +7207,41 @@
 								pointer-events="none"
 							/>
 						{/if}
+						{#if showYardLineCursorEnabled && isArrowPath(drawing.kind)}
+							{@const drawingArrowTip = arrowHitTip(drawing.kind, drawing.start, drawing.end)}
+							{#if isPointOnField(drawing.start)}
+								<text
+									data-yard-line-preview
+									x={drawing.start.x}
+									y={toolYardLinePreviewY(drawing.kind, drawing.start)}
+									text-anchor="middle"
+									fill="#fff"
+									stroke="#1c1917"
+									stroke-width="2"
+									paint-order="stroke"
+									font-size="8"
+									font-weight="900"
+									opacity="0.58"
+									pointer-events="none">{yardLinePreviewText(drawing.start.x)}</text
+								>
+							{/if}
+							{#if isPointOnField(drawingArrowTip)}
+								<text
+									data-yard-line-preview
+									x={drawingArrowTip.x}
+									y={toolYardLinePreviewY(drawing.kind, drawingArrowTip)}
+									text-anchor="middle"
+									fill="#fff"
+									stroke="#1c1917"
+									stroke-width="2"
+									paint-order="stroke"
+									font-size="8"
+									font-weight="900"
+									opacity="0.58"
+									pointer-events="none">{yardLinePreviewText(drawingArrowTip.x)}</text
+								>
+							{/if}
+						{/if}
 					{/if}
 
 					{#each markers as marker}
@@ -6864,6 +7436,57 @@
 						</g>
 					{/each}
 
+					{#if showYardLineCursorEnabled && draggedYardMarker && isPointOnField(draggedYardMarker)}
+						<text
+							data-yard-line-preview
+							x={draggedYardMarker.x}
+							y={markerYardLinePreviewY(draggedYardMarker)}
+							text-anchor="middle"
+							fill="#fff"
+							stroke="#1c1917"
+							stroke-width="2"
+							paint-order="stroke"
+							font-size="8"
+							font-weight="900"
+							opacity="0.58"
+							pointer-events="none">{yardLinePreviewText(draggedYardMarker.x)}</text
+						>
+					{:else if showYardLineCursorEnabled && draggedYardPath && isArrowPath(draggedYardPath.kind)}
+						{@const draggedArrowTip = arrowHitTip(draggedYardPath.kind, draggedYardPath.start, draggedYardPath.end)}
+						{#if isPointOnField(draggedYardPath.start)}
+							<text
+								data-yard-line-preview
+								x={draggedYardPath.start.x}
+								y={toolYardLinePreviewY(draggedYardPath.kind, draggedYardPath.start)}
+								text-anchor="middle"
+								fill="#fff"
+								stroke="#1c1917"
+								stroke-width="2"
+								paint-order="stroke"
+								font-size="8"
+								font-weight="900"
+								opacity="0.58"
+								pointer-events="none">{yardLinePreviewText(draggedYardPath.start.x)}</text
+							>
+						{/if}
+						{#if isPointOnField(draggedArrowTip)}
+							<text
+								data-yard-line-preview
+								x={draggedArrowTip.x}
+								y={toolYardLinePreviewY(draggedYardPath.kind, draggedArrowTip)}
+								text-anchor="middle"
+								fill="#fff"
+								stroke="#1c1917"
+								stroke-width="2"
+								paint-order="stroke"
+								font-size="8"
+								font-weight="900"
+								opacity="0.58"
+								pointer-events="none">{yardLinePreviewText(draggedArrowTip.x)}</text
+							>
+						{/if}
+					{/if}
+
 					<!-- Keep one Svelte-owned drawing layer above every field element. Moving individual strokes can detach them from keyed state. -->
 					<g data-free-drawing-layer pointer-events="none">
 						{#each freeStrokes as stroke (stroke.id)}
@@ -6891,14 +7514,16 @@
 						{/each}
 						{#if activeFreeStroke}
 							{#if activeFreeStroke.points.length === 1}
-								<circle
-									data-free-drawing
-									cx={activeFreeStroke.points[0].x}
-									cy={activeFreeStroke.points[0].y}
-									r={(activeFreeStroke.width ?? freeDrawStrokeWidth) * 0.85}
-									fill={drawingColor(activeFreeStroke.color)}
-									filter="url(#builder-neon-glow)"
-								/>
+								{#if activeFreeDrawShape === 'squiggle'}
+									<circle
+										data-free-drawing
+										cx={activeFreeStroke.points[0].x}
+										cy={activeFreeStroke.points[0].y}
+										r={(activeFreeStroke.width ?? freeDrawStrokeWidth) * 0.85}
+										fill={drawingColor(activeFreeStroke.color)}
+										filter="url(#builder-neon-glow)"
+									/>
+								{/if}
 							{:else}
 								<path
 									data-free-drawing
@@ -6944,6 +7569,7 @@
 								<g
 									class="down-marker-graphic"
 									data-down-marker
+									data-hover-tooltip={editingDownGuideId === guide.id ? undefined : 'Click to Edit'}
 									data-export-down-marker
 									data-field-element
 									data-field-type="guide"
@@ -7016,6 +7642,7 @@
 								<g
 									class="los-marker-graphic"
 									data-los-marker
+									data-hover-tooltip={editingGuideId === guide.id ? undefined : 'Click to Edit'}
 									data-export-los-marker
 									data-field-element
 									data-field-type="guide"
@@ -7024,7 +7651,7 @@
 									aria-label={`Line of Scrimmage at the ${losYardLine(guide.x)} yard line`}
 									on:pointerdown|stopPropagation={(event) => beginOnGuide(event, guide, true)}
 									on:click|stopPropagation={(event) => startEditingLineOfScrimmageMarker(event, guide)}
-									on:dblclick|stopPropagation={(event) => startEditingLineOfScrimmageMarker(event, guide)}
+									on:dblclick|stopPropagation={(event) => startEditingGuide(event, guide)}
 									on:keydown|stopPropagation={(event) => {
 										if (event.key === 'Enter' || event.key === ' ') startEditingLineOfScrimmageMarker(event, guide);
 									}}
@@ -7097,6 +7724,33 @@
 
 					{#if tool === 'laser' || laserTrail.length > 0 || laserDrawings.length > 0 || (activeLaserDrawing?.points.length ?? 0) > 1}
 						<g data-laser-pointer-layer pointer-events="none">
+							<defs>
+								<linearGradient
+									id="builder-rainbow-laser-gradient"
+									x1="0"
+									y1="0"
+									x2="180"
+									y2="0"
+									gradientUnits="userSpaceOnUse"
+									spreadMethod="repeat"
+								>
+									<stop offset="0%" stop-color="#ff1744" />
+									<stop offset="16.67%" stop-color="#ff9100" />
+									<stop offset="33.33%" stop-color="#ffea00" />
+									<stop offset="50%" stop-color="#00e676" />
+									<stop offset="66.67%" stop-color="#00e5ff" />
+									<stop offset="83.33%" stop-color="#2979ff" />
+									<stop offset="100%" stop-color="#d500f9" />
+									<animateTransform
+										attributeName="gradientTransform"
+										type="translate"
+										from="-180 0"
+										to="180 0"
+										dur="0.8s"
+										repeatCount="indefinite"
+									/>
+								</linearGradient>
+							</defs>
 							{#each laserDrawings as drawing}
 								{@const drawingFreshness = laserDrawingVisibility(drawing, laserTrailClock)}
 								<g
@@ -7107,7 +7761,7 @@
 									<path
 										d={laserDrawingPath(drawing.points)}
 										fill="none"
-										stroke={laserColorValue(drawing.color)}
+										stroke={laserPaint(drawing.color)}
 										stroke-width="8"
 										stroke-linecap="round"
 										stroke-linejoin="round"
@@ -7116,7 +7770,7 @@
 									<path
 										d={laserDrawingPath(drawing.points)}
 										fill="none"
-										stroke={laserColorValue(drawing.color)}
+										stroke={laserPaint(drawing.color)}
 										stroke-width="3.8"
 										stroke-linecap="round"
 										stroke-linejoin="round"
@@ -7130,7 +7784,7 @@
 									<path
 										d={laserDrawingPath(activeLaserDrawing.points)}
 										fill="none"
-										stroke={laserColorValue(activeLaserDrawing.color)}
+										stroke={laserPaint(activeLaserDrawing.color)}
 										stroke-width="8"
 										stroke-linecap="round"
 										stroke-linejoin="round"
@@ -7139,7 +7793,7 @@
 									<path
 										d={laserDrawingPath(activeLaserDrawing.points)}
 										fill="none"
-										stroke={laserColorValue(activeLaserDrawing.color)}
+										stroke={laserPaint(activeLaserDrawing.color)}
 										stroke-width="3.8"
 										stroke-linecap="round"
 										stroke-linejoin="round"
@@ -7169,72 +7823,118 @@
 								</defs>
 								<path
 									d={laserTrailPath(laserTrail, laserTrailClock)}
-									fill="url(#builder-laser-trail-gradient)"
+									fill={rainbowLaserEnabled ? 'url(#builder-rainbow-laser-gradient)' : 'url(#builder-laser-trail-gradient)'}
 									opacity={Math.pow(trailFreshness, 1.25)}
 									filter="url(#builder-neon-glow)"
 								/>
 							{/if}
 							{#if tool === 'laser' && laserPointer && pointerOnField}
-								<circle cx={laserPointer.x} cy={laserPointer.y} r="7" fill={laserColorValue(laserColor)} opacity="0.2" />
-								<circle cx={laserPointer.x} cy={laserPointer.y} r="3" fill={laserColorValue(laserColor)} filter="url(#builder-neon-glow)" />
+								<circle
+									cx={laserPointer.x}
+									cy={laserPointer.y}
+									r="7"
+									fill={laserPaint(rainbowLaserEnabled ? 'rainbow' : laserColor)}
+									opacity="0.2"
+								/>
+								<circle
+									cx={laserPointer.x}
+									cy={laserPointer.y}
+									r="3"
+									fill={laserPaint(rainbowLaserEnabled ? 'rainbow' : laserColor)}
+									filter="url(#builder-neon-glow)"
+								/>
 							{/if}
 						</g>
 					{/if}
 				</svg>
+				</HoverTooltip>
 
 				{#if editingDownGuide}
 					<div
 						bind:this={editorElement}
-						class="absolute z-20 flex -translate-x-1/2 gap-px bg-stone-900 p-px shadow-xl ring-2 ring-stone-950"
-						style:left={`${editingDownGuide.x / 10}%`}
+						class="absolute z-20 flex -translate-x-1/2 items-stretch gap-2"
+						style:left={`${inlineGuideEditorPinnedLeft ?? editingDownGuide.x / 10}%`}
 						style:top={`${((fieldTop + 14) / 484) * 100}%`}
+						on:pointerleave={releaseInlineGuideEditorPin}
 						role="group"
 						aria-label="Select down"
 					>
-						{#each downMarkerOptions as option}
-							<button
-								type="button"
-								aria-label={option.label}
-								aria-pressed={(editingDownGuide.down ?? '1st') === option.id}
-								on:click={() => selectDownMarkerValue(option.id)}
-								class="h-7 w-10 cursor-pointer bg-stone-100 text-[10px] font-black whitespace-nowrap text-stone-800 hover:bg-orange-100"
-								class:!bg-stone-700={(editingDownGuide.down ?? '1st') === option.id}
-								class:!text-[#ff5a1f]={(editingDownGuide.down ?? '1st') === option.id}>{option.label}</button
+						<div class="flex gap-px bg-stone-900 p-px shadow-xl ring-2 ring-stone-950">
+							{#each downMarkerOptions as option}
+								<HoverTooltip
+									text={option.id === 'pat' ? 'Set to P.A.T.' : `Set to ${option.label} Down`}
+									placement="above"
+									minWidthPx={0}
+									wrapperClass="flex h-7 w-10 shrink-0"
+								>
+									<button
+										type="button"
+										aria-label={option.label}
+										aria-pressed={(editingDownGuide.down ?? '1st') === option.id}
+										on:click={() => selectDownMarkerValue(option.id)}
+										class="h-7 w-10 cursor-pointer bg-stone-100 text-[10px] font-black whitespace-nowrap text-stone-800 hover:bg-orange-100"
+										class:!bg-stone-700={(editingDownGuide.down ?? '1st') === option.id}
+										class:!text-[#ff5a1f]={(editingDownGuide.down ?? '1st') === option.id}>{option.label}</button
+									>
+								</HoverTooltip>
+							{/each}
+						</div>
+						<div class="flex gap-px bg-stone-900 p-px shadow-xl ring-2 ring-stone-950">
+							{#if !isAtMidfieldX(editingDownGuide.x)}
+							<HoverTooltip
+								text={`Flip to ${downGuideSide === 'a' ? 'B' : 'A'}'s Side`}
+								placement="above"
+								minWidthPx={0}
+								wrapperClass="flex h-7 w-7 shrink-0"
 							>
-						{/each}
-						{#if !isAtMidfieldX(editingDownGuide.x)}
-							<button
-								type="button"
-								aria-label={`Field side ${downGuideSide.toUpperCase()}; switch to ${downGuideSide === 'a' ? 'B' : 'A'}`}
-								title={`${downGuideSide.toUpperCase()} Side`}
-								on:click={() => setDownGuideSide(downGuideSide === 'a' ? 'b' : 'a')}
-								class="h-7 w-7 shrink-0 cursor-pointer border border-stone-900 text-[11px] font-black"
-								class:bg-stone-900={downGuideSide === 'a'}
-								class:text-white={downGuideSide === 'a'}
-								class:bg-white={downGuideSide === 'b'}
-								class:text-stone-950={downGuideSide === 'b'}>{downGuideSide.toUpperCase()}</button
-							>
-						{/if}
-						<label class="sr-only" for="custom-down-yardage">Custom yardage</label>
-						<input
+								<button
+									type="button"
+									aria-label={`Field side ${downGuideSide.toUpperCase()}; switch to ${downGuideSide === 'a' ? 'B' : 'A'}`}
+									on:click={() => {
+										pinInlineGuideEditorUnderPointer();
+										setDownGuideSide(downGuideSide === 'a' ? 'b' : 'a');
+									}}
+									class="h-7 w-7 shrink-0 cursor-pointer text-[11px] font-black"
+									class:bg-stone-900={downGuideSide === 'a'}
+									class:text-white={downGuideSide === 'a'}
+									class:bg-white={downGuideSide === 'b'}
+									class:text-stone-950={downGuideSide === 'b'}>{downGuideSide.toUpperCase()}</button
+								>
+							</HoverTooltip>
+							{/if}
+							<label class="sr-only" for="custom-down-yardage">Custom yardage</label>
+							<input
+							bind:this={guideYardageInput}
 							id="custom-down-yardage"
-							type="number"
+							type="text"
 							min="0"
 							max={maximumDownMarkerYardage(editingDownGuide.x, lineOfScrimmageX)}
 							step="0.5"
 							inputmode="decimal"
+							pattern="[0-9]*[.]?[0-9]*"
 							bind:value={downYardageValue}
 							aria-label="Custom yardage"
 							title="Custom yardage"
-							class="down-yardage-input h-7 w-10 border-0 bg-stone-100 px-1 text-center text-[10px] font-black text-stone-800 outline-none hover:bg-orange-100 focus:bg-white focus:ring-1 focus:ring-[#ff5a1f] focus:ring-inset"
+							class="down-yardage-input h-7 w-10 border-0 bg-stone-100 px-1 text-center text-[10px] font-black text-stone-800 outline-none hover:bg-orange-100 focus:bg-white focus:ring-2 focus:ring-[#ff5a1f] focus:ring-inset"
 							on:focus={(event) => (event.currentTarget as HTMLInputElement).select()}
 							on:input={updateDownMarkerYardage}
 							on:keydown|stopPropagation={(event) => {
+								if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+									event.preventDefault();
+									moveEditingDownGuideByYard(event.key === 'ArrowLeft' ? -1 : 1);
+									return;
+								}
+								if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+									event.preventDefault();
+									stepDownMarkerYardageInput(event.currentTarget, event.key === 'ArrowUp' ? 1 : -1);
+									return;
+								}
 								if (event.key !== 'Enter' && event.key !== 'Escape') return;
 								event.preventDefault();
 								commitDownMarkerEditor();
 							}}
-						/>
+							/>
+						</div>
 					</div>
 				{/if}
 
@@ -7351,30 +8051,133 @@
 					</form>
 				{/if}
 
-				{#if (editingGuide || editingPath) && lineEditorPoint}
+				{#if editingGuideFromLosMarker && editingGuide?.kind === 'line-of-scrimmage'}
+					<div
+						bind:this={editorElement}
+						class="absolute z-20 flex -translate-x-1/2 items-center gap-2"
+						style:left={`${inlineGuideEditorPinnedLeft ?? editingGuide.x / 10}%`}
+						style:top={`${((fieldBottom - 43) / 484) * 100}%`}
+						on:pointerleave={releaseInlineGuideEditorPin}
+						role="group"
+						aria-label="Edit line of scrimmage yard line"
+					>
+						<div class="flex items-center gap-px bg-stone-950 p-px shadow-xl ring-2 ring-stone-950">
+							{#each [3, 5, 14, 20, 30] as yardLine}
+								<HoverTooltip
+									text={`Jump to ${yardLine} Yard Line`}
+									placement="above"
+									minWidthPx={0}
+									wrapperClass="flex h-7 min-w-8 shrink-0"
+								>
+									<button
+										type="button"
+										aria-label={`Move line of scrimmage to the ${yardLine} yard line`}
+										aria-pressed={losYardageValue === yardLine}
+										on:click={() => {
+											pinInlineGuideEditorUnderPointer();
+											setEditingLosYardLine(yardLine);
+										}}
+										class="h-7 min-w-8 w-full cursor-pointer bg-white px-2 text-[10px] font-black text-stone-950 hover:bg-green-100 aria-pressed:bg-stone-950 aria-pressed:text-green-400"
+									>
+										{yardLine}
+									</button>
+								</HoverTooltip>
+							{/each}
+						</div>
+						<div class="flex items-center gap-px bg-stone-950 p-px shadow-xl ring-2 ring-stone-950">
+							<HoverTooltip
+							text={`Flip to ${editingGuideSide === 'a' ? 'B' : 'A'}'s Side`}
+							placement="above"
+							minWidthPx={0}
+							wrapperClass="flex h-7 w-8 shrink-0"
+						>
+							<button
+								type="button"
+								aria-label={`Field side ${editingGuideSide.toUpperCase()}; switch to ${editingGuideSide === 'a' ? 'B' : 'A'}`}
+								on:click={() => {
+									pinInlineGuideEditorUnderPointer();
+									setEditingGuideSide(editingGuideSide === 'a' ? 'b' : 'a');
+								}}
+								class="h-7 w-8 cursor-pointer text-[10px] font-black"
+								class:bg-stone-950={editingGuideSide === 'a'}
+								class:text-white={editingGuideSide === 'a'}
+								class:bg-white={editingGuideSide === 'b'}
+								class:text-stone-950={editingGuideSide === 'b'}
+							>
+								{editingGuideSide.toUpperCase()}
+							</button>
+							</HoverTooltip>
+							<label class="sr-only" for="los-marker-yardage">Line of Scrimmage yard line</label>
+							<input
+							bind:this={guideYardageInput}
+							id="los-marker-yardage"
+							type="number"
+							min="0.5"
+							max={maximumLosYardLine()}
+							step="0.5"
+							inputmode="decimal"
+							bind:value={losYardageValue}
+							aria-label="Line of Scrimmage yard line"
+							class="down-yardage-input h-7 w-10 border-0 bg-white px-1 text-center text-[10px] font-black text-stone-950 outline-none hover:bg-green-100 focus:ring-2 focus:ring-green-600 focus:ring-inset"
+							on:focus={(event) => (event.currentTarget as HTMLInputElement).select()}
+							on:input={updateGuideYardage}
+							on:keydown|stopPropagation={(event) => {
+								if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+									event.preventDefault();
+									moveEditingGuideByYard(event.key === 'ArrowLeft' ? -1 : 1);
+									return;
+								}
+								if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+									event.preventDefault();
+									if (event.key === 'ArrowUp') event.currentTarget.stepUp();
+									else event.currentTarget.stepDown();
+									updateGuideYardage(event);
+									return;
+								}
+								if (event.key !== 'Enter' && event.key !== 'Escape') return;
+								event.preventDefault();
+								commitGuideEditor();
+							}}
+							/>
+						</div>
+					</div>
+				{/if}
+
+				{#if (editingGuide || editingPath) && lineEditorPoint && !editingGuideFromLosMarker}
 					<form
 						bind:this={editorElement}
 						data-tutorial="line-editor"
+						data-line-format-editor
 						class="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 bg-white p-2 shadow-xl ring-2 ring-stone-900"
-						style:left={`${Math.max(16, Math.min(84, lineEditorPoint.x / 10))}%`}
+						style:left={`${inlineGuideEditorPinnedLeft ?? Math.max(16, Math.min(84, lineEditorPoint.x / 10))}%`}
 						style:top={`${Math.max(12, Math.min(88, (lineEditorPoint.y / 484) * 100))}%`}
+						on:pointerleave={releaseInlineGuideEditorPin}
 						on:submit|preventDefault={commitActiveEditor}
 						aria-label="Line format"
 					>
 						{#if editingGuide?.kind === 'line-of-scrimmage' || editingGuide?.kind === 'line-to-gain'}
 							{@const editingLos = editingGuide.kind === 'line-of-scrimmage'}
 							{#if !isAtMidfieldX(editingGuide.x)}
-								<button
-									type="button"
-									aria-label={`Field side ${editingGuideSide.toUpperCase()}; switch to ${editingGuideSide === 'a' ? 'B' : 'A'}`}
-									title={`${editingGuideSide.toUpperCase()} Side`}
-									on:click={() => setEditingGuideSide(editingGuideSide === 'a' ? 'b' : 'a')}
-									class="h-7 w-7 shrink-0 cursor-pointer border border-stone-900 text-[11px] font-black"
-									class:bg-stone-900={editingGuideSide === 'a'}
-									class:text-white={editingGuideSide === 'a'}
-									class:bg-white={editingGuideSide === 'b'}
-									class:text-stone-950={editingGuideSide === 'b'}>{editingGuideSide.toUpperCase()}</button
+								<HoverTooltip
+									text={`Flip to ${editingGuideSide === 'a' ? 'B' : 'A'}'s Side`}
+									placement="above"
+									minWidthPx={0}
+									wrapperClass="flex h-5 w-5 shrink-0"
 								>
+									<button
+										type="button"
+										aria-label={`Field side ${editingGuideSide.toUpperCase()}; switch to ${editingGuideSide === 'a' ? 'B' : 'A'}`}
+										on:click={() => {
+											pinInlineGuideEditorUnderPointer();
+											setEditingGuideSide(editingGuideSide === 'a' ? 'b' : 'a');
+										}}
+										class="h-5 w-5 shrink-0 cursor-pointer border border-stone-900 text-[10px] leading-none font-black"
+										class:bg-stone-900={editingGuideSide === 'a'}
+										class:text-white={editingGuideSide === 'a'}
+										class:bg-white={editingGuideSide === 'b'}
+										class:text-stone-950={editingGuideSide === 'b'}>{editingGuideSide.toUpperCase()}</button
+									>
+								</HoverTooltip>
 							{/if}
 							<label class="sr-only" for="guide-yardage">{editingLos ? 'Line of Scrimmage yard line' : 'Line to Gain distance'}</label>
 							<input
@@ -7388,9 +8191,7 @@
 								bind:value={losYardageValue}
 								aria-label={editingLos ? 'Line of Scrimmage yard line' : 'Line to Gain distance'}
 								title={editingLos ? 'L.O.S. yard line' : 'L.T.G. distance'}
-								class="down-yardage-input h-7 border-0 bg-stone-100 px-1 text-center text-[10px] font-black text-stone-800 outline-none hover:bg-stone-200 focus:bg-white focus:ring-1 focus:ring-stone-700 focus:ring-inset"
-								class:w-8={editingLos}
-								class:w-10={!editingLos}
+								class="down-yardage-input h-5 w-7 border-0 bg-stone-100 px-1 text-center text-[10px] leading-none font-black text-stone-800 outline-none hover:bg-stone-200 focus:bg-white focus:ring-1 focus:ring-stone-700 focus:ring-inset"
 								on:focus={(event) => (event.currentTarget as HTMLInputElement).select()}
 								on:input={updateGuideYardage}
 								on:keydown|stopPropagation={(event) => {
@@ -7407,46 +8208,75 @@
 						{/if}
 						<div class="flex gap-1" aria-label="Line color">
 							{#each guideColors as option}
-								<button
-									type="button"
-									title={option.label}
-									aria-label={option.label}
-									aria-pressed={guideEditColor === option.id}
-									on:click={() => updateGuideColor(option.id)}
-									class="h-5 w-5 cursor-pointer border-2 border-white shadow-sm ring-1 ring-stone-400"
-									class:!ring-2={guideEditColor === option.id}
-									class:!ring-stone-950={guideEditColor === option.id}
-									style:background-color={option.value}
-								></button>
+								<HoverTooltip text={option.label} placement="above" minWidthPx={0} wrapperClass="flex h-5 w-5 shrink-0">
+									<button
+										type="button"
+										aria-label={option.label}
+										aria-pressed={guideEditColor === option.id}
+										on:click={() => updateGuideColor(option.id)}
+										class="h-5 w-5 cursor-pointer border-2 border-white shadow-sm ring-1 ring-stone-400"
+										class:!ring-2={guideEditColor === option.id}
+										class:!ring-stone-950={guideEditColor === option.id}
+										style:background-color={option.value}
+									></button>
+								</HoverTooltip>
 							{/each}
 						</div>
 						<div class="flex gap-px bg-stone-400 p-px" aria-label="Line type">
 							{#each guideStyles as styleOption}
+								<HoverTooltip
+									text={styleOption.charAt(0).toUpperCase() + styleOption.slice(1)}
+									placement="above"
+									minWidthPx={0}
+									wrapperClass="flex h-5 w-8 shrink-0"
+								>
+									<button
+										type="button"
+										aria-label={`${styleOption} line`}
+										aria-pressed={guideEditStyle === styleOption}
+										on:click={() => updateGuideStyle(styleOption)}
+										class="flex h-5 w-8 cursor-pointer items-center justify-center bg-stone-100 text-stone-700 hover:bg-white"
+										class:!bg-stone-900={guideEditStyle === styleOption}
+										class:!text-white={guideEditStyle === styleOption}
+									>
+										<svg viewBox="0 0 24 6" class="h-2 w-6" aria-hidden="true">
+											<line
+												x1="1"
+												y1="3"
+												x2="23"
+												y2="3"
+												stroke="currentColor"
+												stroke-width="2"
+												stroke-dasharray={styleOption === 'dashed' ? '6 3' : styleOption === 'dotted' ? '0.01 4' : undefined}
+												stroke-linecap={styleOption === 'dotted' ? 'round' : 'square'}
+											/>
+										</svg>
+									</button>
+								</HoverTooltip>
+							{/each}
+						</div>
+						{#if showLineFormatReset}
+							<HoverTooltip text="Reset to Default" placement="above" minWidthPx={0} wrapperClass="flex h-5 w-6 shrink-0">
 								<button
 									type="button"
-									title={styleOption}
-									aria-label={`${styleOption} line`}
-									aria-pressed={guideEditStyle === styleOption}
-									on:click={() => updateGuideStyle(styleOption)}
-									class="flex h-5 w-8 cursor-pointer items-center justify-center bg-stone-100 text-stone-700 hover:bg-white"
-									class:!bg-stone-900={guideEditStyle === styleOption}
-									class:!text-white={guideEditStyle === styleOption}
+									data-line-format-reset
+									aria-label="Reset to Default"
+									on:click={resetEditingLineFormat}
+									class="flex h-5 w-6 cursor-pointer items-center justify-center border border-stone-400 bg-stone-100 p-0.5 text-stone-800 hover:border-stone-900 hover:bg-stone-900 hover:text-white"
 								>
-									<svg viewBox="0 0 24 6" class="h-2 w-6" aria-hidden="true">
-										<line
-											x1="1"
-											y1="3"
-											x2="23"
-											y2="3"
+									<svg viewBox="0 0 24 24" class="h-3.5 w-3.5" aria-hidden="true">
+										<path
+											d="M21 12a9 9 0 1 1-2.64-6.36L21 8M21 3v5h-5"
+											fill="none"
 											stroke="currentColor"
-											stroke-width="2"
-											stroke-dasharray={styleOption === 'dashed' ? '6 3' : styleOption === 'dotted' ? '1 3' : undefined}
-											stroke-linecap={styleOption === 'dotted' ? 'round' : 'square'}
+											stroke-width="2.5"
+											stroke-linecap="round"
+											stroke-linejoin="round"
 										/>
 									</svg>
 								</button>
-							{/each}
-						</div>
+							</HoverTooltip>
+						{/if}
 					</form>
 				{/if}
 
@@ -7550,7 +8380,14 @@
 				</div>
 			{:else if item.image}
 				<div class="flex h-11 w-11 items-center justify-center border border-stone-400 bg-stone-100">
-					<img src={toolbarToolImage(item)} alt="" class="h-9 w-9 object-contain" draggable="false" loading="lazy" decoding="async" />
+					<img
+						src={toolbarToolImage(item, deflagPlacementColor, beanBagPlacementColor)}
+						alt=""
+						class="h-9 w-9 object-contain"
+						draggable="false"
+						loading="lazy"
+						decoding="async"
+					/>
 				</div>
 			{:else if item.icon === 'event'}
 				<div class="flex h-11 w-11 items-center justify-center border border-stone-400 bg-stone-100">
@@ -7593,7 +8430,7 @@
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="restore-draft-title"
-			class="fixed z-10 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			class="scroll-modal fixed z-10 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
 			style:left={`${diagramModalCenterX}px`}
 			style:top={`${diagramModalCenterY}px`}
 			style:max-height={`${diagramModalMaxHeight}px`}
@@ -7639,7 +8476,7 @@
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="play-builder-share-title"
-			class="fixed z-10 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			class="scroll-modal fixed z-10 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
 			style:left={`${diagramModalCenterX}px`}
 			style:top={`${diagramModalCenterY}px`}
 			style:max-height={`${diagramModalMaxHeight}px`}
@@ -7891,7 +8728,7 @@
 			aria-modal="true"
 			aria-labelledby="new-play-title"
 			aria-describedby="new-play-description"
-			class="fixed z-10 w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			class="scroll-modal fixed z-10 w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
 			style:left={`${diagramModalCenterX}px`}
 			style:top={`${diagramModalCenterY}px`}
 			style:max-height={`${diagramModalMaxHeight}px`}
@@ -7950,7 +8787,8 @@
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="play-builder-settings-title"
-			class="fixed z-10 w-[calc(100vw-2rem)] max-w-4xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-white/80 text-stone-800 shadow-2xl backdrop-blur-[1px]"
+			class="scroll-modal fixed z-10 w-[calc(100vw-2rem)] max-w-4xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-white/80 text-stone-800 shadow-2xl backdrop-blur-[1px]"
+			class:high-contrast-settings={highContrastEnabled}
 			style:left={`${diagramModalCenterX}px`}
 			style:top={`${diagramModalCenterY}px`}
 			style:max-height={`${diagramModalMaxHeight}px`}
@@ -8058,6 +8896,109 @@
 						{/each}
 					</div>
 				</section>
+
+				<section class="border-t-2 border-stone-400 pt-5">
+					<h3 class="text-sm font-black tracking-wide uppercase">Play Builder Settings</h3>
+					<p class="mt-1 text-[11px] leading-snug text-stone-600">These preferences apply to every play builder opened in this browser.</p>
+					<div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+						<button
+							type="button"
+							role="switch"
+							aria-checked={autoSaveEnabled}
+							on:click={() => (autoSaveEnabled = !autoSaveEnabled)}
+							class="flex h-full cursor-pointer items-start gap-3 border border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90"
+						>
+							<span
+								class="relative mt-0.5 h-5 w-9 shrink-0 border-2 border-stone-700 bg-stone-300 transition-colors"
+								class:!bg-green-600={autoSaveEnabled}
+							>
+								<span
+									class="absolute top-0.5 h-3 w-3 bg-white transition-[left]"
+									class:left-0.5={!autoSaveEnabled}
+									class:left-[18px]={autoSaveEnabled}
+								></span>
+							</span>
+							<span class="min-w-0">
+								<strong class="block text-xs font-black">Auto-Save</strong>
+								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600">
+									Batch nearby changes and save after you pause, with database writes limited to at most one every 15 seconds.
+								</span>
+							</span>
+						</button>
+						<button
+							type="button"
+							role="switch"
+							aria-checked={snappingEnabled}
+							on:click={() => (snappingEnabled = !snappingEnabled)}
+							class="flex h-full cursor-pointer items-start gap-3 border border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90"
+						>
+							<span
+								class="relative mt-0.5 h-5 w-9 shrink-0 border-2 border-stone-700 bg-stone-300 transition-colors"
+								class:!bg-green-600={snappingEnabled}
+							>
+								<span
+									class="absolute top-0.5 h-3 w-3 bg-white transition-[left]"
+									class:left-0.5={!snappingEnabled}
+									class:left-[18px]={snappingEnabled}
+								></span>
+							</span>
+							<span class="min-w-0">
+								<strong class="block text-xs font-black">Enable Snapping</strong>
+								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600">
+									Snap compatible elements automatically to marked yard lines.
+								</span>
+							</span>
+						</button>
+						<button
+							type="button"
+							role="switch"
+							aria-checked={highContrastEnabled}
+							on:click={() => (highContrastEnabled = !highContrastEnabled)}
+							class="flex h-full cursor-pointer items-start gap-3 border border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90"
+						>
+							<span
+								class="relative mt-0.5 h-5 w-9 shrink-0 border-2 border-stone-700 bg-stone-300 transition-colors"
+								class:!bg-green-600={highContrastEnabled}
+							>
+								<span
+									class="absolute top-0.5 h-3 w-3 bg-white transition-[left]"
+									class:left-0.5={!highContrastEnabled}
+									class:left-[18px]={highContrastEnabled}
+								></span>
+							</span>
+							<span class="min-w-0">
+								<strong class="block text-xs font-black">High Contrast Mode</strong>
+								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600">
+									Increase visual separation between the field, controls, text, and elements.
+								</span>
+							</span>
+						</button>
+						<button
+							type="button"
+							role="switch"
+							aria-checked={showYardLineCursorEnabled}
+							on:click={() => (showYardLineCursorEnabled = !showYardLineCursorEnabled)}
+							class="flex h-full cursor-pointer items-start gap-3 border border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90"
+						>
+							<span
+								class="relative mt-0.5 h-5 w-9 shrink-0 border-2 border-stone-700 bg-stone-300 transition-colors"
+								class:!bg-green-600={showYardLineCursorEnabled}
+							>
+								<span
+									class="absolute top-0.5 h-3 w-3 bg-white transition-[left]"
+									class:left-0.5={!showYardLineCursorEnabled}
+									class:left-[18px]={showYardLineCursorEnabled}
+								></span>
+							</span>
+							<span class="min-w-0">
+								<strong class="block text-xs font-black">Show Yard Line Under Cursor</strong>
+								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600">
+									Show the nearest half-yard line beneath placeable element previews and single elements while they are moved.
+								</span>
+							</span>
+						</button>
+					</div>
+				</section>
 			</div>
 		</div>
 	</div>
@@ -8075,7 +9016,7 @@
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="play-builder-feedback-title"
-			class="fixed z-10 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			class="scroll-modal fixed z-10 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
 			style:left={`${diagramModalCenterX}px`}
 			style:top={`${diagramModalCenterY}px`}
 			style:max-height={`${diagramModalMaxHeight}px`}
@@ -8118,7 +9059,7 @@
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="play-builder-help-title"
-			class="fixed z-10 w-[calc(100vw-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+			class="scroll-modal fixed z-10 w-[calc(100vw-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
 			style:left={`${diagramModalCenterX}px`}
 			style:top={`${diagramModalCenterY}px`}
 			style:max-height={`${diagramModalMaxHeight}px`}
@@ -8153,8 +9094,8 @@
 							use the diagram strictly for grabbing and moving.
 						</p>
 						<p>
-							<strong>Select and nudge:</strong> Click an element, then use the arrow keys for precise movement. Hold <kbd>Shift</kbd> with an arrow key
-							to move farther. Shift-click adds or removes individual elements from a group. In neutral <kbd>V</kbd> mode, drag across empty field space
+							<strong>Select and nudge:</strong> Click an element, then use the arrow keys for precise movement. Hold <kbd>Shift</kbd> with an arrow
+							key to move farther. Shift-click adds or removes individual elements from a group. In neutral <kbd>V</kbd> mode, drag across empty field space
 							to box-select everything inside the marquee.
 						</p>
 						<p>
@@ -8224,7 +9165,8 @@
 						{@render helpToolCard(helpDrawTool)}
 						<ul class="list-square space-y-2 border border-stone-300 bg-white p-4 pl-8 text-sm leading-relaxed">
 							<li>
-								<strong>Squiggle</strong> draws freehand; <strong>Straight</strong> creates a precise segment. A single click places a solid dot.
+								<strong>Squiggle</strong> draws freehand and allows a single click to place a solid dot. <strong>Straight</strong> creates a precise
+								segment only after the pointer moves a visible distance.
 							</li>
 							<li>Choose one of ten colors or press <kbd>1</kbd>–<kbd>0</kbd>. Left/right arrows cycle the palette while Draw is open.</li>
 							<li>The line slider controls thickness. Every new dot or stroke keeps the selected color and thickness.</li>
@@ -8234,8 +9176,8 @@
 							</li>
 							<li>
 								<strong>Surface/stylus eraser:</strong> Flip a supported pen over and press its eraser end against the builder. Dragging removes drawing
-								strokes only while Draw is selected. Outside Draw mode, it also deletes touched players, field elements, routes, and cross-field lines.
-								One continuous eraser gesture is one Undo action.
+								strokes only while Draw is selected, and laser drawings only while Laser Pointer is selected. Outside those modes, it can remove any
+								touched drawing, player, field element, route, or cross-field line. One continuous eraser gesture is one Undo action.
 							</li>
 							<li>
 								<strong>Surface Pen barrel button:</strong> Hold the side/right-click button while using Straight to lock the stroke to the nearest
@@ -8248,11 +9190,15 @@
 				<section>
 					<h3 class="mb-2 border-b border-stone-300 pb-1 text-lg font-black">Snapping and the Default Setup</h3>
 					<ul class="list-square grid gap-x-8 gap-y-2 pl-5 text-sm leading-relaxed md:grid-cols-2">
-						<li>L.O.S., L.T.G., and football previews snap after resting near a valid marking for one second.</li>
+						<li>With Enable Snapping on, compatible elements snap immediately to nearby elements and valid field markings.</li>
 						<li>
-							Hold <kbd>Shift</kbd> while moving to snap instantly. Footballs prioritize cross-field lines; L.O.S. and L.T.G. prioritize footballs.
+							Turn Enable Snapping off for free movement; hold <kbd>Shift</kbd> while moving whenever you want to snap temporarily. Footballs prioritize
+							cross-field lines, while L.O.S. and L.T.G. prioritize footballs.
 						</li>
 						<li>Snap points automatically follow the markings available on the selected Traditional, 4v4, Unified, or NFL Flag field.</li>
+						<li>
+							<strong>Flip</strong> mirrors every field element and drawing across midfield. Use the button or press <kbd>Shift</kbd> + <kbd>F</kbd>.
+						</li>
 						<li>
 							<strong>Setup</strong> uses the selected field’s proper starting spot and first line to gain: A’s 14 to A’s 20 on Traditional, A’s 10 to midfield
 							on 4v4, A’s 5 to midfield on Unified, or A’s 5 to midfield on NFL Flag. It adds A-1 and the appropriate initial official positions: a four-person
@@ -8296,6 +9242,12 @@
 							the diagram and settings. Revert to Defaults restores the default details and green grass without changing the selected field type.
 						</p>
 						<p>
+							<strong>Play builder-wide:</strong> Auto-Save, Enable Snapping, High Contrast Mode, and Show Yard Line Under Cursor apply to every play
+							builder in this browser rather than an individual play. Auto-Save batches nearby edits, waits until the current interaction is complete,
+							and limits database writes to at most one every 15 seconds. Yard-line cursor labels appear only while placing or moving eligible elements;
+							they are not saved or exported.
+						</p>
+						<p>
 							<strong>Field types:</strong> Traditional is the 100 × 40-yard NIRSA field. 4v4 uses the 60 × 30-yard layout with a single midfield hash.
 							Unified uses the 60 × 25-yard SONA/NIRSA layout with dashed no-run-zone lines and optional no-run-zone labels.
 						</p>
@@ -8318,8 +9270,8 @@
 							under a new shareable address.
 						</p>
 						<p>
-							<strong>Share:</strong> Press <kbd>{primaryModifierKey}</kbd> + <kbd>L</kbd> to open the selected shareable link plus a QR code that can
-							be copied as an image or downloaded as a PNG.
+							<strong>Share:</strong> Press <kbd>{primaryModifierKey}</kbd> + <kbd>L</kbd> to open the selected shareable link plus a QR code that can be
+							copied as an image or downloaded as a PNG.
 						</p>
 						<p>
 							<strong>Exports:</strong> PNG, JPG, and WebP export the selected play. PDF exports every play in tab order on its own page. Export Settings
@@ -8441,6 +9393,17 @@
 		appearance: textfield;
 		-moz-appearance: textfield;
 	}
+	[data-line-format-editor] button,
+	[data-line-format-editor] input {
+		box-sizing: border-box;
+		height: 1.25rem;
+		min-height: 1.25rem;
+		max-height: 1.25rem;
+	}
+	[data-toolbar-line-format-reset],
+	[data-line-format-reset] {
+		padding: 0.125rem;
+	}
 	.down-yardage-input::-webkit-inner-spin-button,
 	.down-yardage-input::-webkit-outer-spin-button {
 		margin: 0;
@@ -8472,9 +9435,33 @@
 	.view-only .field-canvas {
 		pointer-events: none;
 	}
+	.high-contrast-mode {
+		border-color: #000;
+		filter: contrast(1.35) saturate(1.1);
+		box-shadow:
+			0 0 0 2px #fff,
+			0 0 0 4px #000;
+	}
+	.high-contrast-settings {
+		border-color: #000;
+		background: #fff;
+		color: #000;
+		filter: contrast(1.3);
+	}
+	.high-contrast-mode :global(button:focus-visible),
+	.high-contrast-mode :global([tabindex]:focus-visible),
+	.high-contrast-settings :global(button:focus-visible),
+	.high-contrast-settings :global([tabindex]:focus-visible) {
+		outline: 4px solid #facc15;
+		outline-offset: 2px;
+	}
 	.element-delete-button:hover,
 	.element-delete-button:focus-visible {
 		background-color: #dc2626 !important;
+	}
+	.scroll-modal > header {
+		top: -1px;
+		box-shadow: 0 -4px 0 #1c1917;
 	}
 	.tool-column {
 		container-type: inline-size;
