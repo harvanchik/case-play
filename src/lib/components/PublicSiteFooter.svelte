@@ -14,10 +14,8 @@
 		<a href="/about" class="font-semibold hover:underline">About</a>
 		<a href="/contact" class="font-semibold hover:underline">Contact</a>
 		<a href="/contact" class="font-semibold hover:underline">Contribute</a>
-		<a href="/privacy" class="font-semibold hover:underline">Privacy</a>
-		<button type="button" class="cursor-pointer font-semibold hover:underline" on:click={openConsentChoices}>Use of Cookies</button>
 		<button type="button" class="cursor-pointer font-semibold hover:underline" on:click={openConsentChoices}>
-			Do Not Sell or Share My Personal Information
+			Your Privacy Choices
 		</button>
 	</div>
 </footer>

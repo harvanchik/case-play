@@ -39,8 +39,8 @@
 		<p class="mt-2 leading-7">
 			Saved-play data is processed to provide the feature you request. Essential technical and security records are processed to operate, prevent
 			abuse, debug, and protect the service. Where applicable, these activities rely on providing the requested service and the legitimate interest in
-			operating a secure educational website. Optional advertising is processed according to your consent choice. You may withdraw optional advertising
-			consent at any time without affecting earlier lawful processing.
+			operating a secure educational website. Optional advertising is processed according to your consent choice. You may withdraw optional
+			advertising consent at any time without affecting earlier lawful processing.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Advertising</h2>
@@ -59,15 +59,15 @@
 
 		<h2 class="mt-7 text-xl font-bold">Analytics</h2>
 		<p class="mt-2 leading-7">
-			Analytics: We use Vercel Web Analytics to collect anonymous, aggregate data (such as pageviews and browser types) to improve our site performance.
-			This tool does not collect personal identifiers or track your behavior across other websites.
+			Analytics: We use Vercel Web Analytics to collect anonymous, aggregate data (such as pageviews and browser types) to improve our site
+			performance. This tool does not collect personal identifiers or track your behavior across other websites.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Service Providers and International Processing</h2>
 		<p class="mt-2 leading-7">
 			CasePlay.org uses Vercel for hosting, delivery, and anonymous aggregate analytics; Turso for database services; and, according to your choices,
-			Google for advertising. These providers may process information in the United States and other countries under their own data-protection commitments and
-			applicable transfer safeguards. Review the
+			Google for advertising. These providers may process information in the United States and other countries under their own data-protection
+			commitments and applicable transfer safeguards. Review the
 			<a class="font-semibold underline" href="https://vercel.com/legal/privacy-policy" rel="noreferrer" target="_blank">Vercel Privacy Policy</a>,
 			<a class="font-semibold underline" href="https://turso.tech/privacy-policy" rel="noreferrer" target="_blank">Turso Privacy Policy</a>, and
 			<a class="font-semibold underline" href="https://policies.google.com/privacy" rel="noreferrer" target="_blank">Google Privacy Policy</a>.
@@ -89,31 +89,31 @@
 			the right to complain to your local data-protection authority. To exercise a right, identify the relevant saved-play URL and contact
 			<a class="font-semibold underline" href="mailto:contact@caseplay.org">contact@caseplay.org</a>.
 		</p>
+		<p class="mt-2 leading-7">
+			CasePlay.org never sells your personal data for money or shares it with offline data brokers. Information is disclosed online only to the
+			service providers needed to operate the site, including Google AdSense according to your privacy choice, when you intentionally share a play
+			URL, or when disclosure is legally required.
+		</p>
 
 		<h2 class="mt-7 text-xl font-bold">United States State Privacy Notice</h2>
 		<p class="mt-2 leading-7">
-			In the preceding 12 months, CasePlay.org may have processed identifiers and network information (such as IP address and browser or device
-			information), internet or electronic activity (such as page requests, ad interactions, and security events), and content you submit (such as
-			saved play diagrams and labels). This information comes from you, your browser, and the service providers identified above. It is used to
-			provide requested features, secure and maintain the service, measure aggregate use, and fund the service through advertising. It may be
-			disclosed to Vercel, Turso, Google and its approved advertising partners, or authorities when legally required. CasePlay.org does not sell
-			personal information for money.
+			CasePlay.org may process identifiers and network information (such as IP address and browser or device information), internet or electronic
+			activity (such as page requests, ad interactions, and security events), and content you submit (such as saved play diagrams and labels). This
+			information comes from you, your browser, and the service providers identified above. It is used to provide requested features, secure and
+			maintain the service, measure aggregate use, and fund the service through advertising. It may be disclosed to Vercel, Turso, Google and its
+			approved advertising partners, or authorities when legally required. CasePlay.org does not sell personal information for money.
 		</p>
 		<p class="mt-2 leading-7">
 			Some state laws may define personalized advertising disclosures as a sale, sharing, or targeted advertising. You can opt out by choosing
-			<strong>Essential Cookies Only</strong>, using <strong>Do Not Sell or Share My Personal Information</strong> in the footer, or enabling a
-			supported Global Privacy Control signal. For that choice, CasePlay.org disables ad personalization and requests Google's restricted data
-			processing mode. Subject to applicable law and verification, you may also request access, correction, deletion, or portability; use an
-			authorized agent; or appeal a denied request by replying to the decision. CasePlay.org will not discriminate against you for exercising a
-			privacy right. Send requests and appeals to
-			<a class="font-semibold underline" href="mailto:contact@caseplay.org">contact@caseplay.org</a>.
+			<strong>Essential Cookies Only</strong>, using <strong>Your Privacy Choices</strong> in the footer, or enabling a supported Global Privacy
+			Control signal. For that choice, CasePlay.org disables ad personalization and requests Google's restricted data processing mode. Subject to
+			applicable law and verification, you may also request access, correction, deletion, or portability; use an authorized agent; or appeal a denied
+			request by replying to the decision. CasePlay.org will not discriminate against you for exercising a privacy right. Send requests and appeals to
+			<a class="font-semibold underline" href="mailto:privacy@caseplay.org">privacy@caseplay.org</a>.
 		</p>
 		<div class="mt-4 flex flex-wrap gap-2">
 			<button class="cursor-pointer border-2 border-stone-900 bg-white px-4 py-2 font-bold text-stone-900" on:click={openConsentChoices}>
-				Use of Cookies
-			</button>
-			<button class="cursor-pointer border-2 border-stone-900 bg-white px-4 py-2 font-bold text-stone-900" on:click={openConsentChoices}>
-				Do Not Sell or Share My Personal Information
+				Your Privacy Choices
 			</button>
 		</div>
 	</article>

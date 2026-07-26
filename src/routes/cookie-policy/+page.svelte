@@ -62,8 +62,7 @@
 
 		<h2 class="mt-7 text-xl font-bold">Change your choice</h2>
 		<p class="mt-2 leading-7">
-			Use <strong>Use of Cookies</strong> or <strong>Do Not Sell or Share My Personal Information</strong> in the footer, or the
-			<a class="font-semibold underline" href="/privacy">Privacy</a> page, to change your advertising choice at any time. In regions handled by
+			Use <strong>Your Privacy Choices</strong> in the footer to change your advertising choice at any time. In regions handled by
 			Google Privacy &amp; Messaging, this opens Google’s certified consent controls. Global Privacy Control is treated as an
 			advertising-personalization, sale, sharing, and targeted-advertising opt-out. You can also clear existing site data in your browser.
 		</p>
