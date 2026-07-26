@@ -29,7 +29,7 @@ Two notable residual risks remain:
 | 4 | Security baseline and headers | Applicable | Baseline anti-framing, MIME-sniffing, referrer, permissions, and restrictive CSP directives are now set globally. Admin pages also use `no-store` and `noindex`. |
 | 5 | OWASP review | Applicable | Reviewed against common OWASP web risks. Drizzle parameterizes database access, Svelte escapes normal text output, server routes validate input, mutation origins are checked, request bodies are bounded, login and write routes are throttled, and public server errors are generic. |
 | 6 | Server-side validation | Applicable | Public play documents were already structurally validated on the server. Administrator text, identifiers, URLs, integer ranges, and playlist sizes now have server-enforced bounds; external film URLs must use HTTPS. |
-| 7 | Credential/data leaks | Applicable | `.env` files are ignored, repository scanning found only documented placeholders, API responses do not return Turso credentials or edit-token hashes, and unexpected database failures receive generic client messages. Public Google Analytics and AdSense identifiers are intentionally non-secret. |
+| 7 | Credential/data leaks | Applicable | `.env` files are ignored, repository scanning found only documented placeholders, API responses do not return Turso credentials or edit-token hashes, and unexpected database failures receive generic client messages. The public Google AdSense publisher identifier is intentionally non-secret. |
 | 8 | API keys in frontend | Applicable | Turso URL/token and administrator secrets remain server-only. No private API key was found in client code. |
 | 9 | Rate limits | Applicable | Login, new-play creation, and play updates now have bounded application-level limits and standard rate-limit headers. Add a Vercel Firewall rule for globally durable enforcement. |
 | 10 | CAPTCHA and CORS | Partly applicable | There is no public server-submitted contact/signup form, so CAPTCHA is not currently warranted. State-changing public APIs reject cross-site browser mutations and do not emit permissive CORS headers. Reassess if a public form is added. |
@@ -44,7 +44,7 @@ Two notable residual risks remain:
 - Location: `src/hooks.server.ts:4`
 - Evidence: Responses previously relied on platform defaults. The global hook now sets `Content-Security-Policy` with `base-uri 'self'`, `frame-ancestors 'none'`, and `object-src 'none'`; `Referrer-Policy`; `X-Content-Type-Options`; `X-Frame-Options`; and a restrictive `Permissions-Policy`. Administrator routes additionally receive `Cache-Control: no-store` and `X-Robots-Tag`.
 - Impact: Without explicit policy, clickjacking, legacy MIME interpretation, referrer leakage, and unnecessary browser capability exposure are easier.
-- Resolution: Added conservative directives that do not interfere with the existing Svelte, Google Analytics, or AdSense execution model.
+- Resolution: Added conservative directives that do not interfere with the existing Svelte, Vercel Web Analytics, or AdSense execution model.
 - Residual note: A full script/style CSP with nonces is stronger but would require coordinated SvelteKit and third-party tag changes. It should be a separately tested hardening project.
 
 ### SEC-002 — Authentication and database-write endpoints lacked throttling

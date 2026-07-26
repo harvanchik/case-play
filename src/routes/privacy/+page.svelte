@@ -17,7 +17,7 @@
 	<article class="mx-auto max-w-3xl border-2 border-stone-900 bg-white p-6 sm:p-10">
 		<a href="/" class="font-semibold underline">&larr; CasePlay.org</a>
 		<h1 class="mt-5 text-3xl font-bold">Privacy Policy</h1>
-		<p class="mt-2 text-sm text-stone-500">Last updated July 25, 2026</p>
+		<p class="mt-2 text-sm text-stone-500">Last updated July 26, 2026</p>
 
 		<p class="mt-6 leading-7">CasePlay.org is an educational service operated by Jake Harvanchik. It is not directed to children under 13.</p>
 
@@ -39,8 +39,8 @@
 		<p class="mt-2 leading-7">
 			Saved-play data is processed to provide the feature you request. Essential technical and security records are processed to operate, prevent
 			abuse, debug, and protect the service. Where applicable, these activities rely on providing the requested service and the legitimate interest in
-			operating a secure educational website. Optional Analytics and advertising are processed according to your consent choices. You may withdraw
-			optional consent at any time without affecting earlier lawful processing.
+			operating a secure educational website. Optional advertising is processed according to your consent choice. You may withdraw optional advertising
+			consent at any time without affecting earlier lawful processing.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Advertising</h2>
@@ -55,18 +55,14 @@
 
 		<h2 class="mt-7 text-xl font-bold">Analytics</h2>
 		<p class="mt-2 leading-7">
-			If you choose <strong>Analytics Only</strong> or <strong>Accept All Cookies</strong>, Google Analytics records aggregate usage such as pages
-			visited, visit duration, approximate region, referring source, and device or browser type. For United States visitors who have not enabled
-			Global Privacy Control, CasePlay.org may use Google Advanced Consent Mode after optional storage is declined. In that mode, Google receives
-			cookieless measurement signals for basic measurement and modeling; Analytics storage remains denied. For other or unknown regions, the Google
-			Analytics tag remains blocked until analytics consent is given. CasePlay.org disables Google signals and advertising-personalization signals and
-			does not send saved play content or player labels to Analytics.
+			Analytics: We use Vercel Web Analytics to collect anonymous, aggregate data (such as pageviews and browser types) to improve our site performance.
+			This tool does not collect personal identifiers or track your behavior across other websites.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Service Providers and International Processing</h2>
 		<p class="mt-2 leading-7">
-			CasePlay.org uses Vercel for hosting and delivery, Turso for database services, and, according to your choices, Google for Analytics and
-			advertising. These providers may process information in the United States and other countries under their own data-protection commitments and
+			CasePlay.org uses Vercel for hosting, delivery, and anonymous aggregate analytics; Turso for database services; and, according to your choices,
+			Google for advertising. These providers may process information in the United States and other countries under their own data-protection commitments and
 			applicable transfer safeguards. Review the
 			<a class="font-semibold underline" href="https://vercel.com/legal/privacy-policy" rel="noreferrer" target="_blank">Vercel Privacy Policy</a>,
 			<a class="font-semibold underline" href="https://turso.tech/privacy-policy" rel="noreferrer" target="_blank">Turso Privacy Policy</a>, and

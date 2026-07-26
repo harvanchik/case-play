@@ -1,12 +1,14 @@
 <script lang="ts">
+	import { dev } from '$app/environment';
+	import { inject } from '@vercel/analytics';
 	import type { LayoutData } from './$types';
 	import '../app.css';
 	import CookieConsent from '$lib/components/CookieConsent.svelte';
-	import GoogleAnalytics from '$lib/components/GoogleAnalytics.svelte';
+
+	inject({ mode: dev ? 'development' : 'production' });
 
 	export let data: LayoutData;
 	$: canonicalUrl = data?.canonicalUrl ?? 'https://caseplay.org/';
-	$: analyticsConsentMode = data?.analyticsConsentMode ?? 'basic';
 </script>
 
 <svelte:head>
@@ -17,5 +19,4 @@
 </svelte:head>
 
 <slot />
-<CookieConsent analyticsMode={analyticsConsentMode} />
-<GoogleAnalytics mode={analyticsConsentMode} />
+<CookieConsent />

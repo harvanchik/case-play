@@ -4,16 +4,13 @@
 		CONSENT_EVENT,
 		OPEN_CONSENT_EVENT,
 		hasGlobalPrivacyControl,
-		initializeConsentMode,
+		initializeConsent,
 		loadAdSense,
-		loadGoogleAnalytics,
 		readConsent,
 		saveConsent,
-		type AnalyticsConsentMode,
 		type ConsentChoice
 	} from '$lib/privacy/consent';
 
-	export let analyticsMode: AnalyticsConsentMode = 'basic';
 	let visible = false;
 	let currentChoice: ConsentChoice | null = null;
 	let globalPrivacyControl = false;
@@ -22,15 +19,11 @@
 		saveConsent(choice);
 		currentChoice = readConsent() ?? (globalPrivacyControl ? 'essential' : choice);
 		visible = false;
-		if (currentChoice === 'all') {
-			await Promise.all([loadGoogleAnalytics(analyticsMode), loadAdSense()]).catch(() => undefined);
-		} else if (currentChoice === 'analytics' || analyticsMode === 'advanced') {
-			await loadGoogleAnalytics(analyticsMode).catch(() => undefined);
-		}
+		if (currentChoice === 'all') await loadAdSense().catch(() => undefined);
 	};
 
 	onMount(() => {
-		initializeConsentMode();
+		initializeConsent();
 		globalPrivacyControl = hasGlobalPrivacyControl();
 		currentChoice = readConsent();
 		if (globalPrivacyControl && currentChoice === 'all') {
@@ -62,11 +55,9 @@
 	>
 		<h2 id="cookie-consent-title" class="text-base font-bold text-stone-900">We Value Your Privacy</h2>
 		<p class="mt-1 text-sm leading-5 text-stone-700">
-			This website uses optional analytics to understand site usage and advertising to support the service. Choose <strong>Analytics Only</strong> to
-			allow measurement without advertising cookies, <strong>Accept All Cookies</strong> to allow both, or <strong>Reject All Cookies</strong> to
-			decline optional storage. In supported regions, declined visits may produce cookieless, aggregated measurement signals. Use
-			<strong>Use of Cookies</strong>
-			in the footer to change your choice at any time.
+			This website uses optional advertising cookies through Google AdSense to support the service. Choose <strong>Accept Advertising Cookies</strong>
+			to allow them or <strong>Reject Advertising Cookies</strong> to decline optional advertising storage. Our site analytics are completely
+			cookie-less and do not store or read any data on your device. Use <strong>Use of Cookies</strong> in the footer to change your choice at any time.
 		</p>
 		<p class="mt-2 text-xs text-stone-600">
 			For more information, read the <a class="font-semibold underline" href="/cookie-policy">Cookie Policy</a> and
@@ -77,21 +68,14 @@
 				class="cursor-pointer border-2 border-stone-900 bg-white px-4 py-2 text-sm font-bold text-stone-900"
 				on:click={() => choose('essential')}
 			>
-				Reject All Cookies
-			</button>
-			<button
-				class="cursor-pointer border-2 border-stone-900 bg-white px-4 py-2 text-sm font-bold text-stone-900 disabled:cursor-not-allowed disabled:opacity-50"
-				disabled={globalPrivacyControl}
-				on:click={() => choose('analytics')}
-			>
-				Analytics Only
+				Reject Advertising Cookies
 			</button>
 			<button
 				class="cursor-pointer border-2 border-stone-900 bg-stone-900 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
 				disabled={globalPrivacyControl}
 				on:click={() => choose('all')}
 			>
-				Accept All Cookies
+				Accept Advertising Cookies
 			</button>
 		</div>
 	</div>

@@ -16,7 +16,7 @@
 	<article class="mx-auto max-w-3xl border-2 border-stone-900 bg-white p-6 sm:p-10">
 		<a href="/" class="font-semibold underline">&larr; CasePlay.org</a>
 		<h1 class="mt-5 text-3xl font-bold">Cookie Policy</h1>
-		<p class="mt-2 text-sm text-stone-500">Last updated July 25, 2026</p>
+		<p class="mt-2 text-sm text-stone-500">Last updated July 26, 2026</p>
 
 		<h2 class="mt-7 text-xl font-bold">Essential storage</h2>
 		<p class="mt-2 leading-7">
@@ -41,20 +41,17 @@
 			>.
 		</p>
 
-		<h2 class="mt-7 text-xl font-bold">Analytics cookies</h2>
+		<h2 class="mt-7 text-xl font-bold">Cookie-less analytics</h2>
 		<p class="mt-2 leading-7">
-			If you choose <strong>Analytics Only</strong> or <strong>Accept All Cookies</strong>, Google Analytics may set <code>_ga</code> cookies for up to
-			one year to distinguish visits and provide aggregate traffic and engagement reports. For United States visitors who have not enabled Global Privacy
-			Control, Google Advanced Consent Mode may send cookieless measurement signals when analytics consent has not been given; Analytics and advertising
-			storage remain denied, and Google may use those signals for aggregated and modeled reporting. For other or unknown regions, the Analytics tag remains
-			blocked until analytics consent is given. Withdrawing consent removes Google tracking cookies accessible to CasePlay.org. Global Privacy Control blocks
-			optional Google Analytics and advertising collection.
+			CasePlay.org uses Vercel Web Analytics for anonymous, aggregate site measurement. Our site analytics are completely cookie-less and do not store
+			or read any data on your device.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Change your choice</h2>
 		<p class="mt-2 leading-7">
 			Use <strong>Use of Cookies</strong> in the footer or the <a class="font-semibold underline" href="/privacy">Privacy</a> page to accept or withdraw
-			optional consent at any time. Global Privacy Control is treated as an opt-out. You can also clear existing site data in your browser.
+			optional advertising consent at any time. Global Privacy Control is treated as an advertising opt-out. You can also clear existing site data in
+			your browser.
 		</p>
 	</article>
 	<PublicSiteFooter />
