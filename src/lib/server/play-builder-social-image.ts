@@ -114,7 +114,7 @@ const fieldLayouts: Record<PlayBuilderFieldType, FieldLayout> = {
 		teamBoxSetbackYards: 1.5,
 		endZonePylonYards: [0, 10, 90, 100]
 	},
-	'four-v-four': {
+	'four-on-four': {
 		totalYards: 60,
 		widthYards: 30,
 		goalLines: [10, 50],

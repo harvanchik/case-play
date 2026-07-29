@@ -6,7 +6,7 @@ export type GuideKind = 'line-of-scrimmage' | 'line-to-gain' | 'custom';
 export type GuideColor = 'orange' | 'gold' | 'yellow' | 'red' | 'cyan' | 'blue' | 'green' | 'purple' | 'black' | 'white' | 'gray' | 'pink';
 export type GuideStyle = 'solid' | 'dashed' | 'dotted';
 export type DownMarkerValue = '1st' | '2nd' | '3rd' | '4th' | 'pat';
-export type PlayBuilderFieldType = 'traditional' | 'four-v-four' | 'unified' | 'nfl-flag';
+export type PlayBuilderFieldType = 'traditional' | 'four-on-four' | 'unified' | 'nfl-flag';
 export type PlayBuilderFieldColor = 'green' | 'red' | 'navy' | 'light-blue' | 'orange' | 'purple';
 export const PLAY_BUILDER_GAME_QUARTERS = ['1st', '2nd', '3rd', '4th', 'OT'] as const;
 export type PlayBuilderGameQuarter = (typeof PLAY_BUILDER_GAME_QUARTERS)[number];
@@ -70,7 +70,7 @@ const styles: GuideStyle[] = ['solid', 'dashed', 'dotted'];
 const downMarkerValues: DownMarkerValue[] = ['1st', '2nd', '3rd', '4th', 'pat'];
 const layerTypes: LayerType[] = ['guide', 'path', 'marker'];
 // New field types must be appended so existing compact field-type indexes remain backward compatible.
-const fieldTypes: PlayBuilderFieldType[] = ['traditional', 'four-v-four', 'unified', 'nfl-flag'];
+const fieldTypes: PlayBuilderFieldType[] = ['traditional', 'four-on-four', 'unified', 'nfl-flag'];
 const fieldColors: PlayBuilderFieldColor[] = ['green', 'red', 'navy', 'light-blue', 'orange', 'purple'];
 const fieldSettingKeys = [
 	'showYardNumbers',

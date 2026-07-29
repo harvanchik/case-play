@@ -44,6 +44,10 @@
 		type SerializedPlayBuilderDocument
 	} from '$lib/play-builder-scene';
 	import HoverTooltip from './HoverTooltip.svelte';
+	import FieldSideToggle from './play-builder/FieldSideToggle.svelte';
+	import LineFormatControls from './play-builder/LineFormatControls.svelte';
+	import ModalCloseButton from './play-builder/ModalCloseButton.svelte';
+	import YardageInput from './play-builder/YardageInput.svelte';
 
 	type Tool =
 		| PlayerKind
@@ -387,6 +391,7 @@
 	let toolPreferencesHydrated = false;
 	let builderPreferencesHydrated = false;
 	let autoSaveEnabled = false;
+	let draftsEnabled = true;
 	let snappingEnabled = true;
 	let highContrastEnabled = false;
 	let showYardLineCursorEnabled = false;
@@ -396,6 +401,7 @@
 	let exportSettingsRight = 8;
 	let showNewPrompt = false;
 	let newPromptCloseButton: HTMLButtonElement;
+	let restoreDraftButton: HTMLButtonElement;
 	let editingPlayId: number | null = null;
 	let playNameValue = '';
 	let playNameInput: HTMLInputElement;
@@ -583,6 +589,7 @@
 				builderPreferencesStorageKey,
 				JSON.stringify({
 					autoSave: autoSaveEnabled,
+					drafts: draftsEnabled,
 					snapping: snappingEnabled,
 					highContrast: highContrastEnabled,
 					showYardLineCursor: showYardLineCursorEnabled
@@ -719,7 +726,7 @@
 			endZonePylonYards: [0, 10, 90, 100],
 			endLinePylonFractions: [15 / 40, 25 / 40]
 		},
-		'four-v-four': {
+		'four-on-four': {
 			totalYards: 60,
 			widthYards: 30,
 			goalLines: [10, 50],
@@ -812,7 +819,7 @@
 			dimensions: '100 × 40 yards',
 			description: 'NIRSA 7v7 field with four 20-yard zones and 10-yard end zones.'
 		},
-		{ id: 'four-v-four', label: '4v4', dimensions: '60 × 30 yards', description: 'Two 20-yard playing zones and 10-yard end zones.' },
+		{ id: 'four-on-four', label: '4-on-4', dimensions: '60 × 30 yards', description: 'Two 20-yard playing zones and 10-yard end zones.' },
 		{ id: 'unified', label: 'Unified', dimensions: '60 × 25 yards', description: 'SONA/NIRSA Unified field with 5-yard no-run zones.' },
 		{ id: 'nfl-flag', label: 'NFL Flag', dimensions: '70 × 30 yards', description: 'NFL Flag field with 10-yard end zones and 5-yard no-run zones.' }
 	];
@@ -847,7 +854,7 @@
 			key: 'showYardNumbers',
 			label: 'Yard Line Number',
 			description: 'Show the 20-yard midfield number on both sidelines.',
-			fieldTypes: ['four-v-four']
+			fieldTypes: ['four-on-four']
 		},
 		{
 			key: 'showGoalLetters',
@@ -859,25 +866,25 @@
 			key: 'showEndZoneText',
 			label: 'End Zone Text',
 			description: 'Show the vertical END ZONE labels.',
-			fieldTypes: ['traditional', 'four-v-four', 'unified', 'nfl-flag']
+			fieldTypes: ['traditional', 'four-on-four', 'unified', 'nfl-flag']
 		},
 		{
 			key: 'showPylons',
 			label: 'End Zone Pylons',
 			description: 'Show pylons at the end-line and goal-line corners.',
-			fieldTypes: ['traditional', 'four-v-four', 'unified', 'nfl-flag']
+			fieldTypes: ['traditional', 'four-on-four', 'unified', 'nfl-flag']
 		},
 		{
 			key: 'showHashes',
 			label: 'Hash Marks',
 			description: 'Show field hashes and their matching pylons behind the end zones.',
-			fieldTypes: ['traditional', 'four-v-four']
+			fieldTypes: ['traditional', 'four-on-four']
 		},
 		{
 			key: 'showThreeYardMarker',
 			label: '3-Yard Try Line',
 			description: 'Show a short mark three yards from each goal line.',
-			fieldTypes: ['traditional', 'four-v-four']
+			fieldTypes: ['traditional', 'four-on-four']
 		},
 		{
 			key: 'showThreeYardMarker',
@@ -895,7 +902,7 @@
 			key: 'showTenYardMarker',
 			label: '10-Yard X',
 			description: 'Show the 10-yard X on each half of the field.',
-			fieldTypes: ['four-v-four']
+			fieldTypes: ['four-on-four']
 		},
 		{
 			key: 'showFourteenYardX',
@@ -925,19 +932,19 @@
 			key: 'showTeamBoxes',
 			label: 'Team Boxes',
 			description: 'Show the labeled team boxes outside both sidelines.',
-			fieldTypes: ['traditional', 'four-v-four', 'unified', 'nfl-flag']
+			fieldTypes: ['traditional', 'four-on-four', 'unified', 'nfl-flag']
 		},
 		{
 			key: 'showDownMarker',
 			label: 'Down Marker',
 			description: 'Show the down and calculated distance at the Line to Gain.',
-			fieldTypes: ['traditional', 'four-v-four', 'unified', 'nfl-flag']
+			fieldTypes: ['traditional', 'four-on-four', 'unified', 'nfl-flag']
 		},
 		{
 			key: 'showLineOfScrimmageMarker',
 			label: 'L.O.S. Yard Marker',
 			description: 'Show the Line of Scrimmage yard line on the near sideline.',
-			fieldTypes: ['traditional', 'four-v-four', 'unified', 'nfl-flag']
+			fieldTypes: ['traditional', 'four-on-four', 'unified', 'nfl-flag']
 		}
 	];
 	$: fieldLayout = fieldLayouts[fieldSettings.fieldType];
@@ -989,16 +996,6 @@
 		return kind === 'line-of-scrimmage' ? clampLineOfScrimmageX(x) : clampLineToGainX(x);
 	};
 	const maximumLosYardLine = () => (rightGoalYards() - leftGoalYards()) / 2;
-	const lineToGainDirection = (lineToGainX: number, scrimmageX: number) => {
-		const currentDirection = Math.sign(lineToGainX - scrimmageX);
-		if (currentDirection !== 0) return currentDirection;
-		return scrimmageX <= (leftGoalX() + rightGoalX()) / 2 ? 1 : -1;
-	};
-	const maximumDownMarkerYardage = (lineToGainX: number, scrimmageX: number | null) => {
-		if (scrimmageX === null) return 0;
-		const goalX = lineToGainDirection(lineToGainX, scrimmageX) > 0 ? rightGoalX() : leftGoalX();
-		return Math.floor((Math.abs(goalX - scrimmageX) / (fieldWidth / fieldLayout.totalYards)) * 2) / 2;
-	};
 	const guideDistanceYards = (lineToGainX: number, scrimmageX: number | null) =>
 		scrimmageX === null ? null : Math.max(0, Math.round((Math.abs(lineToGainX - scrimmageX) / (fieldWidth / fieldLayout.totalYards)) * 2) / 2);
 	const downMarkerText = (down: DownMarkerValue, lineToGainX: number, scrimmageX: number | null) => {
@@ -1563,7 +1560,7 @@
 		}
 	};
 	const scheduleLocalDraft = (_sceneKey: string, unsaved: boolean) => {
-		if (!draftHydrated || viewOnly) return;
+		if (!draftHydrated || viewOnly || !draftsEnabled) return;
 		if (draftSaveTimer) clearTimeout(draftSaveTimer);
 		draftSaveTimer = null;
 		if (!unsaved) {
@@ -2091,6 +2088,7 @@
 				: isPointOnField(point);
 	const isEditableMarker = (marker: FieldMarker) =>
 		isTeamMarker(marker) || isOfficialMarker(marker) || ['event', 'ball', 'flag', 'bean-bag', 'deflag'].includes(marker.kind);
+	const supportsMarkerNamingEditor = (marker: FieldMarker) => isEditableMarker(marker) && marker.kind !== 'ball';
 	const isPathTool = (value: ActiveTool): value is Exclude<PathKind, 'line'> => ['run', 'pass', 'kick'].includes(value);
 	const isArrowPath = (value: ActiveTool | PathKind): value is Exclude<PathKind, 'line'> => ['run', 'pass', 'kick'].includes(value);
 	const isGuideTool = (value: ActiveTool): value is 'line-of-scrimmage' | 'line-to-gain' => ['line-of-scrimmage', 'line-to-gain'].includes(value);
@@ -2510,6 +2508,9 @@
 			y: Math.max(18, Math.min(476, selectedGroupBounds.top))
 		};
 	};
+	const restoreSelectedElementControls = () => {
+		if (selectedTargets.length === 1) refreshSelectionUi();
+	};
 	const isPointInSelectedGroup = (point: Point) =>
 		selectedTargets.length > 1 &&
 		selectedGroupBounds !== null &&
@@ -2729,6 +2730,7 @@
 			markers = markers.map((marker) => (marker.id === editingMarkerId ? { ...marker, label: nextLabel } : marker));
 		}
 		editingMarkerId = null;
+		restoreSelectedElementControls();
 		completeTutorialAction(`label:${editedKind}`);
 	};
 	const updateDeflagColor = (color: GuideColor) => {
@@ -2741,6 +2743,7 @@
 			markers = markers.map((marker) => (marker.id === markerId ? { ...marker, color, label: nextLabel } : marker));
 		}
 		editingMarkerId = null;
+		restoreSelectedElementControls();
 		completeTutorialAction('label:deflag');
 	};
 	const updateBeanBagColor = (color: GuideColor) => {
@@ -2753,6 +2756,7 @@
 			markers = markers.map((marker) => (marker.id === markerId ? { ...marker, color, label: nextLabel } : marker));
 		}
 		editingMarkerId = null;
+		restoreSelectedElementControls();
 		completeTutorialAction('color:bean-bag');
 	};
 	const commitGuideEditor = () => {
@@ -2761,6 +2765,7 @@
 		losYardageValue = '';
 		losYardageHistorySaved = false;
 		inlineGuideEditorPinnedLeft = null;
+		restoreSelectedElementControls();
 	};
 	const pinInlineGuideEditorUnderPointer = () => {
 		if (!(editorElement instanceof HTMLElement) || !(editorElement.offsetParent instanceof HTMLElement)) return;
@@ -2786,7 +2791,7 @@
 		});
 		if (Math.abs(nextX - editingGuide.x) <= 0.01) return;
 		guides = guides.map((guide) => (guide.id === editingGuideId ? { ...guide, x: nextX } : guide));
-		losYardageValue = editingGuide.kind === 'line-of-scrimmage' ? losYardLine(nextX) : (guideDistanceYards(nextX, lineOfScrimmageX) ?? '');
+		losYardageValue = losYardLine(nextX);
 	};
 	const setDownGuideSide = (side: FieldSide) => {
 		if (!editingDownGuide) return;
@@ -2797,10 +2802,11 @@
 		});
 		if (Math.abs(nextX - editingDownGuide.x) <= 0.01) return;
 		guides = guides.map((guide) => (guide.id === editingDownGuideId ? { ...guide, x: nextX } : guide));
-		downYardageValue = guideDistanceYards(nextX, lineOfScrimmageX) ?? '';
+		downYardageValue = losYardLine(nextX);
 	};
 	const commitPathEditor = () => {
 		editingPathId = null;
+		restoreSelectedElementControls();
 	};
 	const commitTeamBoxEditor = () => {
 		if (editingTeamBoxY === null || editingTeamBoxIndex === null) return;
@@ -2879,7 +2885,7 @@
 		scoreboardHistorySaved = false;
 	};
 	const cycleGameQuarter = (event: Event) => {
-		if (viewOnly || tool === 'laser') return;
+		if (viewOnly || tool === 'laser' || tool === 'free-draw') return;
 		event.preventDefault();
 		event.stopPropagation();
 		if (editingScoreboard === 'clock') commitScoreboardEditor();
@@ -2888,21 +2894,17 @@
 		saveHistory();
 		fieldSettings = { ...fieldSettings, gameQuarter };
 	};
-	const updateDownMarkerYardage = (event: Event) => {
-		if (!editingDownGuide || lineOfScrimmageX === null) return;
-		const rawValue = (event.currentTarget as HTMLInputElement).value;
+	const applyDownMarkerYardage = (rawValue: string) => {
+		if (!editingDownGuide) return;
 		if (rawValue === '') {
 			downYardageValue = '';
 			return;
 		}
-		const requestedDistance = Number(rawValue);
-		if (!Number.isFinite(requestedDistance)) return;
-		const maximum = maximumDownMarkerYardage(editingDownGuide.x, lineOfScrimmageX);
-		const distance = Math.max(0, Math.min(maximum, Math.round(requestedDistance * 2) / 2));
-		downYardageValue = distance;
-		const direction = lineToGainDirection(editingDownGuide.x, lineOfScrimmageX);
-		const nextX = clampLineToGainX(lineOfScrimmageX + direction * distance * (fieldWidth / fieldLayout.totalYards));
-		downGuideSide = fieldSideForX(nextX);
+		const requestedYardLine = Number(rawValue);
+		if (!Number.isFinite(requestedYardLine)) return;
+		const yardLine = Math.max(0, Math.min(maximumLosYardLine(), Math.round(requestedYardLine * 2) / 2));
+		downYardageValue = yardLine;
+		const nextX = xForFieldSideYardLine(downGuideSide, yardLine, 'line-to-gain');
 		if (Math.abs(nextX - editingDownGuide.x) <= 0.01) return;
 		if (!downYardageHistorySaved) {
 			saveHistory();
@@ -2914,31 +2916,20 @@
 		const currentValue = Number(input.value);
 		const baseValue = Number.isFinite(currentValue) ? currentValue : 0;
 		input.value = String(Math.round((baseValue + direction * 0.5) * 2) / 2);
-		updateDownMarkerYardage({ currentTarget: input } as unknown as Event);
+		applyDownMarkerYardage(input.value);
 	};
-	const updateGuideYardage = (event: Event) => {
+	const applyGuideYardage = (rawValue: string) => {
 		if (!editingGuide || (editingGuide.kind !== 'line-of-scrimmage' && editingGuide.kind !== 'line-to-gain')) return;
-		const rawValue = (event.currentTarget as HTMLInputElement).value;
 		if (rawValue === '') {
 			losYardageValue = '';
 			return;
 		}
 		const requestedYards = Number(rawValue);
 		if (!Number.isFinite(requestedYards)) return;
-		let nextX: number;
-		if (editingGuide.kind === 'line-of-scrimmage') {
-			const yardLine = Math.max(0.5, Math.min(maximumLosYardLine(), Math.round(requestedYards * 2) / 2));
-			losYardageValue = yardLine;
-			nextX = xForFieldSideYardLine(editingGuideSide, yardLine, 'line-of-scrimmage');
-		} else {
-			if (lineOfScrimmageX === null) return;
-			const maximum = maximumDownMarkerYardage(editingGuide.x, lineOfScrimmageX);
-			const distance = Math.max(0, Math.min(maximum, Math.round(requestedYards * 2) / 2));
-			losYardageValue = distance;
-			const direction = lineToGainDirection(editingGuide.x, lineOfScrimmageX);
-			nextX = clampLineToGainX(lineOfScrimmageX + direction * distance * (fieldWidth / fieldLayout.totalYards));
-			editingGuideSide = fieldSideForX(nextX);
-		}
+		const minimum = editingGuide.kind === 'line-of-scrimmage' ? 0.5 : 0;
+		const yardLine = Math.max(minimum, Math.min(maximumLosYardLine(), Math.round(requestedYards * 2) / 2));
+		losYardageValue = yardLine;
+		const nextX = xForFieldSideYardLine(editingGuideSide, yardLine, editingGuide.kind);
 		if (Math.abs(nextX - editingGuide.x) <= 0.01) return;
 		if (!losYardageHistorySaved) {
 			saveHistory();
@@ -2959,13 +2950,15 @@
 		}
 		guides = guides.map((guide) => (guide.id === editingGuideId ? { ...guide, x: nextX } : guide));
 	};
+	const guideXAfterYardMove = (guide: FieldGuide, direction: -1 | 1) => {
+		const yardWidth = fieldWidth / fieldLayout.totalYards;
+		return guide.kind === 'line-of-scrimmage'
+			? clampLineOfScrimmageX(guide.x + direction * yardWidth)
+			: clampLineToGainX(guide.x + direction * yardWidth);
+	};
 	const moveEditingGuideByYard = (direction: -1 | 1) => {
 		if (!editingGuide || (editingGuide.kind !== 'line-of-scrimmage' && editingGuide.kind !== 'line-to-gain')) return;
-		const yardWidth = fieldWidth / fieldLayout.totalYards;
-		const nextX =
-			editingGuide.kind === 'line-of-scrimmage'
-				? clampLineOfScrimmageX(editingGuide.x + direction * yardWidth)
-				: clampLineToGainX(editingGuide.x + direction * yardWidth);
+		const nextX = guideXAfterYardMove(editingGuide, direction);
 		if (Math.abs(nextX - editingGuide.x) <= 0.01) return;
 		if (!losYardageHistorySaved) {
 			saveHistory();
@@ -2973,10 +2966,10 @@
 		}
 		guides = guides.map((guide) => (guide.id === editingGuideId ? { ...guide, x: nextX } : guide));
 		editingGuideSide = fieldSideForX(nextX);
-		losYardageValue = editingGuide.kind === 'line-of-scrimmage' ? losYardLine(nextX) : (guideDistanceYards(nextX, lineOfScrimmageX) ?? '');
+		losYardageValue = losYardLine(nextX);
 	};
 	const moveEditingDownGuideByYard = (direction: -1 | 1) => {
-		if (!editingDownGuide || lineOfScrimmageX === null) return;
+		if (!editingDownGuide) return;
 		const yardWidth = fieldWidth / fieldLayout.totalYards;
 		const nextX = clampLineToGainX(editingDownGuide.x + direction * yardWidth);
 		if (Math.abs(nextX - editingDownGuide.x) <= 0.01) return;
@@ -2986,7 +2979,7 @@
 		}
 		guides = guides.map((guide) => (guide.id === editingDownGuideId ? { ...guide, x: nextX } : guide));
 		downGuideSide = fieldSideForX(nextX);
-		downYardageValue = guideDistanceYards(nextX, lineOfScrimmageX) ?? '';
+		downYardageValue = losYardLine(nextX);
 	};
 	const commitDownMarkerEditor = () => {
 		editingDownGuideId = null;
@@ -3073,7 +3066,7 @@
 		editingTeamBoxY = null;
 		editingTeamBoxIndex = null;
 		editingScoreboard = null;
-		downYardageValue = guideDistanceYards(guide.x, lineOfScrimmageX) ?? '';
+		downYardageValue = losYardLine(guide.x);
 		downGuideSide = fieldSideForX(guide.x);
 		downYardageHistorySaved = false;
 		fieldControlTooltip = '';
@@ -3083,7 +3076,7 @@
 		guideYardageInput?.select();
 	};
 	const startEditingGameClock = async (event: Event) => {
-		if (viewOnly || tool === 'laser') return;
+		if (viewOnly || tool === 'laser' || tool === 'free-draw') return;
 		event.preventDefault();
 		event.stopPropagation();
 		clearDeleteState();
@@ -3102,7 +3095,7 @@
 		gameClockEditInput?.select();
 	};
 	const startEditingTeamBox = async (event: Event, teamBoxY: number, teamBoxIndex: number) => {
-		if (viewOnly || tool === 'laser') return;
+		if (viewOnly || tool === 'laser' || tool === 'free-draw') return;
 		event.preventDefault();
 		clearDeleteState();
 		editingMarkerId = null;
@@ -3117,11 +3110,12 @@
 		teamBoxEditInput?.focus();
 		teamBoxEditInput?.select();
 	};
-	const startEditingMarker = async (event: Event, marker: FieldMarker) => {
+	const startEditingMarker = async (event: Event, marker: FieldMarker, preserveSelection = false) => {
 		if (viewOnly) return;
 		if (!isEditableMarker(marker) || tool === 'laser' || (tool === 'event' && marker.kind !== 'ball')) return;
 		event.preventDefault();
-		clearDeleteState();
+		if (preserveSelection) hideDeleteButton();
+		else clearDeleteState();
 		editingMarkerId = marker.id;
 		editingGuideId = null;
 		editingPathId = null;
@@ -3157,12 +3151,13 @@
 		editingMarkerId = null;
 		completeTutorialAction('label:ball');
 	};
-	const startEditingGuide = async (event: Event, guide: FieldGuide, fromLosMarker = false) => {
+	const startEditingGuide = async (event: Event, guide: FieldGuide, fromLosMarker = false, preserveSelection = false) => {
 		if (viewOnly) return;
 		if (tool === 'event' || tool === 'laser') return;
 		event.preventDefault();
 		inlineGuideEditorPinnedLeft = null;
-		clearDeleteState();
+		if (preserveSelection) hideDeleteButton();
+		else clearDeleteState();
 		editingMarkerId = null;
 		editingGuideId = guide.id;
 		editingGuideFromLosMarker = fromLosMarker;
@@ -3175,7 +3170,7 @@
 			guide.kind === 'line-of-scrimmage'
 				? losYardLine(guide.x)
 				: guide.kind === 'line-to-gain'
-					? (guideDistanceYards(guide.x, lineOfScrimmageX) ?? '')
+					? losYardLine(guide.x)
 					: '';
 		losYardageHistorySaved = false;
 		if (guide.kind === 'line-of-scrimmage' || guide.kind === 'line-to-gain') {
@@ -3191,11 +3186,12 @@
 		fieldControlTooltip = '';
 		await startEditingGuide(event, guide, true);
 	};
-	const startEditingPath = (event: Event, path: FieldPath) => {
+	const startEditingPath = (event: Event, path: FieldPath, preserveSelection = false) => {
 		if (viewOnly) return;
 		if (tool === 'event' || tool === 'laser') return;
 		event.preventDefault();
-		clearDeleteState();
+		if (preserveSelection) hideDeleteButton();
+		else clearDeleteState();
 		editingMarkerId = null;
 		editingGuideId = null;
 		editingPathId = path.id;
@@ -3203,6 +3199,26 @@
 		guideEditColor = path.color;
 		guideEditStyle = path.style;
 		completeTutorialAction(`edit:${path.kind}`);
+	};
+	const openSelectedElementEditor = (event: KeyboardEvent) => {
+		if (selectedTargets.length !== 1) return false;
+		const [selectedTarget] = selectedTargets;
+		if (selectedTarget.type === 'marker') {
+			const marker = markers.find((item) => item.id === selectedTarget.id);
+			if (!marker || !supportsMarkerNamingEditor(marker)) return false;
+			void startEditingMarker(event, marker, true);
+			return true;
+		}
+		if (selectedTarget.type === 'guide') {
+			const guide = guides.find((item) => item.id === selectedTarget.id);
+			if (!guide) return false;
+			void startEditingGuide(event, guide, false, true);
+			return true;
+		}
+		const path = paths.find((item) => item.id === selectedTarget.id);
+		if (!path) return false;
+		startEditingPath(event, path, true);
+		return true;
 	};
 	const isToolbarPresetTool = (value: Tool): value is ToolbarPresetTool =>
 		value === 'deflag' ||
@@ -3229,15 +3245,13 @@
 			const existing = guides.find((guide) => guide.kind === selectedTool);
 			toolbarGuideSide = existing ? fieldSideForX(existing.x) : 'a';
 			const defaultYardages = {
-				traditional: { 'line-of-scrimmage': 14, 'line-to-gain': 6 },
-				'four-v-four': { 'line-of-scrimmage': 10, 'line-to-gain': 10 },
+				traditional: { 'line-of-scrimmage': 14, 'line-to-gain': 20 },
+				'four-on-four': { 'line-of-scrimmage': 10, 'line-to-gain': 10 },
 				unified: { 'line-of-scrimmage': 5, 'line-to-gain': 15 },
 				'nfl-flag': { 'line-of-scrimmage': 5, 'line-to-gain': 20 }
 			} as const;
 			toolbarGuideYardage = existing
-				? selectedTool === 'line-of-scrimmage'
-					? losYardLine(existing.x)
-					: (guideDistanceYards(existing.x, lineOfScrimmageX) ?? defaultYardages[fieldSettings.fieldType][selectedTool])
+				? losYardLine(existing.x)
 				: defaultYardages[fieldSettings.fieldType][selectedTool];
 			await tick();
 			toolbarGuideYardageInput?.focus();
@@ -3323,32 +3337,20 @@
 		});
 		if (Math.abs(nextX - existing.x) <= 0.01) return;
 		guides = guides.map((guide) => (guide.id === existing.id ? { ...guide, x: nextX } : guide));
-		toolbarGuideYardage = existing.kind === 'line-of-scrimmage' ? losYardLine(nextX) : (guideDistanceYards(nextX, lineOfScrimmageX) ?? '');
+		toolbarGuideYardage = losYardLine(nextX);
 	};
-	const updateToolbarGuideYardage = (event: Event) => {
+	const applyToolbarGuideYardage = (rawValue: string) => {
 		if (toolbarEditorTool !== 'line-of-scrimmage' && toolbarEditorTool !== 'line-to-gain') return;
-		const rawValue = (event.currentTarget as HTMLInputElement).value;
 		if (rawValue === '') {
 			toolbarGuideYardage = '';
 			return;
 		}
 		const requested = Number(rawValue);
 		if (!Number.isFinite(requested)) return;
-		let nextX: number;
-		if (toolbarEditorTool === 'line-of-scrimmage') {
-			const yardLine = Math.max(0.5, Math.min(maximumLosYardLine(), Math.round(requested * 2) / 2));
-			toolbarGuideYardage = yardLine;
-			nextX = xForFieldSideYardLine(toolbarGuideSide, yardLine, 'line-of-scrimmage');
-		} else {
-			if (lineOfScrimmageX === null) return;
-			const existing = guides.find((guide) => guide.kind === toolbarEditorTool);
-			const maximum = maximumDownMarkerYardage(existing?.x ?? lineOfScrimmageX, lineOfScrimmageX);
-			const distance = Math.max(0, Math.min(maximum, Math.round(requested * 2) / 2));
-			toolbarGuideYardage = distance;
-			const direction = lineToGainDirection(existing?.x ?? lineOfScrimmageX + 1, lineOfScrimmageX);
-			nextX = clampLineToGainX(lineOfScrimmageX + direction * distance * (fieldWidth / fieldLayout.totalYards));
-			toolbarGuideSide = fieldSideForX(nextX);
-		}
+		const minimum = toolbarEditorTool === 'line-of-scrimmage' ? 0.5 : 0;
+		const yardLine = Math.max(minimum, Math.min(maximumLosYardLine(), Math.round(requested * 2) / 2));
+		toolbarGuideYardage = yardLine;
+		const nextX = xForFieldSideYardLine(toolbarGuideSide, yardLine, toolbarEditorTool);
 		const existing = guides.find((guide) => guide.kind === toolbarEditorTool);
 		if (existing && Math.abs(existing.x - nextX) <= 0.01) return;
 		if (!toolbarGuideHistorySaved) saveHistory();
@@ -3367,11 +3369,28 @@
 			raiseLayer('guide', guide.id);
 		}
 	};
+	const moveToolbarGuideByYard = (direction: -1 | 1) => {
+		if (toolbarEditorTool !== 'line-of-scrimmage' && toolbarEditorTool !== 'line-to-gain') return;
+		let existing = guides.find((guide) => guide.kind === toolbarEditorTool);
+		if (!existing) {
+			applyToolbarGuideYardage(String(toolbarGuideYardage));
+			existing = guides.find((guide) => guide.kind === toolbarEditorTool);
+		}
+		if (!existing) return;
+		const nextX = guideXAfterYardMove(existing, direction);
+		if (Math.abs(existing.x - nextX) <= 0.01) return;
+		if (!toolbarGuideHistorySaved) saveHistory();
+		toolbarGuideHistorySaved = true;
+		guides = guides.map((guide) => (guide.id === existing.id ? { ...guide, x: nextX } : guide));
+		toolbarGuideSide = fieldSideForX(nextX);
+		toolbarGuideYardage = losYardLine(nextX);
+	};
 	const handleEditorKeydown = (event: KeyboardEvent) => {
 		if (event.key !== 'Escape' || !hasActiveInlineEditor()) return;
 		event.preventDefault();
 		if (editingDownGuideId !== null) commitDownMarkerEditor();
 		else clearEditorState();
+		restoreSelectedElementControls();
 	};
 	const handleGlobalKeydown = (event: KeyboardEvent) => {
 		if (viewOnly) return;
@@ -3488,6 +3507,11 @@
 			handleEditorKeydown(event);
 			return;
 		}
+		if (event.key === 'Escape' && selectedTargets.length > 0) {
+			event.preventDefault();
+			clearDeleteState();
+			return;
+		}
 		if (toolbarEditorTool !== null && event.key === 'Escape') {
 			event.preventDefault();
 			toolbarEditorTool = null;
@@ -3505,6 +3529,10 @@
 			return;
 		}
 		if (isEditableTarget) return;
+		if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && (event.key === 'Enter' || event.key === 'F2')) {
+			if (openSelectedElementEditor(event)) event.preventDefault();
+			return;
+		}
 		if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'v') {
 			event.preventDefault();
 			selectTool('select');
@@ -4309,7 +4337,7 @@
 		clearPlacementSnap();
 		const setupByFieldType: Record<PlayBuilderFieldType, { lineOfScrimmage: number; lineToGain: number; quarterbackDepth: number }> = {
 			traditional: { lineOfScrimmage: 24, lineToGain: 30, quarterbackDepth: 5 },
-			'four-v-four': { lineOfScrimmage: 20, lineToGain: 30, quarterbackDepth: 5 },
+			'four-on-four': { lineOfScrimmage: 20, lineToGain: 30, quarterbackDepth: 5 },
 			unified: { lineOfScrimmage: 15, lineToGain: 30, quarterbackDepth: 5 },
 			'nfl-flag': { lineOfScrimmage: 15, lineToGain: 35, quarterbackDepth: 5 }
 		};
@@ -4339,7 +4367,7 @@
 				{ kind: 'official-b', x: xForYards(setup.lineOfScrimmage + 20), y: fieldTop + fieldHeight * 0.375 },
 				{ kind: 'official-f', x: xForYards(setup.lineOfScrimmage + 10), y: fieldJudgeY }
 			],
-			'four-v-four': [
+			'four-on-four': [
 				{ kind: 'official-r', x: standardRefereeX, y: standardRefereeY },
 				{ kind: 'official-l', x: lineOfScrimmageX, y: lineJudgeY }
 			],
@@ -4399,7 +4427,7 @@
 	};
 	const handleMarkerKeydown = (event: KeyboardEvent, marker: FieldMarker) => {
 		if (viewOnly) return;
-		if (event.key === 'Enter' || event.key === 'F2') {
+		if ((event.key === 'Enter' || event.key === 'F2') && supportsMarkerNamingEditor(marker)) {
 			startEditingMarker(event, marker);
 			return;
 		}
@@ -5272,6 +5300,7 @@
 			if (!raw) return;
 			const stored = JSON.parse(raw) as Record<string, unknown>;
 			if (typeof stored.autoSave === 'boolean') autoSaveEnabled = stored.autoSave;
+			if (typeof stored.drafts === 'boolean') draftsEnabled = stored.drafts;
 			if (typeof stored.snapping === 'boolean') snappingEnabled = stored.snapping;
 			if (typeof stored.highContrast === 'boolean') highContrastEnabled = stored.highContrast;
 			if (typeof stored.showYardLineCursor === 'boolean') showYardLineCursorEnabled = stored.showYardLineCursor;
@@ -5340,10 +5369,18 @@
 	onMount(() => {
 		canEditSavedPlay = savedPlayId === null || Boolean(editTokenForPlay(savedPlayId));
 		ownershipResolved = true;
+		restoreExportSettings();
+		exportSettingsHydrated = true;
+		restoreToolPreferences();
+		toolPreferencesHydrated = true;
+		restoreBuilderPreferences();
+		builderPreferencesHydrated = true;
 		if (!viewOnly) {
 			try {
 				const rawDraft = localStorage.getItem(localDraftKey());
-				if (rawDraft) {
+				if (!draftsEnabled) {
+					localStorage.removeItem(localDraftKey());
+				} else if (rawDraft) {
 					const stored = JSON.parse(rawDraft) as { document?: unknown; updatedAt?: unknown };
 					const decoded = decodePlayBuilderDocument(stored.document as SerializedPlayBuilderDocument);
 					const normalizedDocument = encodePlayBuilderDocument(decoded);
@@ -5364,12 +5401,6 @@
 			}
 		}
 		draftHydrated = !showDraftRestore;
-		restoreExportSettings();
-		exportSettingsHydrated = true;
-		restoreToolPreferences();
-		toolPreferencesHydrated = true;
-		restoreBuilderPreferences();
-		builderPreferencesHydrated = true;
 		tutorialButtonBouncing = localStorage.getItem(tutorialSeenKey) !== '1';
 		const browserNavigator = navigator as Navigator & { userAgentData?: { platform?: string } };
 		const usesAppleShortcuts = /Mac|iPhone|iPad|iPod/i.test(browserNavigator.userAgentData?.platform ?? navigator.platform ?? navigator.userAgent);
@@ -5398,6 +5429,7 @@
 		const builderResizeObserver = new ResizeObserver(updateDiagramModalPosition);
 		builderResizeObserver.observe(builderRoot);
 		updateDiagramModalPosition();
+		if (showDraftRestore) void tick().then(() => restoreDraftButton?.focus());
 		syncLayerDom();
 		return () => {
 			tutorialDriver?.destroy();
@@ -5558,118 +5590,42 @@
 						{@const toolbarEditingLos = toolbarEditorTool === 'line-of-scrimmage'}
 						{@const toolbarEditingGuide = guides.find((guide) => guide.kind === toolbarEditorTool)}
 						{#if !toolbarEditingGuide || !isAtMidfieldX(toolbarEditingGuide.x)}
-							<button
-								type="button"
-								aria-label={`Field side ${toolbarGuideSide.toUpperCase()}; switch to ${toolbarGuideSide === 'a' ? 'B' : 'A'}`}
-								title={`${toolbarGuideSide.toUpperCase()} Side`}
-								on:click={() => setToolbarGuideSide(toolbarGuideSide === 'a' ? 'b' : 'a')}
-								class="h-5 w-7 shrink-0 cursor-pointer border border-stone-900 text-[10px] leading-none font-black"
-								class:bg-stone-900={toolbarGuideSide === 'a'}
-								class:text-white={toolbarGuideSide === 'a'}
-								class:bg-white={toolbarGuideSide === 'b'}
-								class:text-stone-950={toolbarGuideSide === 'b'}>{toolbarGuideSide.toUpperCase()}</button
-							>
+							<FieldSideToggle side={toolbarGuideSide} onToggle={() => setToolbarGuideSide(toolbarGuideSide === 'a' ? 'b' : 'a')} />
 						{/if}
-						<input
-							bind:this={toolbarGuideYardageInput}
-							type="number"
+						<YardageInput
+							bind:element={toolbarGuideYardageInput}
+							value={toolbarGuideYardage}
+							label={toolbarEditingLos ? 'Line of Scrimmage yard line' : 'Line to Gain yard line'}
+							tooltip={toolbarEditingLos ? 'L.O.S. Yard Line' : 'L.T.G. Yard Line'}
 							min={toolbarEditingLos ? 0.5 : 0}
-							max={toolbarEditingLos
-								? maximumLosYardLine()
-								: lineOfScrimmageX === null
-									? 0
-									: maximumDownMarkerYardage(guides.find((guide) => guide.kind === 'line-to-gain')?.x ?? lineOfScrimmageX, lineOfScrimmageX)}
-							step="0.5"
-							inputmode="decimal"
-							bind:value={toolbarGuideYardage}
-							disabled={!toolbarEditingLos && lineOfScrimmageX === null}
-							aria-label={toolbarEditingLos ? 'Line of Scrimmage yard line' : 'Line to Gain distance'}
-							title={toolbarEditingLos ? 'L.O.S. yard line' : 'L.T.G. distance'}
-							class="down-yardage-input h-5 border-0 bg-stone-100 px-1 text-center text-[10px] leading-none font-black text-stone-800 outline-none hover:bg-stone-200 focus:bg-white focus:ring-1 focus:ring-stone-700 focus:ring-inset disabled:opacity-40"
-							class:w-8={toolbarEditingLos}
-							class:w-10={!toolbarEditingLos}
-							on:focus={(event) => event.currentTarget.select()}
-							on:input={updateToolbarGuideYardage}
-							on:keydown|stopPropagation={(event) => {
-								if (event.key !== 'Enter' && event.key !== 'Escape') return;
-								event.preventDefault();
+							max={maximumLosYardLine()}
+							onValueInput={(input) => applyToolbarGuideYardage(input.value)}
+							onMoveYard={moveToolbarGuideByYard}
+							onCommit={(input) => {
+								applyToolbarGuideYardage(input.value);
 								toolbarEditorTool = null;
 							}}
+							onEscape={() => (toolbarEditorTool = null)}
 						/>
 					{/if}
-					<div class="flex gap-1" aria-label="Preset color">
-						{#each toolbarEditorTool === 'deflag' ? deflagColors : toolbarEditorTool === 'bean-bag' ? beanBagColors : toolbarEditorTool === 'laser' ? laserColors : guideColors as option}
-							<HoverTooltip text={option.label} placement="above" minWidthPx={0} wrapperClass="flex h-5 w-5 shrink-0">
-								<button
-									type="button"
-									aria-label={option.label}
-									aria-pressed={toolbarPresetColor === option.id}
-									on:click={() => updateToolbarPresetColor(option.id)}
-									class="h-5 w-5 cursor-pointer border-2 border-white shadow-sm ring-1 ring-stone-400"
-									class:!ring-2={toolbarPresetColor === option.id}
-									class:!ring-stone-950={toolbarPresetColor === option.id}
-									style:background-color={option.value}
-								></button>
-							</HoverTooltip>
-						{/each}
-					</div>
-					{#if toolbarPresetStyle}
-						<div class="flex gap-px bg-stone-400 p-px" aria-label="Preset line type">
-							{#each guideStyles as styleOption}
-								<HoverTooltip
-									text={styleOption.charAt(0).toUpperCase() + styleOption.slice(1)}
-									placement="above"
-									minWidthPx={0}
-									wrapperClass="flex h-5 w-8 shrink-0"
-								>
-									<button
-										type="button"
-										aria-label={`${styleOption} line`}
-										aria-pressed={toolbarPresetStyle === styleOption}
-										on:click={() => updateToolbarPresetStyle(styleOption)}
-										class="flex h-5 w-8 cursor-pointer items-center justify-center bg-stone-100 text-stone-700 hover:bg-white"
-										class:!bg-stone-900={toolbarPresetStyle === styleOption}
-										class:!text-white={toolbarPresetStyle === styleOption}
-									>
-										<svg viewBox="0 0 24 6" class="h-2 w-6" aria-hidden="true">
-											<line
-												x1="1"
-												y1="3"
-												x2="23"
-												y2="3"
-												stroke="currentColor"
-												stroke-width="2"
-												stroke-dasharray={styleOption === 'dashed' ? '6 3' : styleOption === 'dotted' ? '0.01 4' : undefined}
-												stroke-linecap={styleOption === 'dotted' ? 'round' : 'square'}
-											/>
-										</svg>
-									</button>
-								</HoverTooltip>
-							{/each}
-						</div>
-					{/if}
-					{#if showToolbarLineFormatReset}
-						<HoverTooltip text="Reset to Default" placement="above" minWidthPx={0} wrapperClass="flex h-5 w-6 shrink-0">
-							<button
-								type="button"
-								data-toolbar-line-format-reset
-								aria-label="Reset to Default"
-								on:click={resetToolbarLineFormat}
-								class="flex h-5 w-6 cursor-pointer items-center justify-center border border-stone-400 bg-stone-100 p-0.5 text-stone-800 hover:border-stone-900 hover:bg-stone-900 hover:text-white"
-							>
-								<svg viewBox="0 0 24 24" class="h-3.5 w-3.5" aria-hidden="true">
-									<path
-										d="M21 12a9 9 0 1 1-2.64-6.36L21 8M21 3v5h-5"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2.5"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									/>
-								</svg>
-							</button>
-						</HoverTooltip>
-					{/if}
+					<LineFormatControls
+						colorOptions={toolbarEditorTool === 'deflag'
+							? deflagColors
+							: toolbarEditorTool === 'bean-bag'
+								? beanBagColors
+								: toolbarEditorTool === 'laser'
+									? laserColors
+									: guideColors}
+						selectedColor={toolbarPresetColor}
+						colorLabel="Preset color"
+						styleOptions={guideStyles}
+						selectedStyle={toolbarPresetStyle}
+						styleLabel="Preset line type"
+						showReset={showToolbarLineFormatReset}
+						onColor={updateToolbarPresetColor}
+						onStyle={updateToolbarPresetStyle}
+						onReset={resetToolbarLineFormat}
+					/>
 				</div>
 			{/if}
 
@@ -5784,13 +5740,12 @@
 								aria-pressed={freeDrawMode === 'erase'}
 								on:pointerdown|stopPropagation
 								on:click|stopPropagation={() => (freeDrawMode = freeDrawMode === 'erase' ? 'draw' : 'erase')}
-								class="flex h-7 w-full cursor-pointer items-center justify-center bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
-								class:!bg-stone-600={freeDrawMode === 'erase'}
-								class:!text-white={freeDrawMode === 'erase'}
+								class="flex h-7 w-full cursor-pointer items-center justify-center bg-white hover:ring-1 hover:ring-stone-500 hover:ring-inset"
+								class:!ring-2={freeDrawMode === 'erase'}
+								class:!ring-stone-900={freeDrawMode === 'erase'}
+								class:!ring-inset={freeDrawMode === 'erase'}
 							>
-								<svg viewBox="0 0 24 24" class="h-3.5 w-3.5" aria-hidden="true">
-									<path d="m4 15 9-10 7 6-8 9H7zM10 20h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
-								</svg>
+								<img src="/images/toolbar/drawing-eraser.png" alt="" class="h-6 w-6 object-contain" draggable="false" />
 								<span class="sr-only">Eraser</span>
 							</button>
 						</HoverTooltip>
@@ -5801,11 +5756,9 @@
 								disabled={freeStrokes.length === 0 && !activeFreeStroke}
 								on:pointerdown|stopPropagation
 								on:click|stopPropagation={() => runGuardedAction(clearFreeDrawings)}
-								class="flex h-7 w-full cursor-pointer items-center justify-center bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950 disabled:cursor-not-allowed disabled:opacity-35"
+								class="flex h-7 w-full cursor-pointer items-center justify-center bg-white hover:ring-1 hover:ring-stone-500 hover:ring-inset disabled:cursor-not-allowed disabled:opacity-35"
 							>
-								<svg viewBox="0 0 24 24" class="h-3.5 w-3.5" aria-hidden="true">
-									<path d="M4 16c3-5 5 5 8 0s5 3 8-2M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-								</svg>
+								<img src="/images/toolbar/clear-drawings.png" alt="" class="h-6 w-6 object-contain" draggable="false" />
 								<span class="sr-only">Clear</span>
 							</button>
 						</HoverTooltip>
@@ -6307,7 +6260,16 @@
 							<filter id="builder-air-shadow" x="-15%" y="-40%" width="130%" height="180%">
 								<feGaussianBlur stdDeviation="3" />
 							</filter>
-							<filter id="builder-neon-glow" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB">
+							<!-- User-space bounds keep filtered paths visible when a straight line has a zero-width or zero-height object bounding box. -->
+							<filter
+								id="builder-neon-glow"
+								filterUnits="userSpaceOnUse"
+								x="-32"
+								y="-32"
+								width="1064"
+								height="548"
+								color-interpolation-filters="sRGB"
+							>
 								<feGaussianBlur in="SourceGraphic" stdDeviation="5" result="neon-wide" />
 								<feComponentTransfer in="neon-wide" result="neon-wide-soft">
 									<feFuncA type="linear" slope="0.32" />
@@ -6369,26 +6331,28 @@
 											stroke-width="2"
 											pointer-events="none"
 										/>
-										<rect
-											data-field-element
-											data-field-type="team-box-text"
-											data-hover-tooltip="Double Click to Edit"
-											role="button"
-											tabindex="0"
-											aria-label={`${teamBoxLabel}, double-click to rename team box`}
-											x={(xForYards(teamBox[0]) + xForYards(teamBox[1]) - teamBoxTextHitWidth) / 2}
-											y={teamBoxY + 2}
-											width={teamBoxTextHitWidth}
-											height="16"
-											fill="transparent"
-											pointer-events="all"
-											on:pointerdown|stopPropagation
-											on:dblclick|stopPropagation={(event) => startEditingTeamBox(event, teamBoxY, teamBoxIndex)}
-											on:keydown={(event) => {
-												if (event.key === 'Enter') void startEditingTeamBox(event, teamBoxY, teamBoxIndex);
-											}}
-											class="cursor-text focus:outline-none"
-										/>
+										{#if tool !== 'laser' && tool !== 'free-draw'}
+											<rect
+												data-field-element
+												data-field-type="team-box-text"
+												data-hover-tooltip="Double Click to Edit"
+												role="button"
+												tabindex="0"
+												aria-label={`${teamBoxLabel}, double-click to rename team box`}
+												x={(xForYards(teamBox[0]) + xForYards(teamBox[1]) - teamBoxTextHitWidth) / 2}
+												y={teamBoxY + 2}
+												width={teamBoxTextHitWidth}
+												height="16"
+												fill="transparent"
+												pointer-events="all"
+												on:pointerdown|stopPropagation
+												on:dblclick|stopPropagation={(event) => startEditingTeamBox(event, teamBoxY, teamBoxIndex)}
+												on:keydown={(event) => {
+													if (event.key === 'Enter') void startEditingTeamBox(event, teamBoxY, teamBoxIndex);
+												}}
+												class="cursor-text focus:outline-none"
+											/>
+										{/if}
 										<text
 											x={(xForYards(teamBox[0]) + xForYards(teamBox[1])) / 2}
 											y={teamBoxY + 14}
@@ -6423,7 +6387,10 @@
 											stroke-width="2"
 											pointer-events="none"
 										/>
-										{#if scoreboardItem.kind === 'clock' && editingScoreboard === 'clock'}
+										{#if scoreboardItem.kind === 'clock' &&
+											editingScoreboard === 'clock' &&
+											tool !== 'laser' &&
+											tool !== 'free-draw'}
 											<foreignObject
 												bind:this={editorElement}
 												data-scoreboard-inline-editor
@@ -6475,31 +6442,32 @@
 												pointer-events="none">{scoreboardItem.value}</text
 											>
 										{/if}
-										<rect
-											data-field-element
-											data-scoreboard-control={scoreboardItem.kind}
-											data-hover-tooltip={scoreboardItem.kind === 'quarter' ? 'Cycle Through Periods' : 'Set Game Time'}
-											role="button"
-											tabindex={tool === 'laser' ? -1 : 0}
-											aria-label={scoreboardItem.label}
-											aria-disabled={tool === 'laser'}
-											x={scoreboardItem.x}
-											y={scoreboardTeamBoxY}
-											width={scoreboardWidth}
-											height="20"
-											fill="transparent"
-											pointer-events={tool === 'laser' || (scoreboardItem.kind === 'clock' && editingScoreboard === 'clock') ? 'none' : 'all'}
-											on:pointerdown|stopPropagation
-											on:click|stopPropagation={(event) =>
-												scoreboardItem.kind === 'quarter' ? cycleGameQuarter(event) : startEditingGameClock(event)}
-											on:keydown={(event) => {
-												if (event.key !== 'Enter' && event.key !== ' ') return;
-												event.preventDefault();
-												if (scoreboardItem.kind === 'quarter') cycleGameQuarter(event);
-												else startEditingGameClock(event);
-											}}
-											class={tool === 'laser' ? 'focus:outline-none' : 'cursor-pointer focus:outline-none'}
-										/>
+										{#if tool !== 'laser' && tool !== 'free-draw'}
+											<rect
+												data-field-element
+												data-scoreboard-control={scoreboardItem.kind}
+												data-hover-tooltip={scoreboardItem.kind === 'quarter' ? 'Cycle Through Periods' : 'Set Game Time'}
+												role="button"
+												tabindex="0"
+												aria-label={scoreboardItem.label}
+												x={scoreboardItem.x}
+												y={scoreboardTeamBoxY}
+												width={scoreboardWidth}
+												height="20"
+												fill="transparent"
+												pointer-events={scoreboardItem.kind === 'clock' && editingScoreboard === 'clock' ? 'none' : 'all'}
+												on:pointerdown|stopPropagation
+												on:click|stopPropagation={(event) =>
+													scoreboardItem.kind === 'quarter' ? cycleGameQuarter(event) : startEditingGameClock(event)}
+												on:keydown={(event) => {
+													if (event.key !== 'Enter' && event.key !== ' ') return;
+													event.preventDefault();
+													if (scoreboardItem.kind === 'quarter') cycleGameQuarter(event);
+													else startEditingGameClock(event);
+												}}
+												class="cursor-pointer focus:outline-none"
+											/>
+										{/if}
 									</g>
 								{/each}
 							{/if}
@@ -7885,64 +7853,39 @@
 						</div>
 						<div class="flex gap-px bg-stone-900 p-px shadow-xl ring-2 ring-stone-950">
 							{#if !isAtMidfieldX(editingDownGuide.x)}
-								<HoverTooltip
-									text={`Flip to ${downGuideSide === 'a' ? 'B' : 'A'}'s Side`}
-									placement="above"
-									minWidthPx={0}
-									wrapperClass="flex h-7 w-7 shrink-0"
-								>
-									<button
-										type="button"
-										aria-label={`Field side ${downGuideSide.toUpperCase()}; switch to ${downGuideSide === 'a' ? 'B' : 'A'}`}
-										on:click={() => {
-											pinInlineGuideEditorUnderPointer();
-											setDownGuideSide(downGuideSide === 'a' ? 'b' : 'a');
-										}}
-										class="h-7 w-7 shrink-0 cursor-pointer text-[11px] font-black"
-										class:bg-stone-900={downGuideSide === 'a'}
-										class:text-white={downGuideSide === 'a'}
-										class:bg-white={downGuideSide === 'b'}
-										class:text-stone-950={downGuideSide === 'b'}>{downGuideSide.toUpperCase()}</button
-									>
-								</HoverTooltip>
+								<FieldSideToggle
+									side={downGuideSide}
+									size="marker"
+									onToggle={() => {
+										pinInlineGuideEditorUnderPointer();
+										setDownGuideSide(downGuideSide === 'a' ? 'b' : 'a');
+									}}
+								/>
 							{/if}
-							<label class="sr-only" for="custom-down-yardage">Custom yardage</label>
-							<input
-								bind:this={guideYardageInput}
-								id="custom-down-yardage"
+							<YardageInput
+								bind:element={guideYardageInput}
+								value={downYardageValue}
+								label="Line to Gain yard line"
+								tooltip="L.T.G. Yard Line"
+								min={0}
+								max={maximumLosYardLine()}
 								type="text"
-								min="0"
-								max={maximumDownMarkerYardage(editingDownGuide.x, lineOfScrimmageX)}
-								step="0.5"
-								inputmode="decimal"
 								pattern="[0-9]*[.]?[0-9]*"
-								bind:value={downYardageValue}
-								aria-label="Custom yardage"
-								title="Custom yardage"
-								class="down-yardage-input h-7 w-9 border-0 bg-stone-100 px-1 text-center text-[10px] font-black text-stone-800 outline-none hover:bg-orange-100 focus:bg-white focus:ring-2 focus:ring-[#ff5a1f] focus:ring-inset"
-								on:focus={(event) => (event.currentTarget as HTMLInputElement).select()}
-								on:input={updateDownMarkerYardage}
-								on:keydown|stopPropagation={(event) => {
-									if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-										event.preventDefault();
-										moveEditingDownGuideByYard(event.key === 'ArrowLeft' ? -1 : 1);
-										return;
-									}
-									if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-										event.preventDefault();
-										stepDownMarkerYardageInput(event.currentTarget, event.key === 'ArrowUp' ? 1 : -1);
-										return;
-									}
-									if (event.key !== 'Enter' && event.key !== 'Escape') return;
-									event.preventDefault();
+								variant="ltg-marker"
+								onValueInput={(input) => applyDownMarkerYardage(input.value)}
+								onMoveYard={moveEditingDownGuideByYard}
+								onCommit={(input) => {
+									applyDownMarkerYardage(input.value);
 									commitDownMarkerEditor();
 								}}
+								onEscape={commitDownMarkerEditor}
+								onStep={stepDownMarkerYardageInput}
 							/>
 						</div>
 					</div>
 				{/if}
 
-				{#if editingTeamBoxY !== null}
+				{#if editingTeamBoxY !== null && tool !== 'laser' && tool !== 'free-draw'}
 					<form
 						bind:this={editorElement}
 						class="absolute z-10 w-64 -translate-x-1/2 -translate-y-1/2 bg-white p-1 shadow-xl ring-2 ring-stone-900"
@@ -8021,34 +7964,36 @@
 						{#if editingMarker.kind === 'deflag'}
 							<div class="mt-1 flex justify-center gap-1" role="group" aria-label="Flag belt color">
 								{#each deflagColors as option}
-									<button
-										type="button"
-										title={option.label}
-										aria-label={`${option.label} flags`}
-										aria-pressed={(editingMarker.color ?? 'red') === option.id}
-										on:click={() => updateDeflagColor(option.id)}
-										class="h-6 w-6 cursor-pointer border border-stone-600 ring-offset-1 ring-offset-white hover:ring-1 hover:ring-stone-500"
-										class:ring-2={(editingMarker.color ?? 'red') === option.id}
-										class:ring-stone-950={(editingMarker.color ?? 'red') === option.id}
-										style:background={option.value}
-									></button>
+									<HoverTooltip text={option.label} placement="above" minWidthPx={0} wrapperClass="flex h-6 w-6 shrink-0">
+										<button
+											type="button"
+											aria-label={`${option.label} flags`}
+											aria-pressed={(editingMarker.color ?? 'red') === option.id}
+											on:click={() => updateDeflagColor(option.id)}
+											class="h-6 w-6 cursor-pointer border border-stone-600 ring-offset-1 ring-offset-white hover:ring-1 hover:ring-stone-500"
+											class:ring-2={(editingMarker.color ?? 'red') === option.id}
+											class:ring-stone-950={(editingMarker.color ?? 'red') === option.id}
+											style:background={option.value}
+										></button>
+									</HoverTooltip>
 								{/each}
 							</div>
 						{/if}
 						{#if editingMarker.kind === 'bean-bag'}
 							<div class="mt-1 flex justify-center gap-1" role="group" aria-label="Bean bag color">
 								{#each beanBagColors as option}
-									<button
-										type="button"
-										title={option.label}
-										aria-label={`${option.label} bean bag`}
-										aria-pressed={(editingMarker.color ?? 'blue') === option.id}
-										on:click={() => updateBeanBagColor(option.id)}
-										class="h-6 w-6 cursor-pointer border border-stone-600 ring-offset-1 ring-offset-white hover:ring-1 hover:ring-stone-500"
-										class:ring-2={(editingMarker.color ?? 'blue') === option.id}
-										class:ring-stone-950={(editingMarker.color ?? 'blue') === option.id}
-										style:background={option.value}
-									></button>
+									<HoverTooltip text={option.label} placement="above" minWidthPx={0} wrapperClass="flex h-6 w-6 shrink-0">
+										<button
+											type="button"
+											aria-label={`${option.label} bean bag`}
+											aria-pressed={(editingMarker.color ?? 'blue') === option.id}
+											on:click={() => updateBeanBagColor(option.id)}
+											class="h-6 w-6 cursor-pointer border border-stone-600 ring-offset-1 ring-offset-white hover:ring-1 hover:ring-stone-500"
+											class:ring-2={(editingMarker.color ?? 'blue') === option.id}
+											class:ring-stone-950={(editingMarker.color ?? 'blue') === option.id}
+											style:background={option.value}
+										></button>
+									</HoverTooltip>
 								{/each}
 							</div>
 						{/if}
@@ -8084,59 +8029,29 @@
 							{/each}
 						</div>
 						<div class="flex items-center gap-px bg-stone-950 p-px shadow-xl ring-2 ring-stone-950">
-							<HoverTooltip
-								text={`Flip to ${editingGuideSide === 'a' ? 'B' : 'A'}'s Side`}
-								placement="above"
-								minWidthPx={0}
-								wrapperClass="flex h-7 w-7 shrink-0"
-							>
-								<button
-									type="button"
-									aria-label={`Field side ${editingGuideSide.toUpperCase()}; switch to ${editingGuideSide === 'a' ? 'B' : 'A'}`}
-									on:click={() => {
-										pinInlineGuideEditorUnderPointer();
-										setEditingGuideSide(editingGuideSide === 'a' ? 'b' : 'a');
-									}}
-									class="h-7 w-7 cursor-pointer text-[11px] font-black"
-									class:bg-stone-950={editingGuideSide === 'a'}
-									class:text-white={editingGuideSide === 'a'}
-									class:bg-white={editingGuideSide === 'b'}
-									class:text-stone-950={editingGuideSide === 'b'}
-								>
-									{editingGuideSide.toUpperCase()}
-								</button>
-							</HoverTooltip>
-							<label class="sr-only" for="los-marker-yardage">Line of Scrimmage yard line</label>
-							<input
-								bind:this={guideYardageInput}
-								id="los-marker-yardage"
-								type="number"
-								min="0.5"
+							<FieldSideToggle
+								side={editingGuideSide}
+								size="marker"
+								onToggle={() => {
+									pinInlineGuideEditorUnderPointer();
+									setEditingGuideSide(editingGuideSide === 'a' ? 'b' : 'a');
+								}}
+							/>
+							<YardageInput
+								bind:element={guideYardageInput}
+								value={losYardageValue}
+								label="Line of Scrimmage yard line"
+								tooltip="L.O.S. Yard Line"
+								min={0.5}
 								max={maximumLosYardLine()}
-								step="0.5"
-								inputmode="decimal"
-								bind:value={losYardageValue}
-								aria-label="Line of Scrimmage yard line"
-								class="down-yardage-input h-7 w-9 border-0 bg-white px-1 text-center text-[10px] font-black text-stone-950 outline-none hover:bg-green-100 focus:ring-2 focus:ring-green-600 focus:ring-inset"
-								on:focus={(event) => (event.currentTarget as HTMLInputElement).select()}
-								on:input={updateGuideYardage}
-								on:keydown|stopPropagation={(event) => {
-									if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-										event.preventDefault();
-										moveEditingGuideByYard(event.key === 'ArrowLeft' ? -1 : 1);
-										return;
-									}
-									if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-										event.preventDefault();
-										if (event.key === 'ArrowUp') event.currentTarget.stepUp();
-										else event.currentTarget.stepDown();
-										updateGuideYardage(event);
-										return;
-									}
-									if (event.key !== 'Enter' && event.key !== 'Escape') return;
-									event.preventDefault();
+								variant="los-marker"
+								onValueInput={(input) => applyGuideYardage(input.value)}
+								onMoveYard={moveEditingGuideByYard}
+								onCommit={(input) => {
+									applyGuideYardage(input.value);
 									commitGuideEditor();
 								}}
+								onEscape={commitGuideEditor}
 							/>
 						</div>
 					</div>
@@ -8157,141 +8072,66 @@
 						{#if editingGuide?.kind === 'line-of-scrimmage' || editingGuide?.kind === 'line-to-gain'}
 							{@const editingLos = editingGuide.kind === 'line-of-scrimmage'}
 							{#if !isAtMidfieldX(editingGuide.x)}
-								<HoverTooltip
-									text={`Flip to ${editingGuideSide === 'a' ? 'B' : 'A'}'s Side`}
-									placement="above"
-									minWidthPx={0}
-									wrapperClass="flex h-5 w-5 shrink-0"
-								>
-									<button
-										type="button"
-										aria-label={`Field side ${editingGuideSide.toUpperCase()}; switch to ${editingGuideSide === 'a' ? 'B' : 'A'}`}
-										on:click={() => {
-											pinInlineGuideEditorUnderPointer();
-											setEditingGuideSide(editingGuideSide === 'a' ? 'b' : 'a');
-										}}
-										class="h-5 w-5 shrink-0 cursor-pointer border border-stone-900 text-[10px] leading-none font-black"
-										class:bg-stone-900={editingGuideSide === 'a'}
-										class:text-white={editingGuideSide === 'a'}
-										class:bg-white={editingGuideSide === 'b'}
-										class:text-stone-950={editingGuideSide === 'b'}>{editingGuideSide.toUpperCase()}</button
-									>
-								</HoverTooltip>
+								<FieldSideToggle
+									side={editingGuideSide}
+									onToggle={() => {
+										pinInlineGuideEditorUnderPointer();
+										setEditingGuideSide(editingGuideSide === 'a' ? 'b' : 'a');
+									}}
+								/>
 							{/if}
-							<label class="sr-only" for="guide-yardage">{editingLos ? 'Line of Scrimmage yard line' : 'Line to Gain distance'}</label>
-							<input
-								bind:this={guideYardageInput}
-								id="guide-yardage"
-								type="number"
+							<YardageInput
+								bind:element={guideYardageInput}
+								value={losYardageValue}
+								label={editingLos ? 'Line of Scrimmage yard line' : 'Line to Gain yard line'}
+								tooltip={editingLos ? 'L.O.S. Yard Line' : 'L.T.G. Yard Line'}
 								min={editingLos ? 0.5 : 0}
-								max={editingLos ? maximumLosYardLine() : maximumDownMarkerYardage(editingGuide.x, lineOfScrimmageX)}
-								step="0.5"
-								inputmode="decimal"
-								bind:value={losYardageValue}
-								aria-label={editingLos ? 'Line of Scrimmage yard line' : 'Line to Gain distance'}
-								title={editingLos ? 'L.O.S. yard line' : 'L.T.G. distance'}
-								class="down-yardage-input h-5 w-7 border border-stone-900 bg-stone-100 px-1 text-center text-[10px] leading-none font-black text-stone-800 outline-none hover:bg-stone-200 focus:bg-white focus:ring-1 focus:ring-stone-700 focus:ring-inset"
-								on:focus={(event) => (event.currentTarget as HTMLInputElement).select()}
-								on:input={updateGuideYardage}
-								on:keydown|stopPropagation={(event) => {
-									if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-										event.preventDefault();
-										moveEditingGuideByYard(event.key === 'ArrowLeft' ? -1 : 1);
-										return;
-									}
-									if (event.key !== 'Enter' && event.key !== 'Escape') return;
-									event.preventDefault();
+								max={maximumLosYardLine()}
+								onValueInput={(input) => applyGuideYardage(input.value)}
+								onMoveYard={moveEditingGuideByYard}
+								onCommit={(input) => {
+									applyGuideYardage(input.value);
 									commitGuideEditor();
 								}}
+								onEscape={commitGuideEditor}
 							/>
 						{/if}
-						<div class="flex gap-1" aria-label="Line color">
-							{#each guideColors as option}
-								<HoverTooltip text={option.label} placement="above" minWidthPx={0} wrapperClass="flex h-5 w-5 shrink-0">
-									<button
-										type="button"
-										aria-label={option.label}
-										aria-pressed={guideEditColor === option.id}
-										on:click={() => updateGuideColor(option.id)}
-										class="h-5 w-5 cursor-pointer border-2 border-white shadow-sm ring-1 ring-stone-400"
-										class:!ring-2={guideEditColor === option.id}
-										class:!ring-stone-950={guideEditColor === option.id}
-										style:background-color={option.value}
-									></button>
-								</HoverTooltip>
-							{/each}
-						</div>
-						<div class="flex gap-px bg-stone-400 p-px" aria-label="Line type">
-							{#each guideStyles as styleOption}
-								<HoverTooltip
-									text={styleOption.charAt(0).toUpperCase() + styleOption.slice(1)}
-									placement="above"
-									minWidthPx={0}
-									wrapperClass="flex h-5 w-8 shrink-0"
-								>
-									<button
-										type="button"
-										aria-label={`${styleOption} line`}
-										aria-pressed={guideEditStyle === styleOption}
-										on:click={() => updateGuideStyle(styleOption)}
-										class="flex h-5 w-8 cursor-pointer items-center justify-center bg-stone-100 text-stone-700 hover:bg-white"
-										class:!bg-stone-900={guideEditStyle === styleOption}
-										class:!text-white={guideEditStyle === styleOption}
-									>
-										<svg viewBox="0 0 24 6" class="h-2 w-6" aria-hidden="true">
-											<line
-												x1="1"
-												y1="3"
-												x2="23"
-												y2="3"
-												stroke="currentColor"
-												stroke-width="2"
-												stroke-dasharray={styleOption === 'dashed' ? '6 3' : styleOption === 'dotted' ? '0.01 4' : undefined}
-												stroke-linecap={styleOption === 'dotted' ? 'round' : 'square'}
-											/>
-										</svg>
-									</button>
-								</HoverTooltip>
-							{/each}
-						</div>
-						{#if showLineFormatReset}
-							<HoverTooltip text="Reset to Default" placement="above" minWidthPx={0} wrapperClass="flex h-5 w-6 shrink-0">
-								<button
-									type="button"
-									data-line-format-reset
-									aria-label="Reset to Default"
-									on:click={resetEditingLineFormat}
-									class="flex h-5 w-6 cursor-pointer items-center justify-center border border-stone-400 bg-stone-100 p-0.5 text-stone-800 hover:border-stone-900 hover:bg-stone-900 hover:text-white"
-								>
-									<svg viewBox="0 0 24 24" class="h-3.5 w-3.5" aria-hidden="true">
-										<path
-											d="M21 12a9 9 0 1 1-2.64-6.36L21 8M21 3v5h-5"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2.5"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										/>
-									</svg>
-								</button>
-							</HoverTooltip>
-						{/if}
+						<LineFormatControls
+							colorOptions={guideColors}
+							selectedColor={guideEditColor}
+							styleOptions={guideStyles}
+							selectedStyle={guideEditStyle}
+							showReset={showLineFormatReset}
+							onColor={updateGuideColor}
+							onStyle={updateGuideStyle}
+							onReset={resetEditingLineFormat}
+						/>
 					</form>
 				{/if}
 
 				{#if !viewOnly && deleteTarget && deletePosition}
-					<button
-						bind:this={deleteButtonElement}
-						type="button"
-						title={selectedTargets.length > 1 ? 'Delete selected elements' : 'Delete element'}
-						aria-label={selectedTargets.length > 1 ? 'Delete selected elements' : 'Delete element'}
-						on:pointerdown|preventDefault|stopPropagation={deleteHoveredElement}
-						class="element-delete-button absolute z-20 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white"
+					<div
+						class="absolute z-20 -translate-y-1/2"
 						style:left={`${deletePosition.x / 10}%`}
 						style:top={`${(deletePosition.y / 484) * 100}%`}
 					>
-						<img src="/images/toolbar/trash-can.webp" alt="" class="h-4 w-4 object-contain invert" draggable="false" loading="lazy" />
-					</button>
+						<HoverTooltip
+							text={selectedTargets.length > 1 ? 'Delete Selected Elements' : 'Delete Element'}
+							placement="above"
+							minWidthPx={0}
+							wrapperClass="flex h-7 w-7 shrink-0"
+						>
+							<button
+								bind:this={deleteButtonElement}
+								type="button"
+								aria-label={selectedTargets.length > 1 ? 'Delete selected elements' : 'Delete element'}
+								on:pointerdown|preventDefault|stopPropagation={deleteHoveredElement}
+								class="element-delete-button flex h-7 w-7 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white"
+							>
+								<img src="/images/toolbar/trash-can.webp" alt="" class="h-4 w-4 object-contain invert" draggable="false" loading="lazy" />
+							</button>
+						</HoverTooltip>
+					</div>
 				{/if}
 			</div>
 		</div>
@@ -8342,12 +8182,6 @@
 			style:top={`${100 - selection.lightness}%`}
 		></span>
 	</div>
-{/snippet}
-
-{#snippet modalCloseIcon()}
-	<svg viewBox="0 0 24 24" class="block h-4 w-4" aria-hidden="true">
-		<path d="M6 6 18 18M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" />
-	</svg>
 {/snippet}
 
 {#snippet helpToolCard(item: ToolOption)}
@@ -8451,6 +8285,7 @@
 						Discard Draft
 					</button>
 					<button
+						bind:this={restoreDraftButton}
 						type="button"
 						on:click={restorePendingDraft}
 						class="h-10 cursor-pointer bg-stone-900 px-4 text-xs font-black tracking-wide text-white uppercase hover:bg-stone-700"
@@ -8484,15 +8319,7 @@
 				<div>
 					<h2 id="play-builder-share-title" class="text-lg font-black tracking-tight">Share Play Builder</h2>
 				</div>
-				<button
-					bind:this={shareCloseButton}
-					type="button"
-					aria-label="Close share dialog"
-					on:click={() => (showShare = false)}
-					class="flex h-8 w-8 cursor-pointer items-center justify-center bg-white p-0 text-stone-900 hover:bg-stone-200"
-				>
-					{@render modalCloseIcon()}
-				</button>
+				<ModalCloseButton bind:element={shareCloseButton} ariaLabel="Close share dialog" onClose={() => (showShare = false)} />
 			</header>
 
 			<div class="space-y-5 p-4 sm:p-5">
@@ -8593,15 +8420,11 @@
 				<div>
 					<h2 id="play-builder-export-settings-title" class="text-sm font-black tracking-wide">Export Settings</h2>
 				</div>
-				<button
-					bind:this={exportSettingsCloseButton}
-					type="button"
-					aria-label="Close export settings"
-					on:click={() => (showExportSettings = false)}
-					class="flex h-7 w-7 cursor-pointer items-center justify-center bg-white p-0 text-stone-900 hover:bg-stone-200"
-				>
-					{@render modalCloseIcon()}
-				</button>
+				<ModalCloseButton
+					bind:element={exportSettingsCloseButton}
+					ariaLabel="Close export settings"
+					onClose={() => (showExportSettings = false)}
+				/>
 			</header>
 
 			<div class="space-y-4 p-3">
@@ -8734,16 +8557,12 @@
 		>
 			<header class="flex items-center justify-between border-b-2 border-stone-900 bg-stone-900 px-4 py-2.5 text-white">
 				<h2 id="new-play-title" class="text-lg font-black tracking-tight">Start a New Play?</h2>
-				<button
-					bind:this={newPromptCloseButton}
-					type="button"
-					aria-label="Continue editing current play"
+				<ModalCloseButton
+					bind:element={newPromptCloseButton}
+					ariaLabel="Continue editing current play"
 					disabled={actionInProgress === 'save'}
-					on:click={() => (showNewPrompt = false)}
-					class="flex h-7 w-7 cursor-pointer items-center justify-center bg-white p-0 text-stone-900 hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-50"
-				>
-					{@render modalCloseIcon()}
-				</button>
+					onClose={() => (showNewPrompt = false)}
+				/>
 			</header>
 			<div class="p-4">
 				<p id="new-play-description" class="text-sm leading-relaxed text-stone-600">
@@ -8806,15 +8625,7 @@
 					>
 						Revert to Defaults
 					</button>
-					<button
-						bind:this={settingsCloseButton}
-						type="button"
-						aria-label="Close settings"
-						on:click={() => (showSettings = false)}
-						class="flex h-9 w-9 cursor-pointer items-center justify-center bg-white p-0 text-stone-900 hover:bg-stone-200"
-					>
-						{@render modalCloseIcon()}
-					</button>
+					<ModalCloseButton bind:element={settingsCloseButton} ariaLabel="Close settings" onClose={() => (showSettings = false)} />
 				</div>
 			</header>
 
@@ -8925,6 +8736,31 @@
 						<button
 							type="button"
 							role="switch"
+							aria-checked={draftsEnabled}
+							on:click={() => {
+								draftsEnabled = !draftsEnabled;
+								if (!draftsEnabled) clearLocalDraft();
+							}}
+							class="flex h-full cursor-pointer items-start gap-3 border border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90"
+						>
+							<span
+								class="relative mt-0.5 h-5 w-9 shrink-0 border-2 border-stone-700 bg-stone-300 transition-colors"
+								class:!bg-green-600={draftsEnabled}
+							>
+								<span
+									class="absolute top-0.5 h-3 w-3 bg-white transition-[left]"
+									class:left-0.5={!draftsEnabled}
+									class:left-[18px]={draftsEnabled}
+								></span>
+							</span>
+							<span class="min-w-0">
+								<strong class="block text-xs font-black">Save Drafts</strong>
+								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600">Save and restore unfinished work.</span>
+							</span>
+						</button>
+						<button
+							type="button"
+							role="switch"
 							aria-checked={snappingEnabled}
 							on:click={() => (snappingEnabled = !snappingEnabled)}
 							class="flex h-full cursor-pointer items-start gap-3 border border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90"
@@ -9020,15 +8856,7 @@
 				<div>
 					<h2 id="play-builder-feedback-title" class="text-xl font-black tracking-tight">Feedback</h2>
 				</div>
-				<button
-					bind:this={feedbackCloseButton}
-					type="button"
-					aria-label="Close feedback"
-					on:click={() => (showFeedback = false)}
-					class="flex h-9 w-9 cursor-pointer items-center justify-center bg-white p-0 text-stone-900 hover:bg-stone-200"
-				>
-					{@render modalCloseIcon()}
-				</button>
+				<ModalCloseButton bind:element={feedbackCloseButton} ariaLabel="Close feedback" onClose={() => (showFeedback = false)} />
 			</header>
 			<div class="space-y-4 p-5 text-sm leading-relaxed">
 				<p>Found a problem or have an idea? Send your feedback to <strong>feedback@caseplay.org</strong>.</p>
@@ -9063,15 +8891,7 @@
 				<div>
 					<h2 id="play-builder-help-title" class="text-xl font-black tracking-tight sm:text-2xl">Play Builder Guide</h2>
 				</div>
-				<button
-					bind:this={helpCloseButton}
-					type="button"
-					aria-label="Close help"
-					on:click={() => (showHelp = false)}
-					class="flex h-9 w-9 cursor-pointer items-center justify-center bg-white p-0 text-stone-900 hover:bg-stone-200"
-				>
-					{@render modalCloseIcon()}
-				</button>
+				<ModalCloseButton bind:element={helpCloseButton} ariaLabel="Close help" onClose={() => (showHelp = false)} />
 			</header>
 
 			<div class="space-y-7 p-5 sm:p-7">
@@ -9190,14 +9010,14 @@
 							Turn Enable Snapping off for free movement; hold <kbd>Shift</kbd> while moving whenever you want to snap temporarily. Footballs prioritize
 							cross-field lines, while L.O.S. and L.T.G. prioritize footballs.
 						</li>
-						<li>Snap points automatically follow the markings available on the selected Traditional, 4v4, Unified, or NFL Flag field.</li>
+						<li>Snap points automatically follow the markings available on the selected Traditional, 4-on-4, Unified, or NFL Flag field.</li>
 						<li>
 							<strong>Flip</strong> mirrors every field element and drawing across midfield. Use the button or press <kbd>Shift</kbd> + <kbd>F</kbd>.
 						</li>
 						<li>
 							<strong>Setup</strong> uses the selected field’s proper starting spot and first line to gain: A’s 14 to A’s 20 on Traditional, A’s 10 to midfield
-							on 4v4, A’s 5 to midfield on Unified, or A’s 5 to midfield on NFL Flag. It adds A-1 and the appropriate initial official positions: a four-person
-							crew on Traditional and Unified, or the R and LJ on 4v4 and NFL Flag. One Undo restores the previous diagram.
+							on 4-on-4, A’s 5 to midfield on Unified, or A’s 5 to midfield on NFL Flag. It adds A-1 and the appropriate initial official positions: a four-person
+							crew on Traditional and Unified, or the R and LJ on 4-on-4 and NFL Flag. One Undo restores the previous diagram.
 						</li>
 					</ul>
 				</section>
@@ -9243,7 +9063,7 @@
 							saved or exported.
 						</p>
 						<p>
-							<strong>Field types:</strong> Traditional is the 100 × 40-yard NIRSA field. 4v4 uses the 60 × 30-yard layout with a single midfield hash.
+							<strong>Field types:</strong> Traditional is the 100 × 40-yard NIRSA field. 4-on-4 uses the 60 × 30-yard layout with a single midfield hash.
 							Unified uses the 60 × 25-yard SONA/NIRSA layout with dashed no-run-zone lines and optional no-run-zone labels.
 						</p>
 						<p>
@@ -9383,27 +9203,6 @@
 		display: none;
 		width: 0;
 		height: 0;
-	}
-	.down-yardage-input {
-		appearance: textfield;
-		-moz-appearance: textfield;
-	}
-	[data-line-format-editor] button,
-	[data-line-format-editor] input {
-		box-sizing: border-box;
-		height: 1.25rem;
-		min-height: 1.25rem;
-		max-height: 1.25rem;
-	}
-	[data-toolbar-line-format-reset],
-	[data-line-format-reset] {
-		padding: 0.125rem;
-	}
-	.down-yardage-input::-webkit-inner-spin-button,
-	.down-yardage-input::-webkit-outer-spin-button {
-		margin: 0;
-		appearance: none;
-		-webkit-appearance: none;
 	}
 	.play-builder-interaction {
 		container-type: inline-size;
