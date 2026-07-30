@@ -1,0 +1,186 @@
+FLAG FOOTBALL PLAY BUILDER LAUNCH ARTICLE
+FEATURE VERIFICATION NOTES
+
+Audit date: July 28, 2026
+Production site: https://caseplay.org/
+Production builder: https://caseplay.org/play-builder
+Test viewport: 1440 × 900
+
+CASEPLAY.ORG WORKFLOW
+
+1. Searchable case-play database
+   Location: CasePlay.org home page, “Search case plays...” field.
+   Result: Successfully tested with the search term “roughing.” Matching case-play links carried the search value in the q URL parameter.
+   Limitation/uncertainty: The visible result-count text still read “10 case plays found” during this particular query, so the article does not make a claim about live count updates.
+
+2. Difficulty filtering
+   Location: Home page, “Filter Difficulty” button.
+   Result: Successfully opened. Easy, Moderate, and Hard options were visible.
+   Limitation/uncertainty: The article mentions searchable case plays but does not rely on or describe the difficulty filter.
+
+3. Case-play prompt and spoiler ruling
+   Location: A live case-play page for “Completed Pass, Roughing & Taunt.”
+   Result: Successfully inspected the visible prompt, author/source metadata, rule reference, page number, black answer area, reveal control, and similar-case-play column. Clicking the reveal control successfully exposed the ruling text.
+   Limitation/uncertainty: None relevant to the article.
+
+PLAY BUILDER CORE
+
+4. Blank builder workspace
+   Location: Main Play Builder page.
+   Result: Successfully loaded. The field, toolbar, top actions, lower field controls, team boxes, period, clock, and play tab were visible.
+   Limitation/uncertainty: The article is written for the current desktop-oriented interface; smaller-screen behavior was not evaluated for this launch article.
+
+5. Default Setup
+   Location: Bottom-right field controls, “Setup.”
+   Result: Successfully tested. It placed the line of scrimmage, line to gain, A-1, football, down marker, LOS yard marker, and four official positions on the Traditional field.
+   Limitation/uncertainty: The exact default setup varies by field type, as described by the built-in guide. Only the Traditional result was used in the screenshots.
+
+6. Team player placement
+   Location: Left toolbar, Team A and Team B buttons.
+   Result: Successfully placed A-2, A-3, B-1, B-2, and B-3.
+   Limitation/uncertainty: Team K and Team R were visible but were not needed for the example and are not described in the article.
+
+7. Dragging placed elements
+   Location: Diagram canvas.
+   Result: Successfully dragged A-2 from its original placement to a new formation position.
+   Limitation/uncertainty: Group selection and group movement were not needed for this article and are not described.
+
+8. Official positions
+   Location: Left toolbar; also added by Setup.
+   Result: Referee, Line Judge, Back Judge, and Field Judge were successfully placed by Setup and remained visible in the example.
+   Limitation/uncertainty: Editing official names was visible as an available double-click action but was not tested or discussed.
+
+9. Football
+   Location: Left toolbar; also added by Setup.
+   Result: Successfully placed by Setup and used as the pass origin in the example.
+   Limitation/uncertainty: Optional football text editing was not tested or discussed.
+
+10. Penalty marker
+    Location: Left toolbar, “Penalty Flag.”
+    Result: Successfully placed at the discussion point in the completed example.
+    Limitation/uncertainty: Flag color and optional text editing were not tested or discussed.
+
+11. Line of scrimmage and line to gain
+    Location: Left toolbar; also added by Setup.
+    Result: Successfully placed by Setup and retained in the example.
+    Limitation/uncertainty: Their advanced inline formatting and manual yard-line editors were not needed for the tutorial and are not described.
+
+12. Run arrow
+    Location: Left toolbar, “Run Arrow.”
+    Result: Successfully drawn as a solid white movement arrow.
+    Limitation/uncertainty: Advanced color, line-format, reset, and endpoint editing were not needed for the article.
+
+13. Forward-pass arrow
+    Location: Left toolbar, “Forward Pass.”
+    Result: Successfully drawn as a dashed cyan arrow from the football toward the receiving area.
+    Limitation/uncertainty: Punt/Kick was visible but not used and is not discussed.
+
+14. Free drawing
+    Location: Left toolbar, “Free Draw.”
+    Result: Successfully drew a red circle around the discussion point. The live drawing controls showed freehand/straight-line choices, thickness, ten colors, an eraser, and clear-drawings.
+    Limitation/uncertainty: Only the freehand red annotation was exercised for the screenshot.
+
+15. Laser pointer
+    Location: Left toolbar, “Laser Pointer.”
+    Result: Successfully entered laser-pointer mode, moved the pointer over the field, and created a laser stroke before leaving the mode.
+    Limitation/uncertainty: Color selection and the undocumented rainbow color were not tested or discussed.
+
+EDITING AND CONTEXT
+
+16. Undo and Redo
+    Location: Top-left action controls.
+    Result: Successfully tested by undoing and redoing an example change. Redo enabled after Undo, and Undo remained enabled after Redo.
+    Limitation/uncertainty: None relevant to the article.
+
+17. Clear All and recovery
+    Location: Top-left action controls.
+    Result: Successfully removed the diagram. Undo then restored A-1 and the rest of the prior play state.
+    Limitation/uncertainty: None relevant to the article.
+
+18. Flip field direction
+    Location: Bottom-right field controls, “Flip.”
+    Result: Successfully mirrored the diagram. A-1 moved from approximately x=279 to x=906, then returned to its original location after a second flip.
+    Limitation/uncertainty: None relevant to the article.
+
+19. Period selector
+    Location: Above the top team box.
+    Result: Successfully cycled 1st → 2nd → 3rd → 4th → OT → 1st.
+    Limitation/uncertainty: None relevant to the article.
+
+20. Game clock
+    Location: Above the top team box.
+    Result: Successfully opened the inline clock input and changed 00:00 to 02:30.
+    Limitation/uncertainty: Arrow-key adjustment and cancel/revert behavior were not needed for the article.
+
+FIELD SETTINGS
+
+21. Field layouts
+    Location: Settings → Field Type.
+    Result: Traditional, 4-on-4, Unified, and NFL Flag options were visible. The test switched to 4-on-4 and back to Traditional successfully.
+    Limitation/uncertainty: Only the Traditional field appears in the example screenshots.
+
+22. Field colors
+    Location: Settings → Grass Color.
+    Result: Green, Red, Navy Blue, Light Blue, Orange, and Purple were visible. The test switched to Purple and back to Green successfully.
+    Limitation/uncertainty: Only green appears in the screenshots.
+
+23. Field-detail controls
+    Location: Settings → Field Details.
+    Result: The settings panel visibly presented switches for yard numbers, goal-line letters, end-zone text, pylons, hash marks, try lines, the 14-yard X, the 30-yard marker, team boxes, down marker, and LOS yard marker.
+    Limitation/uncertainty: These switches were inspected but not individually toggled. The article says they are presented in the panel; it does not claim every combination was tested.
+
+24. Builder-wide settings
+    Location: Settings → Play Builder Settings.
+    Result: Auto-Save, Save Drafts, Enable Snapping, High Contrast Mode, and Show Yard Line Under Cursor were visible.
+    Limitation/uncertainty: These settings were not changed for the launch example and are not described as tested features in the article.
+
+HELP, SAVE, SHARE, AND EXPORT
+
+25. Built-in guide
+    Location: Bottom-right field controls, “Help.”
+    Result: Successfully opened the Play Builder Guide. It contained sections for starting, team players, officials, field elements, cross-field lines, free drawing, snapping/setup, multiple plays, field settings, and save/share/export.
+    Limitation/uncertainty: Clicking the separate Tutorial button also presented the guide during this audit rather than a distinct visible step-by-step sequence. The article mentions the guide, not a separate interactive tutorial.
+
+26. Save
+    Location: Top-left action controls.
+    Result: Successfully saved the completed example. The URL changed from /play-builder to a shareable builder URL, the button changed to “Saved,” and the Share action appeared.
+    Limitation/uncertainty: The saved example was created solely for this article audit. The public article links to the general builder rather than depending on the audit-specific saved URL.
+
+27. Shareable link and QR code
+    Location: “Share” button after saving.
+    Result: Successfully opened the Share Play Builder dialog. It displayed a selected shareable URL, copy-link control, QR code, Copy Image action, and Download PNG action.
+    Limitation/uncertainty: The clipboard actions themselves were not invoked because copying was not required to verify the interface.
+
+28. PNG, JPG, WebP, and PDF exports
+    Location: Top-right export controls.
+    Result: All four export buttons were clicked successfully. The UI confirmed the final PDF export, and no browser or application error appeared for any format.
+    Limitation/uncertainty: Downloaded file contents were not opened individually; article claims are limited to the presence and successful activation of the export actions.
+
+29. Export background options
+    Location: Top-right “Options” button.
+    Result: Successfully opened Export Settings. Transparent and Solid Color background choices were visible, along with a solid-color picker.
+    Limitation/uncertainty: The default transparent option was left unchanged.
+
+VISIBLE FEATURES OMITTED FROM THE ARTICLE
+
+30. Add another play
+    Location: Plus button beside Play 1.
+    Result: The button was clicked once, but no second visible play tab appeared in the DOM snapshot during this audit.
+    Limitation/uncertainty: The built-in guide describes multiple plays, but this interaction was not conclusively verified. The launch article therefore does not advertise multiple-play creation.
+
+31. Other toolbar objects
+    Location: Left toolbar.
+    Result: Bean Bag, Flag Belt, Event Tag, Punt/Kick, Team K, and Team R were visible.
+    Limitation/uncertainty: They were not needed for the demonstration and were not individually tested, so the article does not enumerate them.
+
+32. Advanced editing
+    Location: Double-click editors, keyboard shortcuts, multi-selection, copy/paste, snapping, auto-save, drafts, and high-contrast mode.
+    Result: Their controls or documentation were visible.
+    Limitation/uncertainty: They were outside the scope of the launch walkthrough and are intentionally omitted rather than inferred.
+
+ARTICLE ACCURACY BOUNDARIES
+
+• The article describes the builder as a diagramming, teaching, presentation, and discussion tool.
+• It does not claim that the builder generates rulings, simulates plays, verifies rule enforcement, or automatically attaches diagrams to case plays.
+• The example is deliberately described as a neutral illustration, not as a rules case with a verified ruling.
+• The article clearly states that the builder is in early development and that controls, workflows, and visual details may change.

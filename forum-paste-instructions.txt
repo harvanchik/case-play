@@ -1,0 +1,36 @@
+HOW TO COPY THE RENDERED ARTICLE INTO A FORUM
+
+1. Keep this file, flag-football-play-builder-launch.html, and the images folder together in their current relative locations.
+
+2. Open flag-football-play-builder-launch.html in a desktop browser. The article should appear on a white page with readable headings, spacing, links, and screenshots.
+
+3. Click inside the article, press Ctrl+A, then press Ctrl+C.
+
+4. Open the forum’s rich-text editor and paste with Ctrl+V. Do not paste into a Markdown or source-code mode.
+
+5. Review the image handling before publishing. Some forum editors do not upload images copied from a local HTML file. If an image is missing or points to a local path, upload the matching PNG from:
+
+   images/flag-football-play-builder/
+
+   Insert the images in this order:
+
+   a. play-builder-full-interface.png
+   b. starting-example-setup.png
+   c. adding-a-player.png
+   d. arranging-players-and-markers.png
+   e. drawing-movement-and-pass-arrows.png
+   f. annotating-the-play.png
+   g. completed-example-play.png
+   h. field-settings-and-options.png
+
+6. If the forum provides an alt-text field, use the alt text already present on each image in the HTML file. The matching captions are immediately below each image.
+
+7. Confirm that these links remain clickable after pasting:
+
+   CasePlay.org: https://caseplay.org/
+   Flag Football Play Builder: https://caseplay.org/play-builder
+   Feedback email: mailto:feedback@caseplay.org
+
+8. Preview the forum post before publishing. Check heading hierarchy, numbered steps, image order, captions, and the final feedback invitation.
+
+9. If the forum strips the custom font sizes or spacing, the semantic HTML structure will still preserve the title, headings, paragraphs, lists, links, figures, and captions. The plain-text file is available as a fallback.

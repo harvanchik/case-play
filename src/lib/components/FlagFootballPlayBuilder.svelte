@@ -131,6 +131,7 @@
 	export let exportPrompt: string | null = null;
 	export let exportPromptSource: HTMLElement | null = null;
 	export let viewOnly = false;
+	export let adsEnabled = false;
 
 	type ToolIcon = 'event' | 'line-of-scrimmage' | 'line-to-gain';
 	type ToolOption = {
@@ -592,7 +593,8 @@
 					drafts: draftsEnabled,
 					snapping: snappingEnabled,
 					highContrast: highContrastEnabled,
-					showYardLineCursor: showYardLineCursorEnabled
+					showYardLineCursor: showYardLineCursorEnabled,
+					ads: adsEnabled
 				})
 			);
 		} catch {
@@ -817,7 +819,7 @@
 			id: 'traditional',
 			label: 'Traditional',
 			dimensions: '100 × 40 yards',
-			description: 'NIRSA 7v7 field with four 20-yard zones and 10-yard end zones.'
+			description: 'NIRSA/NCAA/NFHS 7v7 field with four 20-yard zones and 10-yard end zones.'
 		},
 		{ id: 'four-on-four', label: '4-on-4', dimensions: '60 × 30 yards', description: 'Two 20-yard playing zones and 10-yard end zones.' },
 		{ id: 'unified', label: 'Unified', dimensions: '60 × 25 yards', description: 'SONA/NIRSA Unified field with 5-yard no-run zones.' },
@@ -3166,12 +3168,7 @@
 		guideEditColor = guide.color;
 		guideEditStyle = guide.style;
 		if (guide.kind === 'line-of-scrimmage' || guide.kind === 'line-to-gain') editingGuideSide = fieldSideForX(guide.x);
-		losYardageValue =
-			guide.kind === 'line-of-scrimmage'
-				? losYardLine(guide.x)
-				: guide.kind === 'line-to-gain'
-					? losYardLine(guide.x)
-					: '';
+		losYardageValue = guide.kind === 'line-of-scrimmage' ? losYardLine(guide.x) : guide.kind === 'line-to-gain' ? losYardLine(guide.x) : '';
 		losYardageHistorySaved = false;
 		if (guide.kind === 'line-of-scrimmage' || guide.kind === 'line-to-gain') {
 			await tick();
@@ -3250,9 +3247,7 @@
 				unified: { 'line-of-scrimmage': 5, 'line-to-gain': 15 },
 				'nfl-flag': { 'line-of-scrimmage': 5, 'line-to-gain': 20 }
 			} as const;
-			toolbarGuideYardage = existing
-				? losYardLine(existing.x)
-				: defaultYardages[fieldSettings.fieldType][selectedTool];
+			toolbarGuideYardage = existing ? losYardLine(existing.x) : defaultYardages[fieldSettings.fieldType][selectedTool];
 			await tick();
 			toolbarGuideYardageInput?.focus();
 			toolbarGuideYardageInput?.select();
@@ -5304,6 +5299,7 @@
 			if (typeof stored.snapping === 'boolean') snappingEnabled = stored.snapping;
 			if (typeof stored.highContrast === 'boolean') highContrastEnabled = stored.highContrast;
 			if (typeof stored.showYardLineCursor === 'boolean') showYardLineCursorEnabled = stored.showYardLineCursor;
+			if (typeof stored.ads === 'boolean') adsEnabled = stored.ads;
 		} catch {
 			// Ignore malformed settings left by an older browser session.
 		}
@@ -6387,10 +6383,7 @@
 											stroke-width="2"
 											pointer-events="none"
 										/>
-										{#if scoreboardItem.kind === 'clock' &&
-											editingScoreboard === 'clock' &&
-											tool !== 'laser' &&
-											tool !== 'free-draw'}
+										{#if scoreboardItem.kind === 'clock' && editingScoreboard === 'clock' && tool !== 'laser' && tool !== 'free-draw'}
 											<foreignObject
 												bind:this={editorElement}
 												data-scoreboard-inline-editor
@@ -8110,11 +8103,7 @@
 				{/if}
 
 				{#if !viewOnly && deleteTarget && deletePosition}
-					<div
-						class="absolute z-20 -translate-y-1/2"
-						style:left={`${deletePosition.x / 10}%`}
-						style:top={`${(deletePosition.y / 484) * 100}%`}
-					>
+					<div class="absolute z-20 -translate-y-1/2" style:left={`${deletePosition.x / 10}%`} style:top={`${(deletePosition.y / 484) * 100}%`}>
 						<HoverTooltip
 							text={selectedTargets.length > 1 ? 'Delete Selected Elements' : 'Delete Element'}
 							placement="above"
@@ -8420,11 +8409,7 @@
 				<div>
 					<h2 id="play-builder-export-settings-title" class="text-sm font-black tracking-wide">Export Settings</h2>
 				</div>
-				<ModalCloseButton
-					bind:element={exportSettingsCloseButton}
-					ariaLabel="Close export settings"
-					onClose={() => (showExportSettings = false)}
-				/>
+				<ModalCloseButton bind:element={exportSettingsCloseButton} ariaLabel="Close export settings" onClose={() => (showExportSettings = false)} />
 			</header>
 
 			<div class="space-y-4 p-3">
@@ -8747,10 +8732,7 @@
 								class="relative mt-0.5 h-5 w-9 shrink-0 border-2 border-stone-700 bg-stone-300 transition-colors"
 								class:!bg-green-600={draftsEnabled}
 							>
-								<span
-									class="absolute top-0.5 h-3 w-3 bg-white transition-[left]"
-									class:left-0.5={!draftsEnabled}
-									class:left-[18px]={draftsEnabled}
+								<span class="absolute top-0.5 h-3 w-3 bg-white transition-[left]" class:left-0.5={!draftsEnabled} class:left-[18px]={draftsEnabled}
 								></span>
 							</span>
 							<span class="min-w-0">
@@ -8826,6 +8808,24 @@
 							<span class="min-w-0">
 								<strong class="block text-xs font-black">Show Yard Line Under Cursor</strong>
 								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600"> Show the yard line beneath an element before you place it. </span>
+							</span>
+						</button>
+						<button
+							type="button"
+							role="switch"
+							aria-checked={adsEnabled}
+							on:click={() => (adsEnabled = !adsEnabled)}
+							class="flex h-full cursor-pointer items-start gap-3 border border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90"
+						>
+							<span
+								class="relative mt-0.5 h-5 w-9 shrink-0 border-2 border-stone-700 bg-stone-300 transition-colors"
+								class:!bg-green-600={adsEnabled}
+							>
+								<span class="absolute top-0.5 h-3 w-3 bg-white transition-[left]" class:left-0.5={!adsEnabled} class:left-[18px]={adsEnabled}></span>
+							</span>
+							<span class="min-w-0">
+								<strong class="block text-xs font-black">Show Ads</strong>
+								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600"> Show the Play Builder ad panel beside the diagram. </span>
 							</span>
 						</button>
 					</div>

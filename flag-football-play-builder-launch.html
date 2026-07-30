@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>See the Play: Introducing the Flag Football Play Builder</title>
+		<style>
+			:root {
+				color-scheme: light;
+				--text: #232323;
+				--muted: #616161;
+				--rule: #d9d9d9;
+				--accent: #245f42;
+				--soft: #f5f7f5;
+			}
+
+			* {
+				box-sizing: border-box;
+			}
+
+			body {
+				margin: 0;
+				background: #ffffff;
+				color: var(--text);
+				font-family: Arial, Helvetica, sans-serif;
+				font-size: 18px;
+				line-height: 1.7;
+			}
+
+			main {
+				width: min(860px, calc(100% - 40px));
+				margin: 0 auto;
+				padding: 64px 0 80px;
+			}
+
+			h1,
+			h2,
+			h3 {
+				color: #171717;
+				line-height: 1.15;
+				letter-spacing: -0.025em;
+			}
+
+			h1 {
+				max-width: 760px;
+				margin: 0 0 24px;
+				font-size: clamp(2.5rem, 7vw, 4.5rem);
+			}
+
+			h2 {
+				margin: 64px 0 18px;
+				font-size: clamp(1.75rem, 4vw, 2.5rem);
+			}
+
+			h3 {
+				margin: 38px 0 10px;
+				font-size: 1.35rem;
+			}
+
+			p {
+				margin: 0 0 20px;
+			}
+
+			a {
+				color: var(--accent);
+				text-decoration-thickness: 1px;
+				text-underline-offset: 3px;
+			}
+
+			ol,
+			ul {
+				margin: 18px 0 28px;
+				padding-left: 28px;
+			}
+
+			li {
+				margin: 0 0 16px;
+				padding-left: 5px;
+			}
+
+			figure {
+				margin: 34px 0 46px;
+			}
+
+			img {
+				display: block;
+				max-width: 100%;
+				height: auto;
+				border: 1px solid var(--rule);
+				background: #ffffff;
+				box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+			}
+
+			figcaption {
+				margin-top: 10px;
+				color: var(--muted);
+				font-size: 0.88rem;
+				line-height: 1.5;
+			}
+
+			.kicker {
+				margin-bottom: 14px;
+				color: var(--accent);
+				font-size: 0.82rem;
+				font-weight: 700;
+				letter-spacing: 0.14em;
+				text-transform: uppercase;
+			}
+
+			.lead {
+				max-width: 720px;
+				color: #383838;
+				font-size: 1.25rem;
+				line-height: 1.55;
+			}
+
+			.short {
+				max-width: 660px;
+				font-size: 1.35rem;
+				line-height: 1.45;
+			}
+
+			.reveal {
+				margin: 40px 0;
+				padding: 26px 30px;
+				border-left: 5px solid var(--accent);
+				background: var(--soft);
+			}
+
+			.reveal p:last-child {
+				margin-bottom: 0;
+			}
+
+			.cta {
+				margin-top: 54px;
+				padding-top: 30px;
+				border-top: 1px solid var(--rule);
+			}
+
+			.button-link {
+				display: inline-block;
+				margin: 8px 0 22px;
+				padding: 12px 18px;
+				border: 2px solid #1d1d1d;
+				background: #1d1d1d;
+				color: #ffffff;
+				font-weight: 700;
+				text-decoration: none;
+			}
+
+			@media (max-width: 640px) {
+				body {
+					font-size: 17px;
+				}
+
+				main {
+					width: min(100% - 28px, 860px);
+					padding-top: 42px;
+				}
+
+				h2 {
+					margin-top: 48px;
+				}
+
+				.reveal {
+					padding: 22px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<article>
+				<p class="kicker">A new tool on CasePlay.org</p>
+				<h1>See the Play: Introducing the Flag Football Play Builder</h1>
+				<p class="lead">Some flag football plays are difficult to explain for a simple reason: too much happens at once.</p>
+
+				<h2>A rule can be clear. The play can still be hard to picture.</h2>
+				<p>
+					A formation shifts. A receiver crosses the field. The ball changes location. A flag lands at one spot while the end of the run happens
+					somewhere else.
+				</p>
+				<p>Text can describe every part correctly and still leave two people imagining two different plays.</p>
+				<p class="short"><strong>Sometimes the missing piece is not another sentence. It is a picture.</strong></p>
+
+				<h2>Where CasePlay.org fits</h2>
+				<p>
+					<a href="https://caseplay.org/">CasePlay.org</a> already gives sports case plays an organized, searchable home. A reader can find a
+					scenario, study the prompt, and think through the ruling before revealing the answer hidden behind the spoiler.
+				</p>
+				<p>That makes the site useful for rules study, officiating education, and discussion. It also makes a visual tool a natural next step.</p>
+
+				<div class="reveal">
+					<p>Case plays give us the words.</p>
+					<p><strong>Now, we can build the play.</strong></p>
+				</div>
+
+				<h2>Meet the Flag Football Play Builder</h2>
+				<p>
+					The <a href="https://caseplay.org/play-builder"><strong>Flag Football Play Builder</strong></a> is a browser-based diagramming workspace for
+					constructing flag football situations visually.
+				</p>
+				<p>
+					Start with a field. Place players, officials, the football, and a penalty marker. Set the line of scrimmage and line to gain. Then add
+					movement with run and pass arrows, or annotate the field with free drawing and a laser pointer.
+				</p>
+				<p>
+					It does not decide the ruling. It gives everyone a common view of the play so the ruling can be studied, taught, and discussed more clearly.
+				</p>
+
+				<figure>
+					<img
+						src="images/flag-football-play-builder/play-builder-full-interface.png"
+						alt="The complete CasePlay.org Flag Football Play Builder interface showing a finished play with players, officials, field lines, arrows, and a penalty marker"
+					/>
+					<figcaption>The live Play Builder keeps the field, diagram tools, editing controls, and export actions in one workspace.</figcaption>
+				</figure>
+
+				<h2>Who is it for?</h2>
+				<p>The builder is meant for people who need to make a play understandable before they can make it useful.</p>
+				<ul>
+					<li>
+						<strong>A clinician</strong> can prepare a visual before a training session and keep the conversation centered on the same formation and
+						sequence.
+					</li>
+					<li><strong>An official</strong> can diagram an unusual situation, share the link, and ask other officials what they see.</li>
+					<li>
+						<strong>An officials trainer or rules educator</strong> can show positioning, movement, and the location of important events instead of
+						relying on a paragraph alone.
+					</li>
+					<li>
+						<strong>An intramural professional or tournament staff member</strong> can create a diagram for crew review or presentation material.
+					</li>
+					<li><strong>A case-play author</strong> can build a visual companion to a written scenario without turning the diagram into the answer.</li>
+				</ul>
+
+				<h2>Build one example, step by step</h2>
+				<p>
+					The fastest way to understand the tool is to use it. The example below is a neutral passing-play illustration. It shows a formation,
+					movement, a pass path, defenders, and a marked point for discussion. It does not make a rules claim.
+				</p>
+
+				<ol>
+					<li>
+						<h3>Open the builder</h3>
+						<p>
+							Visit <a href="https://caseplay.org/play-builder">caseplay.org/play-builder</a>. You can begin with the blank field or use
+							<strong>Setup</strong> to place a practical starting group: the line of scrimmage, line to gain, an offensive player, the football, and
+							the initial official positions.
+						</p>
+					</li>
+				</ol>
+
+				<figure>
+					<img
+						src="images/flag-football-play-builder/starting-example-setup.png"
+						alt="The Play Builder after using Setup, with a line of scrimmage, line to gain, A-1, the football, and four official positions"
+					/>
+					<figcaption>Setup creates a useful starting point while leaving the rest of the play open.</figcaption>
+				</figure>
+
+				<ol start="2">
+					<li>
+						<h3>Add the people and objects that matter</h3>
+						<p>
+							Choose a team button, then click the field to place a player. The live toolbar also provides official positions, a football, and
+							game-event markers. A selected item can be removed with the small trash control that appears beside it.
+						</p>
+					</li>
+				</ol>
+
+				<figure>
+					<img
+						src="images/flag-football-play-builder/adding-a-player.png"
+						alt="A newly placed Team A player selected on the field with its nearby delete control"
+					/>
+					<figcaption>Choose a team, place a player, and adjust the diagram from there.</figcaption>
+				</figure>
+
+				<ol start="3">
+					<li>
+						<h3>Arrange the formation</h3>
+						<p>
+							Drag placed players and markers to the locations you want. In this example, three Team A players and three Team B players are arranged
+							around the line of scrimmage, with the football and officials still visible.
+						</p>
+					</li>
+				</ol>
+
+				<figure>
+					<img
+						src="images/flag-football-play-builder/arranging-players-and-markers.png"
+						alt="A flag football formation with three Team A players, three Team B players, the football, officials, the line of scrimmage, and line to gain"
+					/>
+					<figcaption>Movement starts with a formation everyone can see in the same way.</figcaption>
+				</figure>
+
+				<ol start="4">
+					<li>
+						<h3>Now add movement</h3>
+						<p>
+							Select the run-arrow or forward-pass tool and drag across the field. In the example, a solid white run arrow shows a receiver’s path
+							while a dashed cyan arrow shows the path of the pass.
+						</p>
+					</li>
+				</ol>
+
+				<figure>
+					<img
+						src="images/flag-football-play-builder/drawing-movement-and-pass-arrows.png"
+						alt="The example formation with a solid white run arrow and a dashed cyan forward-pass arrow"
+					/>
+					<figcaption>The diagram begins to tell a story when formation and movement appear together.</figcaption>
+				</figure>
+
+				<ol start="5">
+					<li>
+						<h3>Mark the point worth discussing</h3>
+						<p>
+							Place a penalty marker where the event occurred. For live explanation, the free-draw controls provide colors, line styles, thickness, an
+							eraser, and a clear-drawings action. The laser-pointer mode offers another way to direct attention during a discussion.
+						</p>
+					</li>
+				</ol>
+
+				<figure>
+					<img
+						src="images/flag-football-play-builder/annotating-the-play.png"
+						alt="The play diagram with the free-draw palette open and a red circle drawn around the marked event location"
+					/>
+					<figcaption>A temporary drawn circle focuses the discussion without changing the underlying play elements.</figcaption>
+				</figure>
+
+				<ol start="6">
+					<li>
+						<h3>Refine without starting over</h3>
+						<p>
+							Use <strong>Undo</strong> and <strong>Redo</strong> as the play develops. <strong>Clear All</strong> removes the diagram, and that clear
+							action can itself be undone. <strong>Flip</strong> mirrors the complete situation to the opposite side of the field. The period and game
+							clock can also be set when that context matters.
+						</p>
+					</li>
+					<li>
+						<h3>Save it. Share it. Or export it.</h3>
+						<p>
+							Saving creates a shareable CasePlay.org address. The Share dialog provides the selected link and a QR code. The current export controls
+							produce PNG, JPG, WebP, and PDF files, with a separate background option for exports.
+						</p>
+					</li>
+				</ol>
+
+				<figure>
+					<img
+						src="images/flag-football-play-builder/completed-example-play.png"
+						alt="A close view of the completed example with players, officials, the football, line of scrimmage, line to gain, run and pass arrows, and a penalty marker"
+					/>
+					<figcaption>The completed example is ready to show, save, share by link or QR code, or export for a presentation.</figcaption>
+				</figure>
+
+				<h2>What the finished visual makes clear</h2>
+				<p>The example does not need to settle a ruling to be useful.</p>
+				<p>
+					It establishes where the snap began. It separates the receiver’s movement from the path of the ball. It keeps the defenders visible. It
+					marks the point the group should discuss. And it preserves the yard-line context around the play.
+				</p>
+				<p><strong>Now the conversation can begin from the same picture.</strong></p>
+
+				<h2>And it keeps getting more useful</h2>
+				<p>The basic idea is simple: place the play on the field.</p>
+				<p>
+					But the current builder also supports several flag-football field layouts. The tested settings include Traditional, 4-on-4, Unified, and NFL
+					Flag fields, along with selectable field colors. The settings panel also presents controls for the visible field details.
+				</p>
+
+				<figure>
+					<img
+						src="images/flag-football-play-builder/field-settings-and-options.png"
+						alt="The Field Settings dialog showing Traditional, 4-on-4, Unified, and NFL Flag layouts with field-detail controls"
+					/>
+					<figcaption>
+						Field Settings begins with the format of football being discussed, then exposes the field details that support the diagram.
+					</figcaption>
+				</figure>
+
+				<p>
+					The built-in guide explains the major player, official, field, drawing, saving, sharing, and export controls. That matters because the tool
+					has enough depth to support a quick case-play sketch and a more deliberate clinic visual.
+				</p>
+				<p>
+					A shared diagram can support a forum question. An exported image can go into presentation slides. A saved builder can give a crew the exact
+					play that inspired the discussion.
+				</p>
+
+				<h2>Built for today. Still being shaped.</h2>
+				<p>The Flag Football Play Builder is in early development.</p>
+				<p>
+					The current version is usable now, but controls, workflows, and visual details may change. Some parts will need more refinement. The tool is
+					also intentionally a diagram builder—not a rules engine, simulation, or substitute for the rule book.
+				</p>
+				<p>
+					That is why feedback from people who teach, officiate, administer, and work with flag football matters now. The best next changes should
+					come from real clinics, real crew conversations, and real moments when a play is still harder to explain than it should be.
+				</p>
+
+				<div class="cta">
+					<h2>Try it. Then tell us what is missing.</h2>
+					<p><a class="button-link" href="https://caseplay.org/play-builder">Open the Flag Football Play Builder</a></p>
+					<p>
+						Please share bugs, confusing controls, missing tools, ideas for useful additions, and the ways you would use the builder in clinics or
+						official development.
+					</p>
+					<p>Feedback is welcome directly in this forum thread or by email at <a href="mailto:feedback@caseplay.org">feedback@caseplay.org</a>.</p>
+					<p><strong>The goal is straightforward: make flag football plays easier to see, explain, discuss, and understand.</strong></p>
+				</div>
+			</article>
+		</main>
+	</body>
+</html>
