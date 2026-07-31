@@ -132,6 +132,9 @@
 	export let exportPromptSource: HTMLElement | null = null;
 	export let viewOnly = false;
 	export let adsEnabled = false;
+	export let accountOwnedByCurrentUser = false;
+	export let accountSessionActive = false;
+	export let accountCsrfToken: string | null = null;
 
 	type ToolIcon = 'event' | 'line-of-scrimmage' | 'line-to-gain';
 	type ToolOption = {
@@ -337,8 +340,8 @@
 	let actionInProgress: 'save' | 'png' | 'jpg' | 'webp' | 'pdf' | null = null;
 	let actionMessage = '';
 	let actionMessageTimer: ReturnType<typeof setTimeout> | null = null;
-	let canEditSavedPlay = savedPlayId === null;
-	let ownershipResolved = savedPlayId === null;
+	let canEditSavedPlay = savedPlayId === null || accountOwnedByCurrentUser;
+	let ownershipResolved = savedPlayId === null || accountSessionActive;
 	let saveFeedbackState: 'idle' | 'saved' = 'idle';
 	let saveActionLabel = '';
 	$: saveActionLabel = !ownershipResolved
@@ -1562,7 +1565,7 @@
 		}
 	};
 	const scheduleLocalDraft = (_sceneKey: string, unsaved: boolean) => {
-		if (!draftHydrated || viewOnly || !draftsEnabled) return;
+		if (!draftHydrated || viewOnly || !draftsEnabled || accountSessionActive) return;
 		if (draftSaveTimer) clearTimeout(draftSaveTimer);
 		draftSaveTimer = null;
 		if (!unsaved) {
@@ -1658,12 +1661,12 @@
 	const createSavedPlay = async (document: SerializedPlayBuilderDocument) => {
 		const response = await fetch('/api/play-builders', {
 			method: 'POST',
-			headers: { 'content-type': 'application/json' },
+			headers: { 'content-type': 'application/json', ...(accountCsrfToken ? { 'x-caseplay-csrf': accountCsrfToken } : {}) },
 			body: JSON.stringify({ document })
 		});
-		const result = (await response.json()) as { id?: string; editToken?: string; message?: string };
-		if (!response.ok || !result.id || !result.editToken) throw new Error(result.message || 'Unable to save play.');
-		storeEditToken(result.id, result.editToken);
+		const result = (await response.json()) as { id?: string; editToken?: string | null; accountOwned?: boolean; message?: string };
+		if (!response.ok || !result.id) throw new Error(result.message || 'Unable to save play.');
+		if (result.editToken) storeEditToken(result.id, result.editToken);
 		return result.id;
 	};
 	const showSavedLabel = () => {
@@ -1677,12 +1680,12 @@
 		lastSaveAttemptAt = Date.now();
 		showPendingActionMessage(canEditSavedPlay ? 'Saving…' : 'Making copy…');
 		try {
-			const editToken = savedPlayId ? editTokenForPlay(savedPlayId) : null;
-			if (savedPlayId && editToken) {
+			const editToken = savedPlayId && !accountOwnedByCurrentUser ? editTokenForPlay(savedPlayId) : null;
+			if (savedPlayId && (accountOwnedByCurrentUser || editToken)) {
 				const response = await fetch(`/api/play-builders/${savedPlayId}`, {
 					method: 'PUT',
-					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify({ document: documentToSave, editToken })
+					headers: { 'content-type': 'application/json', ...(accountCsrfToken ? { 'x-caseplay-csrf': accountCsrfToken } : {}) },
+					body: JSON.stringify({ document: documentToSave, ...(editToken ? { editToken } : {}) })
 				});
 				if (response.ok) {
 					canEditSavedPlay = true;
@@ -1712,6 +1715,20 @@
 		} catch (error) {
 			showActionMessage(error instanceof Error ? error.message : 'Unable to save play.');
 			return false;
+		} finally {
+			actionInProgress = null;
+		}
+	};
+	const makeCopyFromSharedPlay = async () => {
+		if (!viewOnly || !savedPlayId || actionInProgress !== null) return;
+		actionInProgress = 'save';
+		showPendingActionMessage('Making copy…');
+		try {
+			const id = await createSavedPlay(currentSerializedDocument());
+			showActionMessage('Copy created');
+			await goto(`/play-builder/${id}`, { replaceState: true, keepFocus: true, noScroll: true });
+		} catch (error) {
+			showActionMessage(error instanceof Error ? error.message : 'Unable to make a copy.');
 		} finally {
 			actionInProgress = null;
 		}
@@ -5363,7 +5380,7 @@
 	};
 
 	onMount(() => {
-		canEditSavedPlay = savedPlayId === null || Boolean(editTokenForPlay(savedPlayId));
+		canEditSavedPlay = savedPlayId === null || accountOwnedByCurrentUser || Boolean(editTokenForPlay(savedPlayId));
 		ownershipResolved = true;
 		restoreExportSettings();
 		exportSettingsHydrated = true;
@@ -5395,6 +5412,9 @@
 					// Ignore unavailable browser storage.
 				}
 			}
+		}
+		if (accountSessionActive && Object.keys(storedEditTokens()).length > 0) {
+			showActionMessage('Browser-saved plays are available to import from Profile.', 12_000);
 		}
 		draftHydrated = !showDraftRestore;
 		tutorialButtonBouncing = localStorage.getItem(tutorialSeenKey) !== '1';
@@ -8126,6 +8146,14 @@
 		</div>
 	</div>
 	{#if viewOnly}
+		<div class="view-only-actions flex items-center justify-end gap-2 border-t border-stone-700 bg-stone-800 px-2 py-2">
+			<button
+				type="button"
+				class="cursor-pointer border-2 border-stone-100 bg-stone-100 px-3 py-2 text-xs font-black text-stone-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+				disabled={actionInProgress !== null}
+				on:click={makeCopyFromSharedPlay}>Make Copy</button
+			>
+		</div>
 		<nav
 			class="view-only-play-tabs play-tabs-scroll overflow-x-auto overflow-y-hidden bg-stone-800 p-2"
 			aria-label="Plays in this shared play builder"

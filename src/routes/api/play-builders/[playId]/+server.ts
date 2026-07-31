@@ -10,15 +10,19 @@ import {
 	RequestInputError
 } from '$lib/server/request-security';
 import type { RequestHandler } from './$types';
+import { isValidAccountCsrf } from '$lib/server/auth/account-session';
 
 const MAXIMUM_REQUEST_BYTES = 1_600_000;
 const UPDATE_WINDOW_MS = 10 * 60 * 1000;
 const noStoreHeaders = { 'Cache-Control': 'no-store' };
 
-export const PUT: RequestHandler = async ({ params, request, url, getClientAddress }) => {
+export const PUT: RequestHandler = async ({ params, request, url, getClientAddress, locals, cookies }) => {
 	if (!/^[A-Za-z0-9_-]{12}$/.test(params.playId)) return json({ message: 'Invalid play ID.' }, { status: 404, headers: noStoreHeaders });
 	if (!isAllowedMutationOrigin(request, url)) {
 		return json({ message: 'Request origin is not allowed.' }, { status: 403, headers: noStoreHeaders });
+	}
+	if (locals.accountUser && !isValidAccountCsrf(cookies.get('caseplay_account_session'), request.headers.get('x-caseplay-csrf'))) {
+		return json({ message: 'Request could not be verified.' }, { status: 403, headers: noStoreHeaders });
 	}
 
 	const clientAddress = getClientAddress();
@@ -37,7 +41,13 @@ export const PUT: RequestHandler = async ({ params, request, url, getClientAddre
 		if (error instanceof RequestInputError) return json({ message: error.message }, { status: error.status, headers: responseHeaders });
 		return json({ message: 'Invalid JSON request.' }, { status: 400, headers: responseHeaders });
 	}
-	if (typeof body.editToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(body.editToken))
+	if (
+		typeof body.editToken !== 'undefined' &&
+		body.editToken !== null &&
+		(typeof body.editToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(body.editToken))
+	)
+		return json({ message: 'This shared play must be saved as a new copy.' }, { status: 403, headers: responseHeaders });
+	if (!locals.accountUser && typeof body.editToken !== 'string')
 		return json({ message: 'This shared play must be saved as a new copy.' }, { status: 403, headers: responseHeaders });
 
 	let documentJson: string;
@@ -48,7 +58,10 @@ export const PUT: RequestHandler = async ({ params, request, url, getClientAddre
 	}
 
 	try {
-		const updated = await updatePlayBuilderDiagram(params.playId, body.editToken, documentJson);
+		const updated = await updatePlayBuilderDiagram(params.playId, documentJson, {
+			ownerAccountId: locals.accountUser?.id,
+			editToken: typeof body.editToken === 'string' ? body.editToken : null
+		});
 		if (!updated) return json({ message: 'This shared play must be saved as a new copy.' }, { status: 403, headers: responseHeaders });
 		return json({ id: params.playId }, { headers: responseHeaders });
 	} catch (error) {

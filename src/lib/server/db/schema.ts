@@ -118,10 +118,87 @@ export const playBuilderDiagrams = sqliteTable(
 		id: text('id').primaryKey(),
 		documentJson: text('document_json').notNull(),
 		editTokenHash: text('edit_token_hash').notNull(),
+		ownerAccountId: text('owner_account_id'),
 		createdAt: text('created_at').notNull(),
 		updatedAt: text('updated_at').notNull()
 	},
-	(table) => [index('play_builder_diagrams_updated_at_idx').on(table.updatedAt)]
+	(table) => [
+		index('play_builder_diagrams_updated_at_idx').on(table.updatedAt),
+		index('play_builder_diagrams_owner_account_id_idx').on(table.ownerAccountId)
+	]
+);
+
+/** First-party CasePlay accounts are deliberately separate from the legacy admin auth tables. */
+export const accounts = sqliteTable(
+	'caseplay_accounts',
+	{
+		id: text('id').primaryKey(),
+		email: text('email').notNull(),
+		firstName: text('first_name').notNull().default(''),
+		lastName: text('last_name').notNull().default(''),
+		createdAt: text('created_at').notNull(),
+		updatedAt: text('updated_at').notNull()
+	},
+	(table) => [uniqueIndex('caseplay_accounts_email_unique').on(table.email), index('caseplay_accounts_email_idx').on(table.email)]
+);
+
+export const accountIdentities = sqliteTable(
+	'caseplay_account_identities',
+	{
+		id: text('id').primaryKey(),
+		accountId: text('account_id')
+			.notNull()
+			.references(() => accounts.id, { onDelete: 'cascade' }),
+		provider: text('provider').notNull(),
+		providerSubject: text('provider_subject').notNull(),
+		providerEmail: text('provider_email').notNull(),
+		createdAt: text('created_at').notNull(),
+		updatedAt: text('updated_at').notNull()
+	},
+	(table) => [
+		uniqueIndex('caseplay_account_identities_provider_subject_unique').on(table.provider, table.providerSubject),
+		index('caseplay_account_identities_account_idx').on(table.accountId),
+		check('caseplay_account_identities_provider_check', sql`${table.provider} in ('google', 'microsoft')`)
+	]
+);
+
+export const accountSessions = sqliteTable(
+	'caseplay_account_sessions',
+	{
+		id: text('id').primaryKey(),
+		accountId: text('account_id')
+			.notNull()
+			.references(() => accounts.id, { onDelete: 'cascade' }),
+		sessionHash: text('session_hash').notNull(),
+		expiresAt: text('expires_at').notNull(),
+		createdAt: text('created_at').notNull()
+	},
+	(table) => [
+		uniqueIndex('caseplay_account_sessions_hash_unique').on(table.sessionHash),
+		index('caseplay_account_sessions_account_idx').on(table.accountId),
+		index('caseplay_account_sessions_expiry_idx').on(table.expiresAt)
+	]
+);
+
+export const oauthTransactions = sqliteTable(
+	'caseplay_oauth_transactions',
+	{
+		id: text('id').primaryKey(),
+		provider: text('provider').notNull(),
+		accountId: text('account_id').references(() => accounts.id, { onDelete: 'cascade' }),
+		stateHash: text('state_hash').notNull(),
+		codeVerifier: text('code_verifier').notNull(),
+		nonce: text('nonce').notNull(),
+		returnTo: text('return_to').notNull(),
+		expiresAt: text('expires_at').notNull(),
+		createdAt: text('created_at').notNull()
+	},
+	(table) => [
+		uniqueIndex('caseplay_oauth_transactions_state_unique').on(table.stateHash),
+		index('caseplay_oauth_transactions_expiry_idx').on(table.expiresAt),
+		index('caseplay_oauth_transactions_account_idx').on(table.accountId),
+		check('caseplay_oauth_transactions_provider_check', sql`${table.provider} in ('google', 'microsoft')`)
+	]
 );
 
 export const playlistCasePlays = sqliteTable(
@@ -151,6 +228,19 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
 		fields: [sessions.userId],
 		references: [users.id]
 	})
+}));
+
+export const accountsRelations = relations(accounts, ({ many }) => ({
+	identities: many(accountIdentities),
+	sessions: many(accountSessions)
+}));
+
+export const accountIdentitiesRelations = relations(accountIdentities, ({ one }) => ({
+	account: one(accounts, { fields: [accountIdentities.accountId], references: [accounts.id] })
+}));
+
+export const accountSessionsRelations = relations(accountSessions, ({ one }) => ({
+	account: one(accounts, { fields: [accountSessions.accountId], references: [accounts.id] })
 }));
 
 export const authorsRelations = relations(authors, ({ many }) => ({

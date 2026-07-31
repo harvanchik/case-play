@@ -3,7 +3,7 @@ import { getPlayBuilderDiagram } from '$lib/server/db/repositories/play-builder-
 import { parseStoredPlayBuilderDocument } from '$lib/server/play-builder-scenes';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params, url }) => {
+export const load: PageServerLoad = async ({ params, url, locals }) => {
 	if (!/^[A-Za-z0-9_-]{12}$/.test(params.playId)) throw error(404, 'Saved play not found.');
 	const saved = await getPlayBuilderDiagram(params.playId);
 	if (!saved) throw error(404, 'Saved play not found.');
@@ -19,6 +19,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		activePlayName,
 		activePlayNumber: activePlayIndex + 1,
 		playCount: initialDocument.p.length,
-		updatedAt: saved.updatedAt
+		updatedAt: saved.updatedAt,
+		accountOwnedByCurrentUser: Boolean(saved.ownerAccountId && locals.accountUser?.id === saved.ownerAccountId),
+		accountSessionActive: Boolean(locals.accountUser)
 	};
 };

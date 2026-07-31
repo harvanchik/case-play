@@ -32,7 +32,9 @@
 			CasePlay.org processes play diagrams and labels that you choose to save. Saved plays are available to anyone with their shareable URL, so they
 			should not contain confidential or personal information. The site also uses browser storage for creator access, drafts, preferences, and consent
 			choices. Hosting and security providers may process IP address, browser, request, diagnostic, and security information needed to operate and
-			protect the service. CasePlay.org does not offer public user accounts or collect payment information.
+			protect the service. If you choose to sign in, CasePlay stores your provider identity, provider-managed email address, first and last name,
+			account timestamps, session records, and diagrams you save to that account. CasePlay.org does not store provider passwords, access tokens, or
+			payment information.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Purposes and Legal Bases</h2>
@@ -75,10 +77,10 @@
 
 		<h2 class="mt-7 text-xl font-bold">Retention</h2>
 		<p class="mt-2 leading-7">
-			Saved plays remain available until they are deleted at your request or removed as part of service maintenance. Browser drafts and preferences
-			remain until you remove them or clear site data. Consent choices expire after one year. Administrative sessions expire after 30 days. Hosting,
-			security, and diagnostic records follow the applicable provider retention schedules and are kept only as reasonably needed for operations,
-			security, dispute resolution, or legal obligations.
+			Saved plays remain available until they are deleted at your request or removed as part of service maintenance. Account sessions expire after 30
+			days and can be revoked from Profile. Browser drafts and preferences remain until you remove them or clear site data. Consent choices expire
+			after one year. Administrative sessions expire after 30 days. Hosting, security, and diagnostic records follow the applicable provider retention
+			schedules and are kept only as reasonably needed for operations, security, dispute resolution, or legal obligations.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Sharing and Your Rights</h2>

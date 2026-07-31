@@ -1,5 +1,6 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { authenticateRequest } from '$lib/server/auth/session';
+import { authenticateAccountRequest, cleanupAccountAuth } from '$lib/server/auth/account-session';
 
 const setSecurityHeaders = (response: Response, pathname: string) => {
 	response.headers.set('Content-Security-Policy', "base-uri 'self'; frame-ancestors 'none'; object-src 'none'");
@@ -8,7 +9,11 @@ const setSecurityHeaders = (response: Response, pathname: string) => {
 	response.headers.set('X-Frame-Options', 'DENY');
 	response.headers.set('Permissions-Policy', 'camera=(), geolocation=(), microphone=()');
 
-	if (pathname.startsWith('/admin')) {
+	if (pathname.startsWith('/admin') || pathname.startsWith('/account')) {
+		response.headers.set('Cache-Control', 'no-store');
+		response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+	}
+	if (pathname.startsWith('/api/account')) {
 		response.headers.set('Cache-Control', 'no-store');
 		response.headers.set('X-Robots-Tag', 'noindex, nofollow');
 	}
@@ -16,6 +21,8 @@ const setSecurityHeaders = (response: Response, pathname: string) => {
 
 export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.user = await authenticateRequest(event.cookies.get('caseplay_session'));
+	event.locals.accountUser = await authenticateAccountRequest(event.cookies.get('caseplay_account_session'));
+	if (event.locals.accountUser && Math.random() < 0.01) void cleanupAccountAuth().catch(() => undefined);
 
 	if (event.url.pathname.startsWith('/admin')) {
 		const isLoginRoute = event.url.pathname === '/admin/login';

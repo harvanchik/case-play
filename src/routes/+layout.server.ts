@@ -1,4 +1,5 @@
 import type { LayoutServerLoad } from './$types';
+import { getAccountCsrfToken } from '$lib/server/auth/account-session';
 
 const GOOGLE_CMP_COUNTRIES = new Set([
 	'AT',
@@ -58,7 +59,7 @@ const GOOGLE_CMP_US_STATES = new Set([
 	'VA'
 ]);
 
-export const load: LayoutServerLoad = ({ request, url }) => {
+export const load: LayoutServerLoad = ({ request, url, locals, cookies }) => {
 	const canonicalPage = url.searchParams.get('page');
 	const canonicalUrl = `https://caseplay.org${url.pathname}${
 		canonicalPage && Number(canonicalPage) > 1 ? `?page=${encodeURIComponent(canonicalPage)}` : ''
@@ -79,6 +80,8 @@ export const load: LayoutServerLoad = ({ request, url }) => {
 	return {
 		canonicalUrl,
 		googleCmpRequired,
-		robots: isFilteredCaseLibrary || isUtilityOrSharedRoute ? 'noindex, follow' : 'index, follow'
+		robots: isFilteredCaseLibrary || isUtilityOrSharedRoute ? 'noindex, follow' : 'index, follow',
+		accountUser: locals.accountUser ? { signedIn: true as const } : null,
+		accountCsrfToken: locals.accountUser ? getAccountCsrfToken(cookies.get('caseplay_account_session')) : null
 	};
 };

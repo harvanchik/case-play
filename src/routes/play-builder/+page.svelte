@@ -4,6 +4,9 @@
 	import PlayBuilderAttribution from '$lib/components/PlayBuilderAttribution.svelte';
 	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
 	import DesktopPlayBuilderGate from '$lib/components/DesktopPlayBuilderGate.svelte';
+	import type { PageData } from './$types';
+
+	export let data: PageData;
 
 	const pageTitle = 'Flag Football Play Builder | caseplay.org';
 	const pageDescription =
@@ -82,7 +85,11 @@
 							create, annotate, export, save, and share officiating diagrams with the original Flag Football Play Builder tool.
 						</p>
 					</header>
-					<FlagFootballPlayBuilder bind:adsEnabled />
+					<FlagFootballPlayBuilder
+						bind:adsEnabled
+						accountSessionActive={Boolean(data?.accountUser)}
+						accountCsrfToken={data?.accountCsrfToken ?? null}
+					/>
 					<div class="lg:absolute lg:inset-x-0 lg:top-full">
 						<PlayBuilderAttribution />
 					</div>

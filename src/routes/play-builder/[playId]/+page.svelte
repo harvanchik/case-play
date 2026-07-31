@@ -39,7 +39,14 @@
 	<DesktopPlayBuilderGate>
 		<div slot="mobile" class="relative z-10 mx-auto flex min-h-[calc(100vh-6rem)] w-full max-w-3xl flex-col justify-center py-6">
 			<div class="w-full overflow-hidden border-2 border-stone-900 bg-stone-800 shadow-lg">
-				<FlagFootballPlayBuilder initialDocument={data.initialDocument} savedPlayId={data.playId} viewOnly />
+				<FlagFootballPlayBuilder
+					initialDocument={data.initialDocument}
+					savedPlayId={data.playId}
+					viewOnly={!data.accountOwnedByCurrentUser}
+					accountOwnedByCurrentUser={data.accountOwnedByCurrentUser}
+					accountSessionActive={data.accountSessionActive}
+					accountCsrfToken={data.accountCsrfToken ?? null}
+				/>
 			</div>
 		</div>
 		<div
@@ -61,7 +68,15 @@
 							create, annotate, export, save, and share diagrams with the original Flag Football Play Builder tool.
 						</p>
 					</header>
-					<FlagFootballPlayBuilder initialDocument={data.initialDocument} savedPlayId={data.playId} bind:adsEnabled />
+					<FlagFootballPlayBuilder
+						initialDocument={data.initialDocument}
+						savedPlayId={data.playId}
+						bind:adsEnabled
+						viewOnly={!data.accountOwnedByCurrentUser}
+						accountOwnedByCurrentUser={data.accountOwnedByCurrentUser}
+						accountSessionActive={data.accountSessionActive}
+						accountCsrfToken={data.accountCsrfToken ?? null}
+					/>
 					<div class="lg:absolute lg:inset-x-0 lg:top-full">
 						<PlayBuilderAttribution />
 					</div>

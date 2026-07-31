@@ -11,8 +11,17 @@ declare global {
 				createdAt: string;
 				updatedAt: string;
 			} | null;
+			accountUser: {
+				id: string;
+				email: string;
+				firstName: string;
+				lastName: string;
+			} | null;
 		}
-		// interface PageData {}
+		interface PageData {
+			accountUser?: { signedIn: true } | null;
+			accountCsrfToken?: string | null;
+		}
 		// interface Platform {}
 	}
 }

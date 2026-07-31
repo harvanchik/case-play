@@ -61,6 +61,7 @@
 		"@vercel/analytics": "^2.0.1",
 		"@vercel/speed-insights": "^2.0.0",
 		"driver.js": "^1.8.0",
+		"openid-client": "6.8.4",
 		"qrcode": "^1.5.4"
 	}
 }

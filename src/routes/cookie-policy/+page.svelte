@@ -27,18 +27,19 @@
 		</p>
 		<p class="mt-2 leading-7">
 			Consent choices expire after one year. Drafts, creator access, and preferences remain until the related play is restored, the app removes them,
-			or you clear site data. Short-lived editing messages last for the browser session. The administrative session cookie is HTTP-only, Secure in
-			production, SameSite=Lax, and expires after 30 days.
+			or you clear site data. Short-lived editing messages last for the browser session. The administrative session cookie and the optional CasePlay
+			account session cookie are HTTP-only, Secure in production, SameSite=Lax, and expire after 30 days. The account session cookie identifies your
+			signed-in CasePlay session; it does not contain your provider password or OAuth tokens.
 		</p>
 
 		<h2 class="mt-7 text-xl font-bold">Advertising choices</h2>
 		<p class="mt-2 leading-7">
 			Choosing <strong>Accept All Cookies</strong> permits Google AdSense to request personalized ads and use optional advertising storage where
-			allowed. Choosing <strong>Essential Cookies Only</strong> tells AdSense to disable personalization; ads may still appear as non-personalized or
-			limited ads. For U.S. state privacy opt-outs and supported Global Privacy Control signals, CasePlay.org also requests Google's restricted data
-			processing mode. Google Privacy &amp; Messaging is a Google-certified consent management platform that presents and records the additional
-			choices required in the EEA, UK, Switzerland, supported U.S. states, and other supported regions. Its regional consent signals take precedence
-			over less restrictive site settings.
+			allowed. Choosing <strong>Essential Cookies Only</strong> tells AdSense to disable personalization; ads may still appear as non-personalized or limited
+			ads. For U.S. state privacy opt-outs and supported Global Privacy Control signals, CasePlay.org also requests Google's restricted data processing
+			mode. Google Privacy &amp; Messaging is a Google-certified consent management platform that presents and records the additional choices required in
+			the EEA, UK, Switzerland, supported U.S. states, and other supported regions. Its regional consent signals take precedence over less restrictive site
+			settings.
 		</p>
 		<p class="mt-2 leading-7">
 			Privacy-restricted advertising still processes technical information needed to deliver an ad, such as an IP address, and Google’s ad code may be
@@ -46,11 +47,10 @@
 			determines consent is not required. These uses do not enable personalized advertising. Learn more from
 			<a class="font-semibold underline" href="https://policies.google.com/technologies/ads" rel="noreferrer" target="_blank"
 				>Google advertising technologies</a
-			> and <a
-				class="font-semibold underline"
-				href="https://support.google.com/adsense/answer/14210870"
-				rel="noreferrer"
-				target="_blank">Google’s limited ads documentation</a
+			>
+			and
+			<a class="font-semibold underline" href="https://support.google.com/adsense/answer/14210870" rel="noreferrer" target="_blank"
+				>Google’s limited ads documentation</a
 			>.
 		</p>
 
@@ -62,9 +62,9 @@
 
 		<h2 class="mt-7 text-xl font-bold">Change your choice</h2>
 		<p class="mt-2 leading-7">
-			Use <strong>Your Privacy Choices</strong> in the footer to change your advertising choice at any time. In regions handled by
-			Google Privacy &amp; Messaging, this opens Google’s certified consent controls. Global Privacy Control is treated as an
-			advertising-personalization, sale, sharing, and targeted-advertising opt-out. You can also clear existing site data in your browser.
+			Use <strong>Your Privacy Choices</strong> in the footer to change your advertising choice at any time. In regions handled by Google Privacy &amp;
+			Messaging, this opens Google’s certified consent controls. Global Privacy Control is treated as an advertising-personalization, sale, sharing, and
+			targeted-advertising opt-out. You can also clear existing site data in your browser.
 		</p>
 	</article>
 	<PublicSiteFooter />

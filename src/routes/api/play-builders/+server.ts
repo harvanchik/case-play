@@ -10,14 +10,18 @@ import {
 	RequestInputError
 } from '$lib/server/request-security';
 import type { RequestHandler } from './$types';
+import { isValidAccountCsrf } from '$lib/server/auth/account-session';
 
 const MAXIMUM_REQUEST_BYTES = 1_600_000;
 const CREATE_WINDOW_MS = 60 * 60 * 1000;
 const noStoreHeaders = { 'Cache-Control': 'no-store' };
 
-export const POST: RequestHandler = async ({ request, url, getClientAddress }) => {
+export const POST: RequestHandler = async ({ request, url, getClientAddress, locals, cookies }) => {
 	if (!isAllowedMutationOrigin(request, url)) {
 		return json({ message: 'Request origin is not allowed.' }, { status: 403, headers: noStoreHeaders });
+	}
+	if (locals.accountUser && !isValidAccountCsrf(cookies.get('caseplay_account_session'), request.headers.get('x-caseplay-csrf'))) {
+		return json({ message: 'Request could not be verified.' }, { status: 403, headers: noStoreHeaders });
 	}
 
 	const rateLimit = consumeRateLimit(rateLimitKey('play-builder-create', getClientAddress()), 20, CREATE_WINDOW_MS);
@@ -42,8 +46,8 @@ export const POST: RequestHandler = async ({ request, url, getClientAddress }) =
 	}
 
 	try {
-		const saved = await createPlayBuilderDiagram(documentJson);
-		return json(saved, { status: 201, headers: responseHeaders });
+		const saved = await createPlayBuilderDiagram(documentJson, locals.accountUser?.id);
+		return json({ ...saved, accountOwned: Boolean(locals.accountUser?.id) }, { status: 201, headers: responseHeaders });
 	} catch (error) {
 		console.error('Failed to save play builder diagram.', error instanceof Error ? { name: error.name, message: error.message } : undefined);
 		return json({ message: 'Unable to save play. Please try again.' }, { status: 500, headers: responseHeaders });
