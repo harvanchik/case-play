@@ -23,6 +23,22 @@
 		description: 'A searchable case play database and flag football play builder for referee education.',
 		author: { '@type': 'Person', name: 'Jake Harvanchik' }
 	}).replace(/</g, '\\u003c');
+	$: caseLibraryStructuredData = JSON.stringify({
+		'@context': 'https://schema.org',
+		'@type': 'CollectionPage',
+		name: 'Flag Football Case Plays',
+		url: 'https://caseplay.org/',
+		mainEntity: {
+			'@type': 'ItemList',
+			numberOfItems: data.pagination.total,
+			itemListElement: data.casePlays.map((casePlay, index) => ({
+				'@type': 'ListItem',
+				position: (data.pagination.currentPage - 1) * data.pagination.pageSize + index + 1,
+				url: `https://caseplay.org/c/${casePlay.id}`,
+				name: casePlay.title
+			}))
+		}
+	}).replace(/</g, '\\u003c');
 
 	const difficultyOptions = [
 		{ value: 1, label: 'Easy', color: 'bg-green-600' },
@@ -95,6 +111,9 @@
 	<meta property="og:description" content="Study officiating scenarios and build shareable flag football play diagrams." />
 	<meta property="og:type" content="website" />
 	{@html `<script type="application/ld+json">${websiteStructuredData}<\/script>`}
+	{#if !data.initialFilters.searchTerm && data.initialFilters.difficulties.length === 0}
+		{@html `<script type="application/ld+json">${caseLibraryStructuredData}<\/script>`}
+	{/if}
 </svelte:head>
 
 <main class="flex min-h-screen flex-col overflow-hidden bg-stone-100/[97%]">

@@ -13,6 +13,7 @@
 
 <svelte:head>
 	<link rel="canonical" href={canonicalUrl} />
+	<meta name="robots" content={data?.robots ?? 'index, follow'} />
 	<meta property="og:site_name" content="CasePlay.org" />
 	<meta property="og:url" content={canonicalUrl} />
 	<meta property="og:locale" content="en_US" />

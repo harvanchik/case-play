@@ -7,7 +7,7 @@
 
 	const pageTitle = 'Flag Football Play Builder | caseplay.org';
 	const pageDescription =
-		'Create flag football play diagrams online. Draw routes, place players and officials, customize fields, save plays, and share or export your diagrams.';
+		'Create flag football play diagrams online for clinics, officiating education, rules discussions, and case-play training. Draw routes, place players and officials, customize fields, save plays, and share or export your diagrams.';
 	const socialImage = 'https://caseplay.org/play-builder/social.png?v=3';
 	let adsEnabled = false;
 	const structuredData = {
@@ -17,9 +17,15 @@
 		url: 'https://caseplay.org/play-builder',
 		description: pageDescription,
 		applicationCategory: 'SportsApplication',
+		applicationSubCategory: 'Flag football diagramming and officiating education',
 		operatingSystem: 'Any web browser',
 		browserRequirements: 'Requires a desktop-sized screen for editing',
 		isAccessibleForFree: true,
+		audience: [
+			{ '@type': 'Audience', audienceType: 'Flag football officials' },
+			{ '@type': 'Audience', audienceType: 'Officiating educators and clinicians' },
+			{ '@type': 'Audience', audienceType: 'Intramural sports professionals' }
+		],
 		image: socialImage,
 		featureList: [
 			'Draw run, pass, and punt routes',

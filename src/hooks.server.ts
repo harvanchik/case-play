@@ -35,5 +35,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const response = await resolve(event);
 	setSecurityHeaders(response, event.url.pathname);
+
+	const isFilteredCaseLibrary = event.url.pathname === '/' && (event.url.searchParams.has('q') || event.url.searchParams.has('difficulty'));
+	const isUtilityOrSharedRoute =
+		event.url.pathname === '/privacy' ||
+		event.url.pathname === '/cookie-policy' ||
+		event.url.pathname.startsWith('/api/') ||
+		event.url.pathname === '/upload' ||
+		(event.url.pathname.startsWith('/play-builder/') && event.url.pathname !== '/play-builder');
+
+	if (isFilteredCaseLibrary || isUtilityOrSharedRoute) {
+		response.headers.set('X-Robots-Tag', 'noindex, follow');
+	}
+
 	return response;
 };

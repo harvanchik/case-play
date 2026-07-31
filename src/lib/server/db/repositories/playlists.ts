@@ -64,7 +64,15 @@ const listPlaylistsInternal = async (includeHidden: boolean, database?: Database
 	return [...grouped.values()];
 };
 
-export const listPlaylists = (database?: Database) => listPlaylistsInternal(false, database);
+/**
+ * Public playlists must contain at least one publicly visible case play. This keeps
+ * editorially empty collections out of the public site and search engines while
+ * preserving them for administrators, who may still need to finish a draft.
+ */
+export const listPlaylists = async (database?: Database) => {
+	const playlists = await listPlaylistsInternal(false, database);
+	return playlists.filter((playlist) => playlist.casePlays.length > 0);
+};
 
 export const listPlaylistsForAdmin = (database?: Database) => listPlaylistsInternal(true, database);
 

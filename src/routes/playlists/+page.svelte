@@ -57,14 +57,10 @@
 										</li>
 									{/each}
 								</ol>
-							{:else}
-								<p class="text-sm text-stone-500">No case plays assigned yet.</p>
 							{/if}
 						</section>
 					{/each}
 				</div>
-			{:else if data?.playlists}
-				<div>No playlists yet.</div>
 			{/if}
 		</div>
 	</section>

@@ -66,8 +66,19 @@ export const load: LayoutServerLoad = ({ request, url }) => {
 	const country = request.headers.get('x-vercel-ip-country')?.toUpperCase() ?? null;
 	const countryRegion = request.headers.get('x-vercel-ip-country-region')?.toUpperCase() ?? null;
 	const googleCmpRequired =
-		(country ? GOOGLE_CMP_COUNTRIES.has(country) : false) ||
-		(country === 'US' && countryRegion ? GOOGLE_CMP_US_STATES.has(countryRegion) : false);
+		(country ? GOOGLE_CMP_COUNTRIES.has(country) : false) || (country === 'US' && countryRegion ? GOOGLE_CMP_US_STATES.has(countryRegion) : false);
 
-	return { canonicalUrl, googleCmpRequired };
+	const isFilteredCaseLibrary = url.pathname === '/' && (url.searchParams.has('q') || url.searchParams.has('difficulty'));
+	const isUtilityOrSharedRoute =
+		url.pathname === '/privacy' ||
+		url.pathname === '/cookie-policy' ||
+		url.pathname.startsWith('/api/') ||
+		url.pathname === '/upload' ||
+		(url.pathname.startsWith('/play-builder/') && url.pathname !== '/play-builder');
+
+	return {
+		canonicalUrl,
+		googleCmpRequired,
+		robots: isFilteredCaseLibrary || isUtilityOrSharedRoute ? 'noindex, follow' : 'index, follow'
+	};
 };

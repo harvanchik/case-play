@@ -1,12 +1,15 @@
 import type { RequestHandler } from './$types';
 import { listCasePlays } from '$lib/server/db/repositories/case-plays';
+import { listPlaylists } from '$lib/server/db/repositories/playlists';
 
 const SITE_ORIGIN = 'https://caseplay.org';
-const escapeXml = (value: string) => value.replace(/[<>&'\"]/g, (character) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[character] ?? character);
+const escapeXml = (value: string) =>
+	value.replace(/[<>&'\"]/g, (character) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[character] ?? character);
 
 export const GET: RequestHandler = async () => {
-	const casePlays = await listCasePlays();
-	const staticPaths = ['/', '/play-builder', '/playlists', '/about', '/contact', '/privacy', '/cookie-policy'];
+	const [casePlays, playlists] = await Promise.all([listCasePlays(), listPlaylists()]);
+	const staticPaths = ['/', '/play-builder', '/about', '/contact'];
+	if (playlists.length > 0) staticPaths.push('/playlists');
 	const staticUrls = staticPaths.map((path) => `<url><loc>${escapeXml(`${SITE_ORIGIN}${path}`)}</loc></url>`);
 	const casePlayUrls = casePlays.map((casePlay) => {
 		const updated = casePlay.date_updated ? new Date(casePlay.date_updated).toISOString() : null;
