@@ -757,7 +757,7 @@
 			noRunLines: [],
 			noRunZones: [],
 			yardLabels: [{ x: 30, label: '20' }],
-			goalLabelYards: [],
+			goalLabelYards: [12, 48],
 			endZoneCenters: [5, 55],
 			teamBox: [13, 47],
 			teamBoxSetbackYards: 1,
@@ -784,8 +784,8 @@
 				[30, 35],
 				[45, 50]
 			],
-			yardLabels: [],
-			goalLabelYards: [],
+			yardLabels: [{ x: 30, label: '20' }],
+			goalLabelYards: [12, 48],
 			endZoneCenters: [5, 55],
 			teamBox: [15, 45],
 			teamBoxSetbackYards: 1,
@@ -810,8 +810,8 @@
 				[10, 15],
 				[55, 60]
 			],
-			yardLabels: [],
-			goalLabelYards: [],
+			yardLabels: [{ x: 35, label: '25' }],
+			goalLabelYards: [12, 58],
 			endZoneCenters: [5, 65],
 			teamBox: [20, 50],
 			teamBoxSetbackYards: 1.5,
@@ -869,13 +869,19 @@
 			key: 'showYardNumbers',
 			label: 'Yard Line Number',
 			description: 'Show the 20-yard midfield number on both sidelines.',
-			fieldTypes: ['four-on-four']
+			fieldTypes: ['four-on-four', 'unified']
+		},
+		{
+			key: 'showYardNumbers',
+			label: 'Yard Line Number',
+			description: 'Show the 25-yard midfield number on both sidelines.',
+			fieldTypes: ['nfl-flag']
 		},
 		{
 			key: 'showGoalLetters',
 			label: 'Goal Line Letters',
 			description: 'Show the G labels immediately inside each goal line.',
-			fieldTypes: ['traditional']
+			fieldTypes: ['traditional', 'four-on-four', 'unified', 'nfl-flag']
 		},
 		{
 			key: 'showEndZoneText',
@@ -966,19 +972,13 @@
 	$: fieldPalette = fieldColorOptions.find((option) => option.id === fieldSettings.fieldColor) ?? fieldColorOptions[0];
 	$: currentFieldDefaults = { ...DEFAULT_PLAY_BUILDER_FIELD_SETTINGS, fieldType: fieldSettings.fieldType };
 	$: fieldSettingsAreDefault = JSON.stringify(fieldSettings) === JSON.stringify(currentFieldDefaults);
-	$: fieldFixtureScale = fieldLayout.teamBox
-		? (484 - 48 - teamBoxExtraSetback * 2) / (fieldLayout.widthYards + fieldLayout.teamBoxSetbackYards * 2)
-		: Number.POSITIVE_INFINITY;
-	$: fieldWidth = Math.min(
-		fieldMaxWidth,
-		fieldMaxHeight * (fieldLayout.totalYards / fieldLayout.widthYards),
-		fieldFixtureScale * fieldLayout.totalYards
-	);
+	$: fieldWidth = Math.min(fieldMaxWidth, fieldMaxHeight * (fieldLayout.totalYards / fieldLayout.widthYards));
 	$: fieldHeight = fieldWidth * (fieldLayout.widthYards / fieldLayout.totalYards);
 	$: fieldLeft = (1000 - fieldWidth) / 2;
 	$: fieldRight = fieldLeft + fieldWidth;
 	$: fieldTop = (484 - fieldHeight) / 2;
 	$: fieldBottom = fieldTop + fieldHeight;
+	const clampTeamBoxY = (y: number) => Math.max(0, Math.min(484 - 20, y));
 	$: fieldWatermarkAngle = -(Math.atan2(fieldHeight, fieldWidth) * 180) / Math.PI;
 	const xForYards = (yards: number) => fieldLeft + yards * (fieldWidth / fieldLayout.totalYards);
 	const yardsForX = (x: number) => (x - fieldLeft) / (fieldWidth / fieldLayout.totalYards);
@@ -6287,7 +6287,7 @@
 							{#if fieldSettings.showTeamBoxes && fieldLayout.teamBox}
 								{@const teamBox = fieldLayout.teamBox}
 								{@const teamBoxSetback = fieldLayout.teamBoxSetbackYards * (fieldWidth / fieldLayout.totalYards) + teamBoxExtraSetback}
-								{#each [fieldTop - teamBoxSetback - 20, fieldBottom + teamBoxSetback] as teamBoxY, teamBoxIndex}
+								{#each [clampTeamBoxY(fieldTop - teamBoxSetback - 20), clampTeamBoxY(fieldBottom + teamBoxSetback)] as teamBoxY, teamBoxIndex}
 									{@const teamBoxLabel = teamBoxIndex === 0 ? fieldSettings.teamBoxTopLabel : fieldSettings.teamBoxBottomLabel}
 									{@const teamBoxWidth = xForYards(teamBox[1]) - xForYards(teamBox[0])}
 									{@const teamBoxTextHitWidth = Math.min(teamBoxWidth, Math.max(56, teamBoxLabel.length * 9 + 18))}
@@ -6354,8 +6354,9 @@
 
 							{#if fieldLayout.teamBox}
 								{@const scoreboardTeamBox = fieldLayout.teamBox}
-								{@const scoreboardTeamBoxY =
-									fieldTop - fieldLayout.teamBoxSetbackYards * (fieldWidth / fieldLayout.totalYards) - teamBoxExtraSetback - 20}
+								{@const scoreboardTeamBoxY = clampTeamBoxY(
+									fieldTop - fieldLayout.teamBoxSetbackYards * (fieldWidth / fieldLayout.totalYards) - teamBoxExtraSetback - 20
+								)}
 								{@const scoreboardWidth = 58}
 								{@const scoreboardGap = 10}
 								{@const quarterBoxX = xForYards(scoreboardTeamBox[0]) - scoreboardGap - scoreboardWidth}
@@ -9256,7 +9257,17 @@
 	}
 	.tool-column {
 		container-type: inline-size;
-		width: clamp(2rem, calc((100dvh - 14rem) / 13), 3rem);
+		width: clamp(1.5rem, min(4.8cqw, calc((100dvh - 14rem) / 13)), 6rem);
+	}
+	@container (max-width: 32px) {
+		.tool-column [data-builder-tool] svg,
+		.tool-column [data-builder-tool] img {
+			width: 1rem;
+			height: 1rem;
+		}
+		.tool-column [data-builder-tool] span {
+			font-size: 5px;
+		}
 	}
 	@container (max-width: 42px) {
 		.tool-column [data-builder-tool] {
@@ -9269,6 +9280,19 @@
 		}
 		.tool-column [data-builder-tool] span {
 			font-size: 7px;
+		}
+	}
+	@container (min-width: 56px) {
+		.tool-column [data-builder-tool] svg,
+		.tool-column [data-builder-tool]:not([data-tutorial-tool='laser']) img {
+			width: min(66.667cqw, 4rem) !important;
+			height: min(66.667cqw, 4rem) !important;
+		}
+		.tool-column [data-builder-tool] > span[aria-hidden='true'] {
+			font-size: min(38cqw, 2rem);
+		}
+		.tool-column [data-builder-tool] > span:not([aria-hidden='true']) {
+			font-size: min(18cqw, 0.9rem);
 		}
 	}
 	@container (max-width: 900px) {
@@ -9311,6 +9335,86 @@
 		.play-management-toolbar {
 			transform: scale(0.82);
 			transform-origin: bottom left;
+		}
+	}
+	@media (min-height: 1100px) and (max-height: 1299px) {
+		@container (min-width: 1200px) {
+			.top-action-toolbar {
+				transform: scale(1.15);
+				transform-origin: top left;
+			}
+			.export-action-toolbar {
+				transform: scale(1.15);
+				transform-origin: top right;
+			}
+			.bottom-action-toolbar {
+				transform: scale(1.15);
+				transform-origin: bottom right;
+			}
+			.play-management-toolbar {
+				transform: scale(1.15);
+				transform-origin: bottom left;
+			}
+		}
+	}
+	@media (min-height: 1300px) and (max-height: 1599px) {
+		@container (min-width: 1500px) {
+			.top-action-toolbar {
+				transform: scale(1.4);
+				transform-origin: top left;
+			}
+			.export-action-toolbar {
+				transform: scale(1.4);
+				transform-origin: top right;
+			}
+			.bottom-action-toolbar {
+				transform: scale(1.4);
+				transform-origin: bottom right;
+			}
+			.play-management-toolbar {
+				transform: scale(1.4);
+				transform-origin: bottom left;
+			}
+		}
+	}
+	@media (min-height: 1600px) and (max-height: 1899px) {
+		@container (min-width: 1900px) {
+			.top-action-toolbar {
+				transform: scale(1.7);
+				transform-origin: top left;
+			}
+			.export-action-toolbar {
+				transform: scale(1.7);
+				transform-origin: top right;
+			}
+			.bottom-action-toolbar {
+				transform: scale(1.7);
+				transform-origin: bottom right;
+			}
+			.play-management-toolbar {
+				transform: scale(1.7);
+				transform-origin: bottom left;
+			}
+		}
+	}
+	@media (min-height: 1900px) {
+		@container (min-width: 2300px) {
+			.top-action-toolbar {
+				transform: scale(2);
+				transform-origin: top left;
+			}
+			.export-action-toolbar {
+				transform: scale(2);
+				transform-origin: top right;
+			}
+			.bottom-action-toolbar {
+				transform: scale(2);
+				transform-origin: bottom right;
+			}
+			.play-management-toolbar {
+				transform: scale(2);
+				transform-origin: bottom left;
+			}
 		}
 	}
 	.drawing-cursor,

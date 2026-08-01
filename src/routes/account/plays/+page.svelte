@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { tick } from 'svelte';
 	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
+	import PublicSiteFooter from '$lib/components/PublicSiteFooter.svelte';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -350,4 +351,5 @@
 			</section>
 		{/if}
 	</div>
+	<PublicSiteFooter />
 </main>

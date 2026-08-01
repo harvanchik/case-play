@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
 	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
+	import PublicSiteFooter from '$lib/components/PublicSiteFooter.svelte';
 	import type { ActionData, PageData } from './$types';
 
 	export let data: PageData;
@@ -51,19 +52,22 @@
 				<label class="grid gap-1 text-sm font-bold text-stone-800"
 					>Email
 					<span class="relative block">
-						<input class="w-full pr-10" value={data.account.email} disabled aria-disabled="true" aria-label="Email address managed by your sign-in provider" />
-						<Icon icon="mdi:lock-outline" aria-hidden="true" class="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-500" />
+						<input
+							class="w-full pr-10"
+							value={data.account.email}
+							disabled
+							aria-disabled="true"
+							aria-label="Email address managed by your sign-in provider"
+						/>
+						<Icon
+							icon="mdi:lock-outline"
+							aria-hidden="true"
+							class="pointer-events-none absolute top-1/2 right-3 h-5 w-5 -translate-y-1/2 text-stone-500"
+						/>
 					</span>
-				</label
-				>
+				</label>
 				<button class="dark-button" type="submit">Save profile</button>
 			</form>
-			<div class="mt-7 border-t border-stone-300 pt-5">
-				<h2 class="font-black text-stone-900">Connected providers</h2>
-				<ul class="mt-2 list-inside list-disc text-sm text-stone-600">
-					{#each data.providers as provider}<li class="capitalize">{provider.provider} · {provider.email}</li>{/each}
-				</ul>
-			</div>
 		</section>
 		<section class="border-2 border-stone-900 bg-white p-6 shadow-[4px_4px_0_rgba(28,25,23,0.2)]">
 			<h2 class="text-xl font-black tracking-tight text-stone-900">Account actions</h2>
@@ -88,6 +92,7 @@
 			</div>
 		</section>
 	</div>
+	<PublicSiteFooter />
 </main>
 
 <style>

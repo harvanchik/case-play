@@ -7,15 +7,13 @@
 	{#if context === 'database'}
 		<p class="text-sm">This database was created in 2023 by Jake Harvanchik to help train intramural officials.</p>
 	{:else if context === 'play-builder'}
-		<p class="text-sm">This play builder was created in 2026 by Jake Harvanchik to help train intramural flag football officials.</p>
+		<!-- <p class="text-sm">This play builder was created in 2026 by Jake Harvanchik to help train intramural flag football officials.</p> -->
 	{/if}
 	<div class="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
-		<span>&copy; {new Date().getFullYear()} CasePlay.org</span>
+		<span>&copy; {new Date().getFullYear()} caseplay.org</span>
 		<a href="/about" class="font-semibold hover:underline">About</a>
 		<a href="/contact" class="font-semibold hover:underline">Contact</a>
 		<a href="/contact" class="font-semibold hover:underline">Contribute</a>
-		<button type="button" class="cursor-pointer font-semibold hover:underline" on:click={openConsentChoices}>
-			Your Privacy Choices
-		</button>
+		<button type="button" class="cursor-pointer font-semibold hover:underline" on:click={openConsentChoices}> Your Privacy Choices </button>
 	</div>
 </footer>

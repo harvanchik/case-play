@@ -55,8 +55,8 @@
 				: 'lg:grid-cols-1'}"
 			style="min-height: calc(100vh - 4rem);"
 		>
-			<div class="flex min-w-0 items-start justify-start">
-				<div class="min-w-0 lg:relative" style="width: {adsEnabled ? 'min(100%, calc((100vh - 6rem) * 2.1))' : '100%'}; container-type: inline-size;">
+			<div class="flex min-w-0 items-start justify-center">
+				<div class="min-w-0 lg:relative" style="width: min(100%, max(0px, calc((100dvh - 7.25rem) * 2.1))); container-type: inline-size;">
 					<header class="pb-2 text-center">
 						<h1
 							class="font-dokdo leading-none font-semibold tracking-[0.04em] whitespace-nowrap text-stone-800 uppercase select-none text-shadow-md"
