@@ -9205,6 +9205,30 @@
 	.play-builder-interaction {
 		container-type: inline-size;
 	}
+	section {
+		--builder-action-scale: clamp(1, calc(100dvh / 1000px), 4);
+		--builder-tool-scale: clamp(1, calc(100dvh / 1600px), 2.5);
+	}
+	[data-tutorial='draw-workspace'] {
+		gap: calc(0.5rem * var(--builder-action-scale));
+		padding: calc(0.5rem * var(--builder-action-scale));
+	}
+	.top-action-toolbar {
+		transform: scale(var(--builder-action-scale));
+		transform-origin: top left;
+	}
+	.export-action-toolbar {
+		transform: scale(var(--builder-action-scale));
+		transform-origin: top right;
+	}
+	.bottom-action-toolbar {
+		transform: scale(var(--builder-action-scale));
+		transform-origin: bottom right;
+	}
+	.play-management-toolbar {
+		transform: scale(var(--builder-action-scale));
+		transform-origin: bottom left;
+	}
 	.field-canvas {
 		aspect-ratio: 1000 / 484;
 	}
@@ -9256,8 +9280,12 @@
 		box-shadow: 0 -4px 0 #1c1917;
 	}
 	.tool-column {
+		--builder-tool-column-width: clamp(1.5rem, min(4.8cqw, calc((100dvh - 14rem) / 13)), 6rem);
 		container-type: inline-size;
-		width: clamp(1.5rem, min(4.8cqw, calc((100dvh - 14rem) / 13)), 6rem);
+		width: var(--builder-tool-column-width);
+		margin-right: calc(var(--builder-tool-column-width) * (var(--builder-tool-scale) - 1));
+		transform: scale(var(--builder-tool-scale));
+		transform-origin: center left;
 	}
 	@container (max-width: 32px) {
 		.tool-column [data-builder-tool] svg,
@@ -9335,86 +9363,6 @@
 		.play-management-toolbar {
 			transform: scale(0.82);
 			transform-origin: bottom left;
-		}
-	}
-	@media (min-height: 1100px) and (max-height: 1299px) {
-		@container (min-width: 1200px) {
-			.top-action-toolbar {
-				transform: scale(1.15);
-				transform-origin: top left;
-			}
-			.export-action-toolbar {
-				transform: scale(1.15);
-				transform-origin: top right;
-			}
-			.bottom-action-toolbar {
-				transform: scale(1.15);
-				transform-origin: bottom right;
-			}
-			.play-management-toolbar {
-				transform: scale(1.15);
-				transform-origin: bottom left;
-			}
-		}
-	}
-	@media (min-height: 1300px) and (max-height: 1599px) {
-		@container (min-width: 1500px) {
-			.top-action-toolbar {
-				transform: scale(1.4);
-				transform-origin: top left;
-			}
-			.export-action-toolbar {
-				transform: scale(1.4);
-				transform-origin: top right;
-			}
-			.bottom-action-toolbar {
-				transform: scale(1.4);
-				transform-origin: bottom right;
-			}
-			.play-management-toolbar {
-				transform: scale(1.4);
-				transform-origin: bottom left;
-			}
-		}
-	}
-	@media (min-height: 1600px) and (max-height: 1899px) {
-		@container (min-width: 1900px) {
-			.top-action-toolbar {
-				transform: scale(1.7);
-				transform-origin: top left;
-			}
-			.export-action-toolbar {
-				transform: scale(1.7);
-				transform-origin: top right;
-			}
-			.bottom-action-toolbar {
-				transform: scale(1.7);
-				transform-origin: bottom right;
-			}
-			.play-management-toolbar {
-				transform: scale(1.7);
-				transform-origin: bottom left;
-			}
-		}
-	}
-	@media (min-height: 1900px) {
-		@container (min-width: 2300px) {
-			.top-action-toolbar {
-				transform: scale(2);
-				transform-origin: top left;
-			}
-			.export-action-toolbar {
-				transform: scale(2);
-				transform-origin: top right;
-			}
-			.bottom-action-toolbar {
-				transform: scale(2);
-				transform-origin: bottom right;
-			}
-			.play-management-toolbar {
-				transform: scale(2);
-				transform-origin: bottom left;
-			}
 		}
 	}
 	.drawing-cursor,
