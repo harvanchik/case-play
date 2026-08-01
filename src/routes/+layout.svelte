@@ -1,14 +1,20 @@
 <script lang="ts">
 	import { dev } from '$app/environment';
-	import { inject } from '@vercel/analytics';
+	import { injectAnalytics } from '@vercel/analytics/sveltekit';
+	import { onMount } from 'svelte';
 	import type { LayoutData } from './$types';
 	import '../app.css';
+	import AccountBrowserPlayClaim from '$lib/components/AccountBrowserPlayClaim.svelte';
 	import CookieConsent from '$lib/components/CookieConsent.svelte';
 
-	inject({ mode: dev ? 'development' : 'production' });
-
 	export let data: LayoutData;
+	let clientReady = false;
 	$: canonicalUrl = data?.canonicalUrl ?? 'https://caseplay.org/';
+
+	onMount(() => {
+		injectAnalytics({ mode: dev ? 'development' : 'production' });
+		clientReady = true;
+	});
 </script>
 
 <svelte:head>
@@ -21,4 +27,7 @@
 </svelte:head>
 
 <slot />
+{#if clientReady && data?.accountUser && data.accountCsrfToken}
+	<AccountBrowserPlayClaim csrfToken={data.accountCsrfToken} />
+{/if}
 <CookieConsent googleCmpRequired={data?.googleCmpRequired ?? false} />

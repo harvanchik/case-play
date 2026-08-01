@@ -2,7 +2,11 @@ import { Resvg } from '@resvg/resvg-js';
 import { error } from '@sveltejs/kit';
 import { decodePlayBuilderDocument } from '$lib/play-builder-scene';
 import { getPlayBuilderDiagram } from '$lib/server/db/repositories/play-builder-diagrams';
-import { playBuilderSocialRenderOptions, renderPlayBuilderSocialSvg } from '$lib/server/play-builder-social-image';
+import {
+	playBuilderSocialRenderOptions,
+	renderPlayBuilderDiagramSvg,
+	renderPlayBuilderSocialSvg
+} from '$lib/server/play-builder-social-image';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ params, url }) => {
@@ -13,7 +17,8 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	const requestedPlayNumber = Number(url.searchParams.get('play'));
 	const requestedPlayIndex = Number.isInteger(requestedPlayNumber) ? requestedPlayNumber - 1 : -1;
 	if (requestedPlayIndex >= 0 && requestedPlayIndex < document.plays.length) document.activePlayIndex = requestedPlayIndex;
-	const image = new Resvg(renderPlayBuilderSocialSvg(document), playBuilderSocialRenderOptions())
+	const svg = url.searchParams.get('format') === 'diagram' ? renderPlayBuilderDiagramSvg(document) : renderPlayBuilderSocialSvg(document);
+	const image = new Resvg(svg, playBuilderSocialRenderOptions())
 		.render()
 		.asPng();
 	const body = image.buffer.slice(image.byteOffset, image.byteOffset + image.byteLength) as ArrayBuffer;

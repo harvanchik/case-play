@@ -12,21 +12,20 @@ const safeReturnTo = (value: string | null) => {
 	return value;
 };
 
-export const GET: RequestHandler = async ({ params, url, cookies, getClientAddress, locals }) => {
+export const GET: RequestHandler = async ({ params, url, cookies, getClientAddress }) => {
 	const provider = params.provider;
 	if (!provider || !isOAuthProvider(provider)) throw redirect(303, '/account/login?error=oauth');
-	const linking = url.searchParams.get('link') === '1';
-	if (linking && !locals.accountUser) throw redirect(303, '/account/login?error=oauth');
+	if (url.searchParams.get('link') === '1') throw redirect(303, '/account/profile');
 	const rateLimit = consumeRateLimit(rateLimitKey('account-oauth-start', getClientAddress(), provider), 12, 15 * 60 * 1000);
 	if (!rateLimit.allowed) throw redirect(303, '/account/login?error=rate');
 	try {
 		await cleanupExpiredOAuthTransactions();
 		const transaction = await beginOAuth(provider);
-		const returnTo = linking ? '/account/profile' : safeReturnTo(url.searchParams.get('returnTo'));
+		const returnTo = safeReturnTo(url.searchParams.get('returnTo'));
 		await createOAuthTransaction({
 			id: crypto.randomUUID(),
 			provider,
-			accountId: linking ? (locals.accountUser?.id ?? null) : null,
+			accountId: null,
 			stateHash: stateHash(transaction.state),
 			codeVerifier: transaction.codeVerifier,
 			nonce: transaction.nonce,

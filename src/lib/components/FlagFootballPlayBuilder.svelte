@@ -18,6 +18,7 @@
 		formatPlayBuilderGameClock,
 		PLAY_BUILDER_GAME_CLOCK_MAX_SECONDS,
 		PLAY_BUILDER_GAME_QUARTERS,
+		PLAY_BUILDER_HASH_PYLON_END_LINE_OFFSET,
 		PLAY_BUILDER_MAX_PLAYS,
 		PLAY_BUILDER_PLAY_NAME_MAX_LENGTH,
 		PLAY_BUILDER_TEAM_BOX_LABEL_MAX_LENGTH,
@@ -43,6 +44,15 @@
 		type Point,
 		type SerializedPlayBuilderDocument
 	} from '$lib/play-builder-scene';
+	import {
+		PLAY_BUILDER_GUIDE_COLORS,
+		playBuilderAirborneLift,
+		playBuilderAirbornePoint,
+		playBuilderAirborneSegments,
+		playBuilderGuideColor,
+		playBuilderGuideDash,
+		type PlayBuilderAirborneSegment
+	} from '$lib/play-builder-rendering';
 	import HoverTooltip from './HoverTooltip.svelte';
 	import FieldSideToggle from './play-builder/FieldSideToggle.svelte';
 	import LineFormatControls from './play-builder/LineFormatControls.svelte';
@@ -257,16 +267,16 @@
 			'Draws annotations above every other element, including outside the field within the builder. Choose Straight or Squiggle, a color, and a thickness; tap for a dot, drag to draw, or erase whole strokes.'
 	};
 	const guideColors: { id: GuideColor; label: string; value: string }[] = [
-		{ id: 'red', label: 'Red', value: '#ef4444' },
-		{ id: 'orange', label: 'Orange', value: '#f97316' },
-		{ id: 'yellow', label: 'Yellow', value: '#facc15' },
-		{ id: 'green', label: 'Green', value: '#4ade80' },
-		{ id: 'cyan', label: 'Cyan', value: '#22d3ee' },
-		{ id: 'blue', label: 'Blue', value: '#2563eb' },
-		{ id: 'purple', label: 'Purple', value: '#c084fc' },
-		{ id: 'white', label: 'White', value: '#ffffff' },
-		{ id: 'gray', label: 'Gray', value: '#9ca3af' },
-		{ id: 'black', label: 'Black', value: '#000000' }
+		{ id: 'red', label: 'Red', value: PLAY_BUILDER_GUIDE_COLORS.red },
+		{ id: 'orange', label: 'Orange', value: PLAY_BUILDER_GUIDE_COLORS.orange },
+		{ id: 'yellow', label: 'Yellow', value: PLAY_BUILDER_GUIDE_COLORS.yellow },
+		{ id: 'green', label: 'Green', value: PLAY_BUILDER_GUIDE_COLORS.green },
+		{ id: 'cyan', label: 'Cyan', value: PLAY_BUILDER_GUIDE_COLORS.cyan },
+		{ id: 'blue', label: 'Blue', value: PLAY_BUILDER_GUIDE_COLORS.blue },
+		{ id: 'purple', label: 'Purple', value: PLAY_BUILDER_GUIDE_COLORS.purple },
+		{ id: 'white', label: 'White', value: PLAY_BUILDER_GUIDE_COLORS.white },
+		{ id: 'gray', label: 'Gray', value: PLAY_BUILDER_GUIDE_COLORS.gray },
+		{ id: 'black', label: 'Black', value: PLAY_BUILDER_GUIDE_COLORS.black }
 	];
 	const freeDrawColors: { id: GuideColor; label: string; value: string }[] = [
 		{ id: 'red', label: 'Red', value: '#ff1744' },
@@ -1015,7 +1025,7 @@
 		const half = !Number.isInteger(distance);
 		const wholeYards = Math.floor(distance);
 		const base = half && wholeYards === 0 ? `${down} &` : `${down} & ${half ? wholeYards : distance}`;
-		return { base, half, baseWidth: base.length * 5.8 };
+		return { base, half, baseWidth: base.length * 5.8 - (half ? 4 : 0) };
 	};
 	const lineOfScrimmageMarkerDisplay = (x: number) => {
 		const yardLine = losYardLine(x);
@@ -2169,7 +2179,7 @@
 	};
 	const editorLeft = (marker: FieldMarker) => Math.max(10, Math.min(90, marker.x / 10));
 	const editorTop = (marker: FieldMarker) => Math.max(12, Math.min(88, (marker.y / 484) * 100));
-	const guideColor = (color: GuideColor) => (color === 'gold' ? '#d4a017' : (guideColors.find((option) => option.id === color)?.value ?? '#facc15'));
+	const guideColor = playBuilderGuideColor;
 	const drawingColor = (color: GuideColor) => freeDrawColors.find((option) => option.id === color)?.value ?? guideColor(color);
 	const laserColorValue = (color: LaserColor) => laserColors.find((option) => option.id === color)?.value ?? '#ff1744';
 	const laserPaint = (color: LaserRenderColor) => (color === 'rainbow' ? 'url(#builder-rainbow-laser-gradient)' : laserColorValue(color));
@@ -2297,7 +2307,7 @@
 		if (activeTool === 'event') return point.y + eventTagHeight / 2 + yardLinePreviewGap;
 		return point.y + yardLinePreviewGap;
 	};
-	const guideDash = (style: GuideStyle) => (style === 'dashed' ? '16 10' : style === 'dotted' ? '0.01 12' : undefined);
+	const guideDash = playBuilderGuideDash;
 	const renderedGuideColor = (guide: FieldGuide) => guideColor(guide.color);
 	const renderedGuideDash = (guide: FieldGuide) => guideDash(guide.style);
 	const guideLabel = (guide: FieldGuide) =>
@@ -5230,23 +5240,9 @@
 	const defaultPathColor = (kind: PathKind) => guideColor(isArrowKind(kind) ? arrowPlacementColor(kind) : 'yellow');
 	const defaultPathStyle = (kind: PathKind): GuideStyle => (isArrowKind(kind) ? arrowPlacementStyles[kind] : 'solid');
 	const pathMarker = (kind: PathKind) => (isArrowPath(kind) ? 'url(#builder-path-arrow)' : undefined);
-	const airborneLift = (kind: 'pass' | 'kick', start: Point, end: Point) => {
-		const distance = Math.hypot(end.x - start.x, end.y - start.y);
-		const desiredLift = kind === 'kick' ? Math.max(46, Math.min(160, distance * 0.52)) : Math.max(20, Math.min(58, distance * 0.18));
-		const midpointY = (start.y + end.y) / 2;
-		return Math.max(12, Math.min(desiredLift, midpointY - fieldTop - 18));
-	};
-	const airbornePoint = (kind: 'pass' | 'kick', start: Point, end: Point, t: number): Point => {
-		const inverse = 1 - t;
-		const control = {
-			x: (start.x + end.x) / 2,
-			y: (start.y + end.y) / 2 - airborneLift(kind, start, end) * 2
-		};
-		return {
-			x: inverse * inverse * start.x + 2 * inverse * t * control.x + t * t * end.x,
-			y: inverse * inverse * start.y + 2 * inverse * t * control.y + t * t * end.y
-		};
-	};
+	const airborneLift = (kind: 'pass' | 'kick', start: Point, end: Point) => playBuilderAirborneLift(kind, start, end, fieldTop);
+	const airbornePoint = (kind: 'pass' | 'kick', start: Point, end: Point, t: number): Point =>
+		playBuilderAirbornePoint(kind, start, end, t, fieldTop);
 	const arrowHitTip = (kind: Exclude<PathKind, 'line'>, start: Point, end: Point): Point => {
 		const beforeEnd = kind === 'pass' || kind === 'kick' ? airbornePoint(kind, start, end, 0.98) : start;
 		const dx = end.x - beforeEnd.x;
@@ -5258,32 +5254,8 @@
 		const controlY = (start.y + end.y) / 2 - airborneLift(kind, start, end) * 2;
 		return `M ${start.x} ${start.y} Q ${(start.x + end.x) / 2} ${controlY} ${end.x} ${end.y}`;
 	};
-	type AirborneSegment = { d: string; width: number; linecap: 'round' | 'butt' };
-	const airborneSegments = (kind: 'pass' | 'kick', start: Point, end: Point, style: GuideStyle): AirborneSegment[] => {
-		const segmentCount = 64;
-		const segments: AirborneSegment[] = [];
-		for (let index = 0; index < segmentCount; index += 1) {
-			const t1 = index / segmentCount;
-			const t2 = (index + 1) / segmentCount;
-			const midpoint = (t1 + t2) / 2;
-			const visible =
-				style === 'solid' ||
-				(style === 'dashed' && (index % 5 < 3 || index >= segmentCount - 2)) ||
-				(style === 'dotted' && (index % 4 === 0 || index === segmentCount - 1));
-			if (!visible) continue;
-			const startPoint = airbornePoint(kind, start, end, t1);
-			const endPoint = airbornePoint(kind, start, end, t2);
-			const altitude = Math.sin(Math.PI * midpoint);
-			const groundWidth = pathStrokeWidth * 0.68;
-			const peakBoost = pathStrokeWidth * (kind === 'kick' ? 1 : 0.45);
-			segments.push({
-				d: `M ${startPoint.x} ${startPoint.y} L ${endPoint.x} ${endPoint.y}`,
-				width: groundWidth + peakBoost * altitude,
-				linecap: style === 'solid' ? 'round' : style === 'dotted' ? 'round' : 'butt'
-			});
-		}
-		return segments;
-	};
+	const airborneSegments = (kind: 'pass' | 'kick', start: Point, end: Point, style: GuideStyle): PlayBuilderAirborneSegment[] =>
+		playBuilderAirborneSegments(kind, start, end, style, fieldTop, pathStrokeWidth);
 	const airShadowPath = (start: Point, end: Point) => {
 		const startY = Math.min(fieldBottom - 5, start.y + 9);
 		const endY = Math.min(fieldBottom - 5, end.y + 9);
@@ -5412,9 +5384,6 @@
 					// Ignore unavailable browser storage.
 				}
 			}
-		}
-		if (accountSessionActive && Object.keys(storedEditTokens()).length > 0) {
-			showActionMessage('Browser-saved plays are available to import from Profile.', 12_000);
 		}
 		draftHydrated = !showDraftRestore;
 		tutorialButtonBouncing = localStorage.getItem(tutorialSeenKey) !== '1';
@@ -6754,7 +6723,7 @@
 									{/each}
 									{#if fieldSettings.showHashes}
 										{#each fieldLayout.endLinePylonFractions as yFraction}
-											{#each [fieldLeft - 7, fieldRight + 7] as pylonX}
+											{#each [fieldLeft - PLAY_BUILDER_HASH_PYLON_END_LINE_OFFSET, fieldRight + PLAY_BUILDER_HASH_PYLON_END_LINE_OFFSET] as pylonX}
 												<rect
 													data-field-fixture="pylon"
 													x={pylonX - 3.5}

@@ -1,6 +1,7 @@
 import {
 	defaultPlayBuilderFieldSettings,
 	formatPlayBuilderGameClock,
+	PLAY_BUILDER_HASH_PYLON_END_LINE_OFFSET,
 	type FieldGuide,
 	type FieldMarker,
 	type FieldPath,
@@ -13,6 +14,7 @@ import {
 	type PlayBuilderScene,
 	type Point
 } from '$lib/play-builder-scene';
+import { PLAY_BUILDER_GUIDE_COLORS, playBuilderAirborneLift, playBuilderAirborneSegments, playBuilderGuideDash } from '$lib/play-builder-rendering';
 import beanBagBlackImage from './social-assets/bean-bag-black.png?inline';
 import beanBagBlueImage from './social-assets/bean-bag-blue.png?inline';
 import beanBagPinkImage from './social-assets/bean-bag-pink.png?inline';
@@ -82,6 +84,7 @@ type FieldLayout = {
 	teamBox: [number, number] | null;
 	teamBoxSetbackYards: number;
 	endZonePylonYards: number[];
+	endLinePylonFractions: number[];
 };
 
 const fieldLayouts: Record<PlayBuilderFieldType, FieldLayout> = {
@@ -112,7 +115,8 @@ const fieldLayouts: Record<PlayBuilderFieldType, FieldLayout> = {
 		endZoneCenters: [5, 95],
 		teamBox: [30, 70],
 		teamBoxSetbackYards: 1.5,
-		endZonePylonYards: [0, 10, 90, 100]
+		endZonePylonYards: [0, 10, 90, 100],
+		endLinePylonFractions: [15 / 40, 25 / 40]
 	},
 	'four-on-four': {
 		totalYards: 60,
@@ -134,7 +138,8 @@ const fieldLayouts: Record<PlayBuilderFieldType, FieldLayout> = {
 		endZoneCenters: [5, 55],
 		teamBox: [13, 47],
 		teamBoxSetbackYards: 1,
-		endZonePylonYards: [0, 10, 50, 60]
+		endZonePylonYards: [0, 10, 50, 60],
+		endLinePylonFractions: [0.5]
 	},
 	unified: {
 		totalYards: 60,
@@ -161,7 +166,8 @@ const fieldLayouts: Record<PlayBuilderFieldType, FieldLayout> = {
 		endZoneCenters: [5, 55],
 		teamBox: [15, 45],
 		teamBoxSetbackYards: 1,
-		endZonePylonYards: [0, 10, 50, 60]
+		endZonePylonYards: [0, 10, 50, 60],
+		endLinePylonFractions: []
 	},
 	'nfl-flag': {
 		totalYards: 70,
@@ -186,7 +192,8 @@ const fieldLayouts: Record<PlayBuilderFieldType, FieldLayout> = {
 		endZoneCenters: [5, 65],
 		teamBox: [20, 50],
 		teamBoxSetbackYards: 1.5,
-		endZonePylonYards: [0, 10, 60, 70]
+		endZonePylonYards: [0, 10, 60, 70],
+		endLinePylonFractions: []
 	}
 };
 
@@ -199,20 +206,7 @@ const fieldPalettes: Record<PlayBuilderFieldColor, { field: string; endZone: str
 	purple: { field: '#73538f', endZone: '#543a6c' }
 };
 
-const colors: Record<GuideColor, string> = {
-	orange: '#f97316',
-	gold: '#d4a017',
-	yellow: '#facc15',
-	red: '#ef4444',
-	cyan: '#22d3ee',
-	blue: '#2563eb',
-	green: '#22c55e',
-	purple: '#c026d3',
-	black: '#171717',
-	white: '#ffffff',
-	gray: '#9ca3af',
-	pink: '#f06292'
-};
+const colors = PLAY_BUILDER_GUIDE_COLORS;
 
 const officialMarkerImages = {
 	'official-r': officialRefereeImage,
@@ -238,10 +232,8 @@ const beanBagImages: Partial<Record<GuideColor, string>> = {
 
 const escapeXml = (value: string) =>
 	value.replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&apos;', '"': '&quot;' })[character] ?? character);
-const dashArray = (style: GuideStyle, compact = false) =>
-	style === 'dashed' ? (compact ? '10 7' : '16 10') : style === 'dotted' ? (compact ? '2 7' : '2 10') : undefined;
-const dashAttribute = (style: GuideStyle, compact = false) => {
-	const value = dashArray(style, compact);
+const dashAttribute = (style: GuideStyle) => {
+	const value = playBuilderGuideDash(style);
 	return value ? ` stroke-dasharray="${value}"` : '';
 };
 const freehandPath = (points: Point[]) => {
@@ -284,34 +276,40 @@ const renderMarker = (marker: FieldMarker) => {
 	return renderImageMarker(flagBeltImages[marker.color ?? 'red'] ?? flagBeltRedImage, 33.75);
 };
 
-const airborneLift = (kind: 'pass' | 'kick', start: Point, end: Point, fieldTop: number) => {
-	const distance = Math.hypot(end.x - start.x, end.y - start.y);
-	const desiredLift = kind === 'kick' ? Math.max(46, Math.min(160, distance * 0.52)) : Math.max(20, Math.min(58, distance * 0.18));
-	return Math.max(12, Math.min(desiredLift, (start.y + end.y) / 2 - fieldTop - 18));
-};
-
-const renderPath = (path: FieldPath, scene: PlayBuilderScene, fieldTop: number) => {
+const renderPath = (path: FieldPath, scene: PlayBuilderScene, fieldTop: number, fieldBottom: number) => {
 	const attached = path.startMarkerId === undefined ? undefined : scene.markers.find((marker) => marker.id === path.startMarkerId);
 	const start = attached ? { x: attached.x, y: attached.y } : path.start;
 	const color = colors[path.color];
 	if (path.kind === 'line') {
-		return `<line x1="${start.x}" y1="${start.y}" x2="${path.end.x}" y2="${path.end.y}" stroke="${color}" stroke-width="7" stroke-linecap="${path.style === 'dotted' ? 'round' : 'square'}"${dashAttribute(path.style)}/>`;
+		return `<line x1="${start.x}" y1="${start.y}" x2="${path.end.x}" y2="${path.end.y}" stroke="${color}" stroke-width="7.5" stroke-linecap="${path.style === 'dotted' ? 'round' : 'square'}"${dashAttribute(path.style)}/>`;
 	}
 	if (path.kind === 'run') {
-		return `<line x1="${start.x}" y1="${start.y}" x2="${path.end.x}" y2="${path.end.y}" stroke="${color}" stroke-width="5" stroke-linecap="round"${dashAttribute(path.style)} marker-end="url(#arrow-${path.color})"/>`;
+		return `<line x1="${start.x}" y1="${start.y}" x2="${path.end.x}" y2="${path.end.y}" stroke="${color}" stroke-width="5" stroke-linecap="${path.style === 'dotted' ? 'round' : 'square'}"${dashAttribute(path.style)} marker-end="url(#arrow-${path.color})"/>`;
 	}
-	const controlY = (start.y + path.end.y) / 2 - airborneLift(path.kind, start, path.end, fieldTop) * 2;
-	return `<path d="M ${start.x} ${start.y} Q ${(start.x + path.end.x) / 2} ${controlY} ${path.end.x} ${path.end.y}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round"${dashAttribute(path.style, true)} marker-end="url(#arrow-${path.color})"/>`;
+	const controlY = (start.y + path.end.y) / 2 - playBuilderAirborneLift(path.kind, start, path.end, fieldTop) * 2;
+	const shadowStartY = Math.min(fieldBottom - 5, start.y + 9);
+	const shadowEndY = Math.min(fieldBottom - 5, path.end.y + 9);
+	const shadow = `<path d="M ${start.x} ${shadowStartY} Q ${(start.x + path.end.x) / 2} ${(shadowStartY + shadowEndY) / 2 + 8} ${path.end.x} ${shadowEndY}" fill="none" stroke="#10291b" stroke-width="${path.kind === 'kick' ? 7 : 5}" opacity="0.24" filter="url(#preview-air-shadow)"/>`;
+	const segments = playBuilderAirborneSegments(path.kind, start, path.end, path.style, fieldTop)
+		.map((segment) => `<path d="${segment.d}" fill="none" stroke="${color}" stroke-width="${segment.width}" stroke-linecap="${segment.linecap}"/>`)
+		.join('');
+	return `<g>${shadow}${segments}<path d="M ${start.x} ${start.y} Q ${(start.x + path.end.x) / 2} ${controlY} ${path.end.x} ${path.end.y}" fill="none" stroke="${color}" stroke-width="0.01" marker-end="url(#arrow-${path.color})"/></g>`;
 };
 
-const downText = (guide: FieldGuide, los: FieldGuide | undefined, yardsToPixels: number) => {
-	if (guide.down === 'pat') return 'P.A.T.';
-	if (!los) return guide.down ?? '1st';
+const downMarkerDisplay = (guide: FieldGuide, los: FieldGuide | undefined, yardsToPixels: number) => {
+	if (guide.down === 'pat') return { base: 'P.A.T.', half: false, baseWidth: 29 };
+	if (!los) {
+		const base = guide.down ?? '1st';
+		return { base, half: false, baseWidth: base.length * 5.8 };
+	}
 	const distance = Math.round((Math.abs(guide.x - los.x) / yardsToPixels) * 2) / 2;
-	return `${guide.down ?? '1st'} & ${distance}`;
+	const half = !Number.isInteger(distance);
+	const wholeYards = Math.floor(distance);
+	const base = half && wholeYards === 0 ? `${guide.down ?? '1st'} &` : `${guide.down ?? '1st'} & ${wholeYards}`;
+	return { base, half, baseWidth: base.length * 5.8 - (half ? 4 : 0) };
 };
 
-const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings) => {
+const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings, standalone = false) => {
 	const layout = fieldLayouts[settings.fieldType];
 	const palette = fieldPalettes[settings.fieldColor];
 	const fixtureScale =
@@ -341,7 +339,7 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 	const arrowMarkers = (Object.keys(colors) as GuideColor[])
 		.map(
 			(color) =>
-				`<marker id="arrow-${color}" viewBox="0 0 10 10" refX="0" refY="5" markerUnits="userSpaceOnUse" markerWidth="20" markerHeight="20" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="${colors[color]}"/></marker>`
+				`<marker id="arrow-${color}" viewBox="0 0 10 10" refX="0" refY="5" markerUnits="userSpaceOnUse" markerWidth="22.5" markerHeight="22.5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="${colors[color]}"/></marker>`
 		)
 		.join('');
 	const teamBoxes =
@@ -357,11 +355,11 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 										{ x: x - 62, value: settings.gameQuarter.toUpperCase(), fontSize: 12, letterSpacing: 1.5 },
 										{ x: x + width + 4, value: formatPlayBuilderGameClock(settings.gameClockSeconds), fontSize: 11, letterSpacing: 0.5 }
 									]
-									.map(
-										(item) =>
-											`<g><rect x="${item.x}" y="${y}" width="58" height="20" fill="#111827" stroke="#d2b48c" stroke-width="2"/><text x="${item.x + 29}" y="${y + 14}" text-anchor="middle" fill="#fef3c7" font-size="${item.fontSize}" font-weight="900" letter-spacing="${item.letterSpacing}">${item.value}</text></g>`
-									)
-									.join('')
+										.map(
+											(item) =>
+												`<g><rect x="${item.x}" y="${y}" width="58" height="20" fill="#111827" stroke="#d2b48c" stroke-width="2"/><text x="${item.x + 29}" y="${y + 14}" text-anchor="middle" fill="#fef3c7" font-size="${item.fontSize}" font-weight="900" letter-spacing="${item.letterSpacing}">${item.value}</text></g>`
+										)
+										.join('')
 								: '';
 						return `<g><rect x="${x}" y="${y}" width="${width}" height="20" fill="#d2b48c" stroke="rgba(255,255,255,.85)" stroke-width="2"/><text x="${x + width / 2}" y="${y + 14}" text-anchor="middle" fill="#292524" font-size="12" font-weight="900" letter-spacing="2">${label}</text></g>${scoreboard}`;
 					})
@@ -415,23 +413,31 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 		)
 		.join('');
 	const pylons = settings.showPylons
-		? layout.endZonePylonYards
-				.flatMap((yard) =>
+		? [
+				...layout.endZonePylonYards.flatMap((yard) =>
 					[fieldTop, fieldBottom].map(
 						(y) => `<rect x="${xForYards(yard) - 4}" y="${y - 4}" width="8" height="8" fill="#f97316" stroke="#fff" stroke-width="1.5"/>`
 					)
-				)
-				.join('')
+				),
+				...(settings.showHashes
+					? layout.endLinePylonFractions.flatMap((fraction) =>
+							[fieldLeft - PLAY_BUILDER_HASH_PYLON_END_LINE_OFFSET, fieldRight + PLAY_BUILDER_HASH_PYLON_END_LINE_OFFSET].map(
+								(x) =>
+									`<rect x="${x - 4}" y="${fieldTop + fieldHeight * fraction - 4}" width="8" height="8" fill="#f97316" stroke="#fff" stroke-width="1.5"/>`
+							)
+						)
+					: [])
+			].join('')
 		: '';
 	const guideElements = scene.guides
 		.map(
 			(guide) =>
-				`<line x1="${guide.x}" y1="${fieldTop + 4}" x2="${guide.x}" y2="${fieldBottom - 4}" stroke="${colors[guide.color]}" stroke-width="5"${dashAttribute(guide.style)}/>`
+				`<line x1="${guide.x}" y1="${fieldTop + 4}" x2="${guide.x}" y2="${fieldBottom - 4}" stroke="${colors[guide.color]}" stroke-width="5" stroke-linecap="${guide.style === 'dotted' ? 'round' : 'square'}"${dashAttribute(guide.style)}/>`
 		)
 		.join('');
 	const renderLayers = () => {
 		const items = new Map<string, string>();
-		for (const path of scene.paths) items.set(`path:${path.id}`, renderPath(path, scene, fieldTop));
+		for (const path of scene.paths) items.set(`path:${path.id}`, renderPath(path, scene, fieldTop, fieldBottom));
 		for (const marker of scene.markers) items.set(`marker:${marker.id}`, renderMarker(marker));
 		const ordered: string[] = [];
 		for (const layer of scene.layerOrder) {
@@ -456,6 +462,7 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 	const los = scene.guides.find((guide) => guide.kind === 'line-of-scrimmage');
 	const ltg = scene.guides.find((guide) => guide.kind === 'line-to-gain');
 	const losMarker = los ? lineOfScrimmageMarkerDisplay(los.x) : undefined;
+	const downMarker = ltg ? downMarkerDisplay(ltg, los, yardsToPixels) : undefined;
 	const noRunZoneLabels =
 		settings.showNoRunZoneText && (settings.fieldType === 'unified' || settings.fieldType === 'nfl-flag')
 			? layout.noRunZones
@@ -466,8 +473,12 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 					.join('')
 			: '';
 	const indicators = `${
-		settings.showDownMarker && ltg
-			? `<g><rect x="${ltg.x - 32}" y="${fieldTop - 9}" width="64" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5"/><text x="${ltg.x}" y="${fieldTop + 4}" text-anchor="middle" fill="#ff5a1f" font-size="10" font-weight="900">${escapeXml(downText(ltg, los, yardsToPixels))}</text></g>`
+		settings.showDownMarker && ltg && downMarker
+			? `<g><rect x="${ltg.x - 32}" y="${fieldTop - 9}" width="64" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5"/><text x="${ltg.x - (downMarker.half ? 3.5 : 0)}" y="${fieldTop + 4}" text-anchor="middle" fill="#ff5a1f" font-size="10" font-weight="900">${escapeXml(downMarker.base)}</text>${
+					downMarker.half
+						? `<g fill="#ff5a1f" font-size="5.5" font-weight="900" text-anchor="middle"><text x="${ltg.x + downMarker.baseWidth / 2 - 1.5}" y="${fieldTop - 1.5}">1</text><line x1="${ltg.x + downMarker.baseWidth / 2 - 4}" y1="${fieldTop + 0.25}" x2="${ltg.x + downMarker.baseWidth / 2 + 1}" y2="${fieldTop + 0.25}" stroke="#ff5a1f" stroke-width="0.8"/><text x="${ltg.x + downMarker.baseWidth / 2 - 1.5}" y="${fieldTop + 5.5}">2</text></g>`
+						: ''
+				}</g>`
 			: ''
 	}${
 		settings.showLineOfScrimmageMarker && los && losMarker
@@ -479,9 +490,10 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 			: ''
 	}`;
 
-	return `<svg x="30" y="82" width="1140" height="480" viewBox="0 0 1000 484" preserveAspectRatio="xMidYMid meet">
+	return `<svg x="${standalone ? 0 : 30}" y="${standalone ? 0 : 82}" width="${standalone ? 1000 : 1140}" height="${standalone ? 484 : 480}" viewBox="0 0 1000 484" preserveAspectRatio="xMidYMid meet">
 		<defs>
 			<pattern id="field-stripe" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform="rotate(18)"><rect width="16" height="32" fill="rgba(255,255,255,.035)"/></pattern>
+			<filter id="preview-air-shadow" x="-15%" y="-40%" width="130%" height="180%"><feGaussianBlur stdDeviation="3"/></filter>
 			${arrowMarkers}
 		</defs>
 		<rect width="1000" height="484" fill="${palette.endZone}"/>
@@ -517,6 +529,20 @@ export const renderPlayBuilderSocialSvg = (document: PlayBuilderDocument) => {
 		${field}
 		<rect x="350" y="574" width="500" height="46" fill="#1c1917"/>
 		<text x="600" y="605" text-anchor="middle" fill="#fff" font-size="23" font-weight="900" letter-spacing="5">CASEPLAY.ORG/PLAY-BUILDER</text>
+	</svg>`;
+};
+
+/**
+ * Render the diagram without the branded social-card header and footer.
+ * The field renderer is intentionally shared with the social image so both
+ * previews stay visually identical and continue to reflect the same play.
+ */
+export const renderPlayBuilderDiagramSvg = (document: PlayBuilderDocument) => {
+	const activePlayIndex = document.plays[document.activePlayIndex] ? document.activePlayIndex : 0;
+	const active = document.plays[activePlayIndex];
+	const field = renderField(active.scene, active.settings, true);
+	return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="484" viewBox="0 0 1000 484" font-family="Inter, sans-serif">
+		${field}
 	</svg>`;
 };
 

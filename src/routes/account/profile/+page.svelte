@@ -1,12 +1,11 @@
 <script lang="ts">
+	import Icon from '@iconify/svelte';
 	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
 	import type { ActionData, PageData } from './$types';
 
 	export let data: PageData;
 	export let form: ActionData;
 	$: csrfToken = data.csrfToken || '';
-	let claimMessage = '';
-	let claiming = false;
 	const clearLocalBuilderArtifacts = () => {
 		try {
 			localStorage.removeItem('caseplay-play-builder-edit-tokens-v1');
@@ -24,38 +23,6 @@
 			}
 		} catch {
 			// Ignore unavailable session storage.
-		}
-	};
-	const claimBrowserPlays = async () => {
-		claiming = true;
-		claimMessage = '';
-		try {
-			const raw = localStorage.getItem('caseplay-play-builder-edit-tokens-v1');
-			const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-			const plays = Object.entries(parsed)
-				.filter(([id, token]) => /^[A-Za-z0-9_-]{12}$/.test(id) && typeof token === 'string')
-				.map(([id, editToken]) => ({ id, editToken }));
-			if (!plays.length) {
-				claimMessage = 'No browser-saved anonymous plays were found.';
-				return;
-			}
-			const response = await fetch('/api/account/claim-plays', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json', 'x-caseplay-csrf': csrfToken },
-				body: JSON.stringify({ plays })
-			});
-			const result = (await response.json()) as { claimed?: string[]; message?: string };
-			if (!response.ok) throw new Error(result.message || 'Unable to import plays.');
-			const claimed = result.claimed || [];
-			for (const id of claimed) delete parsed[id];
-			localStorage.setItem('caseplay-play-builder-edit-tokens-v1', JSON.stringify(parsed));
-			claimMessage = claimed.length
-				? `${claimed.length} play${claimed.length === 1 ? '' : 's'} imported.`
-				: 'No eligible anonymous plays were found.';
-		} catch (error) {
-			claimMessage = error instanceof Error ? error.message : 'Unable to import plays.';
-		} finally {
-			claiming = false;
 		}
 	};
 </script>
@@ -81,7 +48,14 @@
 				<label class="grid gap-1 text-sm font-bold text-stone-800"
 					>Last name <input name="lastName" maxlength="80" value={data.account.lastName} autocomplete="family-name" /></label
 				>
-				<label class="grid gap-1 text-sm font-bold text-stone-800">Email <input value={data.account.email} readonly aria-readonly="true" /></label>
+				<label class="grid gap-1 text-sm font-bold text-stone-800"
+					>Email
+					<span class="relative block">
+						<input class="w-full pr-10" value={data.account.email} disabled aria-disabled="true" aria-label="Email address managed by your sign-in provider" />
+						<Icon icon="mdi:lock-outline" aria-hidden="true" class="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-500" />
+					</span>
+				</label
+				>
 				<button class="dark-button" type="submit">Save profile</button>
 			</form>
 			<div class="mt-7 border-t border-stone-300 pt-5">
@@ -89,45 +63,11 @@
 				<ul class="mt-2 list-inside list-disc text-sm text-stone-600">
 					{#each data.providers as provider}<li class="capitalize">{provider.provider} · {provider.email}</li>{/each}
 				</ul>
-				<div class="mt-3 flex flex-wrap gap-2">
-					{#if !data.providers.some((provider) => provider.provider === 'google')}<a class="small-button" href="/account/oauth/google/start?link=1"
-							>Link Google</a
-						>{/if}
-					{#if !data.providers.some((provider) => provider.provider === 'microsoft')}<a
-							class="small-button"
-							href="/account/oauth/microsoft/start?link=1">Link Microsoft</a
-						>{/if}
-				</div>
 			</div>
 		</section>
 		<section class="border-2 border-stone-900 bg-white p-6 shadow-[4px_4px_0_rgba(28,25,23,0.2)]">
-			<h2 class="text-xl font-black tracking-tight text-stone-900">Your plays</h2>
-			{#if data.plays.length}
-				<ul class="mt-4 grid gap-3">
-					{#each data.plays as play}<li class="border border-stone-300 p-3">
-							<a class="font-bold underline" href={`/play-builder/${play.id}`}>{play.title}</a>
-							<div class="mt-1 text-xs text-stone-500">Updated {new Date(play.updatedAt).toLocaleString()}</div>
-							<form
-								method="POST"
-								action="?/deletePlay"
-								class="mt-2"
-								on:submit={(event) => {
-									if (!confirm('Delete this saved play?')) event.preventDefault();
-								}}
-							>
-								<input type="hidden" name="csrf" value={csrfToken} /><input type="hidden" name="playId" value={play.id} /><button
-									class="text-xs font-bold text-red-700 underline"
-									type="submit">Delete</button
-								>
-							</form>
-						</li>{/each}
-				</ul>
-			{:else}<p class="mt-3 text-sm text-stone-600">Your saved diagrams will appear here.</p>{/if}
-			<div class="mt-5 border-t border-stone-300 pt-4">
-				<button class="outline-button w-full" type="button" disabled={claiming} on:click={claimBrowserPlays}
-					>{claiming ? 'Importing…' : 'Import browser-saved plays'}</button
-				>{#if claimMessage}<p class="mt-2 text-xs text-stone-600" role="status">{claimMessage}</p>{/if}
-			</div>
+			<h2 class="text-xl font-black tracking-tight text-stone-900">Account actions</h2>
+			<p class="mt-2 text-sm text-stone-600">Manage your saved diagrams from the My Plays menu in the navigation bar.</p>
 			<div class="mt-7 grid gap-3 border-t border-stone-300 pt-5">
 				<form method="POST" action="?/signOutAll">
 					<input type="hidden" name="csrf" value={csrfToken} /><button class="outline-button w-full" type="submit">Sign out all devices</button>
@@ -161,6 +101,12 @@
 		outline: 3px solid #6faf7d;
 		outline-offset: 1px;
 	}
+	input:disabled {
+		cursor: not-allowed;
+		background: #f5f5f4;
+		color: #57534e;
+		opacity: 1;
+	}
 	.dark-button,
 	.outline-button,
 	.danger-button {
@@ -180,13 +126,6 @@
 		border-color: #b91c1c;
 		color: #b91c1c;
 		background: white;
-	}
-	.small-button {
-		border: 1px solid #78716c;
-		padding: 0.35rem 0.5rem;
-		font-size: 0.75rem;
-		font-weight: 800;
-		color: #292524;
 	}
 	.dark-button:hover,
 	.outline-button:hover {

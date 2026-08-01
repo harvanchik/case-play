@@ -8,6 +8,7 @@ export type GuideStyle = 'solid' | 'dashed' | 'dotted';
 export type DownMarkerValue = '1st' | '2nd' | '3rd' | '4th' | 'pat';
 export type PlayBuilderFieldType = 'traditional' | 'four-on-four' | 'unified' | 'nfl-flag';
 export type PlayBuilderFieldColor = 'green' | 'red' | 'navy' | 'light-blue' | 'orange' | 'purple';
+export const PLAY_BUILDER_HASH_PYLON_END_LINE_OFFSET = 10;
 export const PLAY_BUILDER_GAME_QUARTERS = ['1st', '2nd', '3rd', '4th', 'OT'] as const;
 export type PlayBuilderGameQuarter = (typeof PLAY_BUILDER_GAME_QUARTERS)[number];
 export type PlayBuilderFieldSettings = {
@@ -405,8 +406,7 @@ const decodeFieldSettings = (
 		(value.length >= 5 &&
 			(typeof value[4] !== 'string' || value[4].trim().length < 1 || value[4].trim().length > PLAY_BUILDER_TEAM_BOX_LABEL_MAX_LENGTH)) ||
 		(includesScoreboardSettings && !validIndex(value[5], PLAY_BUILDER_GAME_QUARTERS.length)) ||
-		(includesScoreboardSettings &&
-			(!validInteger(value[6]) || Number(value[6]) < 0 || Number(value[6]) > PLAY_BUILDER_GAME_CLOCK_MAX_SECONDS))
+		(includesScoreboardSettings && (!validInteger(value[6]) || Number(value[6]) < 0 || Number(value[6]) > PLAY_BUILDER_GAME_CLOCK_MAX_SECONDS))
 	) {
 		throw new Error('Invalid field settings.');
 	}

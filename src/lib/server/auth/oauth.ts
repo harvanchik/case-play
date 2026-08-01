@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import {
 	authorizationCodeGrant,
@@ -20,8 +19,10 @@ import {
 	getAccountById,
 	getAccountIdentity,
 	newAccountId,
-	updateAccountIdentity
+	updateAccountIdentity,
+	updateAccountProfile
 } from '$lib/server/db/repositories/accounts';
+import { readServerEnv } from '$lib/server/env';
 
 export type OAuthProvider = 'google' | 'microsoft';
 export type OAuthProfile = {
@@ -32,8 +33,7 @@ export type OAuthProfile = {
 	lastName: string;
 };
 
-const viteEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
-const readEnv = (key: string) => process.env[key] || viteEnv?.[key];
+const readEnv = readServerEnv;
 const configs = new Map<OAuthProvider, Promise<Configuration>>();
 
 const providerIssuer = (provider: OAuthProvider) =>
@@ -105,6 +105,19 @@ const textClaim = (claims: IDToken, key: string) => {
 	return typeof value === 'string' ? value.trim() : '';
 };
 
+const textValue = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+
+const fillMissingNameFromDisplayName = (displayName: string, firstName: string, lastName: string) => {
+	const parts = displayName.split(/\s+/).filter(Boolean);
+	if (parts.length < 2) return { firstName, lastName };
+	if (!firstName) firstName = parts[0];
+	if (!lastName) {
+		const firstPartMatches = parts[0].toLocaleLowerCase() === firstName.toLocaleLowerCase();
+		lastName = (firstPartMatches ? parts.slice(1) : parts).join(' ');
+	}
+	return { firstName, lastName };
+};
+
 export const completeOAuth = async (
 	provider: OAuthProvider,
 	callbackUrl: URL,
@@ -125,12 +138,20 @@ export const completeOAuth = async (
 	if (provider === 'microsoft') email ||= textClaim(claims, 'preferred_username') || textClaim(claims, 'upn');
 	let firstName = textClaim(claims, 'given_name');
 	let lastName = textClaim(claims, 'family_name');
+	({ firstName, lastName } = fillMissingNameFromDisplayName(textClaim(claims, 'name'), firstName, lastName));
 	if (provider === 'google' && (claims as Record<string, unknown>).email_verified !== true) throw new Error('Provider email is not verified.');
-	if (!email && typeof tokens.access_token === 'string' && subject) {
-		const userInfo = await fetchUserInfo(config, tokens.access_token, subject);
-		email = typeof userInfo.email === 'string' ? userInfo.email.trim() : '';
-		firstName ||= typeof userInfo.given_name === 'string' ? userInfo.given_name.trim() : '';
-		lastName ||= typeof userInfo.family_name === 'string' ? userInfo.family_name.trim() : '';
+	if (typeof tokens.access_token === 'string' && subject && (!email || !firstName || !lastName)) {
+		try {
+			const userInfo = await fetchUserInfo(config, tokens.access_token, subject);
+			const userInfoRecord = userInfo as Record<string, unknown>;
+			email ||= textValue(userInfoRecord.email);
+			firstName ||= textValue(userInfoRecord.given_name);
+			lastName ||= textValue(userInfoRecord.family_name);
+			({ firstName, lastName } = fillMissingNameFromDisplayName(textValue(userInfoRecord.name), firstName, lastName));
+		} catch {
+			// Some providers omit userinfo. Keep the ID-token claims and continue
+			// when the verified email is already available.
+		}
 	}
 	if (!subject || !email || email.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Provider identity is incomplete.');
 	return { provider, subject, email: email.toLowerCase(), firstName, lastName } satisfies OAuthProfile;
@@ -142,11 +163,16 @@ export const findOrCreateAccountForOAuth = async (profile: OAuthProfile) => {
 		const account = await getAccountById(existingIdentity.accountId);
 		if (!account) throw new Error('Account is unavailable.');
 		await updateAccountIdentity(existingIdentity.id, profile.email);
+		const firstName = account.firstName || profile.firstName.slice(0, 80);
+		const lastName = account.lastName || profile.lastName.slice(0, 80);
+		if (firstName !== account.firstName || lastName !== account.lastName) {
+			return (await updateAccountProfile(account.id, firstName, lastName)) ?? account;
+		}
 		return account;
 	}
 	const existingEmailAccount = await getAccountByEmail(profile.email);
 	if (existingEmailAccount)
-		throw new Error('An account already exists with this email. Sign in with the existing provider and link this provider from Profile.');
+		throw new Error('An account already exists with this email. Sign in with the existing provider.');
 	const now = new Date().toISOString();
 	const accountId = newAccountId();
 	const account = await createAccount({

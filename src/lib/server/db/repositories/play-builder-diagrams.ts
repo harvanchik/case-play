@@ -25,6 +25,20 @@ export const getPlayBuilderDiagram = async (id: string, database?: Database) => 
 	return result[0] ?? null;
 };
 
+/** Returns a diagram only when it belongs to the authenticated account. */
+export const getOwnedPlayBuilderDiagram = async (id: string, ownerAccountId: string, database?: Database) => {
+	const result = await resolveDb(database)
+		.select({
+			id: playBuilderDiagrams.id,
+			documentJson: playBuilderDiagrams.documentJson,
+			updatedAt: playBuilderDiagrams.updatedAt
+		})
+		.from(playBuilderDiagrams)
+		.where(and(eq(playBuilderDiagrams.id, id), eq(playBuilderDiagrams.ownerAccountId, ownerAccountId)))
+		.limit(1);
+	return result[0] ?? null;
+};
+
 export const createPlayBuilderDiagram = async (documentJson: string, ownerAccountId?: string, database?: Database) => {
 	const db = resolveDb(database);
 	const timestamp = new Date().toISOString();

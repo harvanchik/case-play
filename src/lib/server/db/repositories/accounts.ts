@@ -1,4 +1,4 @@
-import { and, eq, lt } from 'drizzle-orm';
+import { and, desc, eq, lt } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import type { Database } from '../connection';
 import { getDb } from '../index';
@@ -127,7 +127,7 @@ export const listOwnedPlayBuilderDiagrams = async (accountId: string, database?:
 		})
 		.from(playBuilderDiagrams)
 		.where(eq(playBuilderDiagrams.ownerAccountId, accountId))
-		.orderBy(playBuilderDiagrams.updatedAt);
+		.orderBy(desc(playBuilderDiagrams.updatedAt));
 };
 
 export const deleteAccountAndOwnedData = async (accountId: string, database?: Database) => {

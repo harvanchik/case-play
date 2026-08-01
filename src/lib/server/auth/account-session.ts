@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { dev } from '$app/environment';
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Cookies } from '@sveltejs/kit';
@@ -10,12 +9,12 @@ import {
 	deleteAllAccountSessions,
 	getAccountBySessionHash
 } from '$lib/server/db/repositories/accounts';
+import { readServerEnv } from '$lib/server/env';
 
 export const ACCOUNT_SESSION_COOKIE = 'caseplay_account_session';
 export const ACCOUNT_CSRF_HEADER = 'x-caseplay-csrf';
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 30;
-const viteEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
-const readEnv = (key: string) => process.env[key] || viteEnv?.[key];
+const readEnv = readServerEnv;
 
 const getSecret = () => {
 	const secret = readEnv('ACCOUNT_SESSION_SECRET');

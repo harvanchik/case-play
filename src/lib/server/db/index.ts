@@ -1,9 +1,8 @@
-import 'dotenv/config';
 import { createDatabase, type Database } from './connection';
+import { readServerEnv } from '$lib/server/env';
 
 let cachedDatabase: Database | undefined;
-const viteEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
-const readEnv = (key: string) => process.env[key] || viteEnv?.[key];
+const readEnv = readServerEnv;
 
 const getDatabaseConfig = () => {
 	const url = readEnv('TURSO_DATABASE_URL');
