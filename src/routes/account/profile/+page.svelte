@@ -1,12 +1,77 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
+	import { goto } from '$app/navigation';
 	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
 	import PublicSiteFooter from '$lib/components/PublicSiteFooter.svelte';
-	import type { ActionData, PageData } from './$types';
+	import type { PageData } from './$types';
 
 	export let data: PageData;
-	export let form: ActionData;
 	$: csrfToken = data.csrfToken || '';
+	let message = '';
+	let errorMessage = '';
+	let savingProfile = false;
+	let signingOutAll = false;
+	let confirmingAccountDeletion = false;
+	let deletingAccount = false;
+	let deleteAuthoredContent = false;
+
+	const requestHeaders = () => ({ 'content-type': 'application/json', 'x-caseplay-csrf': csrfToken });
+	const responseMessage = async (response: Response, fallback: string) => {
+		const body = (await response.json().catch(() => null)) as { message?: string } | null;
+		return body?.message || fallback;
+	};
+	const saveProfile = async (event: SubmitEvent) => {
+		if (savingProfile) return;
+		savingProfile = true;
+		message = '';
+		errorMessage = '';
+		const form = event.currentTarget as HTMLFormElement;
+		const formData = new FormData(form);
+		try {
+			const response = await fetch('/api/account', {
+				method: 'PATCH',
+				headers: requestHeaders(),
+				body: JSON.stringify({ firstName: formData.get('firstName'), lastName: formData.get('lastName') })
+			});
+			if (!response.ok) throw new Error(await responseMessage(response, 'Unable to save your profile.'));
+			message = 'Profile saved.';
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Unable to save your profile.';
+		} finally {
+			savingProfile = false;
+		}
+	};
+	const signOutAll = async () => {
+		if (signingOutAll) return;
+		signingOutAll = true;
+		errorMessage = '';
+		try {
+			const response = await fetch('/api/account/sessions', { method: 'DELETE', headers: { 'x-caseplay-csrf': csrfToken } });
+			if (!response.ok) throw new Error(await responseMessage(response, 'Unable to sign out.'));
+			await goto('/account/login?error=signedout', { invalidateAll: true });
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Unable to sign out.';
+			signingOutAll = false;
+		}
+	};
+	const deleteAccount = async () => {
+		if (deletingAccount) return;
+		deletingAccount = true;
+		errorMessage = '';
+		try {
+			const response = await fetch('/api/account', {
+				method: 'DELETE',
+				headers: requestHeaders(),
+				body: JSON.stringify({ deleteAuthoredContent })
+			});
+			if (!response.ok) throw new Error(await responseMessage(response, 'Unable to delete your account.'));
+			clearLocalBuilderArtifacts();
+			await goto('/?account=deleted', { invalidateAll: true });
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Unable to delete your account.';
+			deletingAccount = false;
+		}
+	};
 	const clearLocalBuilderArtifacts = () => {
 		try {
 			localStorage.removeItem('caseplay-play-builder-edit-tokens-v1');
@@ -40,9 +105,9 @@
 		<section class="border-2 border-stone-900 bg-white p-6 shadow-[4px_4px_0_rgba(28,25,23,0.2)]">
 			<h1 class="text-2xl font-black tracking-tight text-stone-900">Profile</h1>
 			<p class="mt-1 text-sm text-stone-600">Your provider account controls your sign-in email and password.</p>
-			{#if form?.message}<p class="mt-4 border border-stone-300 bg-stone-50 p-3 text-sm text-stone-700" role="status">{form.message}</p>{/if}
-			<form method="POST" action="?/updateProfile" class="mt-6 grid gap-4">
-				<input type="hidden" name="csrf" value={csrfToken} />
+			{#if message}<p class="mt-4 border border-stone-300 bg-stone-50 p-3 text-sm text-stone-700" role="status">{message}</p>{/if}
+			{#if errorMessage}<p class="mt-4 border border-red-300 bg-red-50 p-3 text-sm text-red-700" role="alert">{errorMessage}</p>{/if}
+			<form class="mt-6 grid gap-4" on:submit|preventDefault={saveProfile}>
 				<label class="grid gap-1 text-sm font-bold text-stone-800"
 					>First name <input name="firstName" maxlength="80" value={data.account.firstName} autocomplete="given-name" /></label
 				>
@@ -66,29 +131,44 @@
 						/>
 					</span>
 				</label>
-				<button class="dark-button" type="submit">Save profile</button>
+				<button class="dark-button" type="submit" disabled={savingProfile}>{savingProfile ? 'Saving…' : 'Save profile'}</button>
 			</form>
 		</section>
 		<section class="border-2 border-stone-900 bg-white p-6 shadow-[4px_4px_0_rgba(28,25,23,0.2)]">
 			<h2 class="text-xl font-black tracking-tight text-stone-900">Account actions</h2>
 			<p class="mt-2 text-sm text-stone-600">Manage your saved diagrams from the My Plays menu in the navigation bar.</p>
 			<div class="mt-7 grid gap-3 border-t border-stone-300 pt-5">
-				<form method="POST" action="?/signOutAll">
-					<input type="hidden" name="csrf" value={csrfToken} /><button class="outline-button w-full" type="submit">Sign out all devices</button>
-				</form>
-				<form
-					method="POST"
-					action="?/deleteAccount"
-					on:submit={(event) => {
-						if (!confirm('Delete your account and saved diagrams? This cannot be undone.')) event.preventDefault();
-						else clearLocalBuilderArtifacts();
-					}}
-				>
-					<input type="hidden" name="csrf" value={csrfToken} /><input type="hidden" name="confirm" value="delete" /><button
-						class="danger-button w-full"
-						type="submit">Delete account</button
-					>
-				</form>
+				<button class="outline-button w-full" type="button" disabled={signingOutAll} on:click={signOutAll}>
+					{signingOutAll ? 'Signing out…' : 'Sign out all devices'}
+				</button>
+				{#if confirmingAccountDeletion}
+					<div class="border-2 border-red-700 bg-red-50 p-4">
+						<p class="text-sm font-bold text-red-900">Delete your account?</p>
+						<p class="mt-1 text-sm text-red-800">
+							Your authored case plays and play builders will be preserved under “Deleted User” unless you select the option below.
+						</p>
+						<label class="mt-4 flex cursor-pointer items-start gap-2 text-sm font-semibold text-red-900">
+							<input class="mt-0.5 size-4" type="checkbox" bind:checked={deleteAuthoredContent} />
+							<span>Permanently delete all case plays and play builders I authored</span>
+						</label>
+						<div class="mt-4 grid gap-2 sm:grid-cols-2">
+							<button
+								class="outline-button"
+								type="button"
+								disabled={deletingAccount}
+								on:click={() => {
+									confirmingAccountDeletion = false;
+									deleteAuthoredContent = false;
+								}}>Cancel</button
+							>
+							<button class="danger-button" type="button" disabled={deletingAccount} on:click={deleteAccount}>
+								{deletingAccount ? 'Deleting…' : 'Confirm deletion'}
+							</button>
+						</div>
+					</div>
+				{:else}
+					<button class="danger-button w-full" type="button" on:click={() => (confirmingAccountDeletion = true)}>Delete account</button>
+				{/if}
 			</div>
 		</section>
 	</div>
@@ -115,9 +195,16 @@
 	.dark-button,
 	.outline-button,
 	.danger-button {
+		cursor: pointer;
 		border: 2px solid #292524;
 		padding: 0.65rem 0.9rem;
 		font-weight: 800;
+	}
+	.dark-button:disabled,
+	.outline-button:disabled,
+	.danger-button:disabled {
+		cursor: not-allowed;
+		opacity: 0.6;
 	}
 	.dark-button {
 		background: #1c1917;

@@ -31,7 +31,7 @@
 				items={[
 					{ label: 'My Plays', href: '/account/plays' },
 					{ label: 'Account Settings', href: '/account/profile' },
-					{ label: 'Sign Out', href: '/account/logout', action: 'post', danger: true }
+					{ label: 'Sign Out', href: '/api/account/session', action: 'signout', danger: true }
 				]}
 			/>
 		{:else}

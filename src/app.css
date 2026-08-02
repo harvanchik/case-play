@@ -62,6 +62,14 @@
 		background: #d6d3d1;
 		border-radius: 0;
 	}
+	button:not(:disabled),
+	[role='button']:not([aria-disabled='true']) {
+		cursor: pointer;
+	}
+	button:disabled,
+	[role='button'][aria-disabled='true'] {
+		cursor: not-allowed;
+	}
 
 	mark {
 		@apply bg-current px-[1px] pb-0.5 font-extrabold text-stone-900 group-[.revealed]:bg-yellow-300 selection:bg-yellow-200;

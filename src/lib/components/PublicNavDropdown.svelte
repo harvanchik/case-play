@@ -2,7 +2,7 @@
 	export type PublicNavDropdownItem = {
 		label: string;
 		href?: string;
-		action?: 'post';
+		action?: 'signout';
 		danger?: boolean;
 		disabled?: boolean;
 		suffix?: string;
@@ -10,12 +10,31 @@
 </script>
 
 <script lang="ts">
+	import { goto } from '$app/navigation';
+
 	export let label: string;
 	export let href: string;
 	export let items: PublicNavDropdownItem[] = [];
 	export let menuLabel: string | undefined = undefined;
 	export let align: 'left' | 'center' | 'right' = 'left';
 	export let csrfToken: string | null = null;
+	let signingOut = false;
+	const runItemAction = async (item: PublicNavDropdownItem) => {
+		if (item.action !== 'signout' || signingOut) return;
+		signingOut = true;
+		try {
+			const response = await fetch(item.href || '/api/account/session', {
+				method: 'DELETE',
+				headers: { 'x-caseplay-csrf': csrfToken ?? '' }
+			});
+			if (!response.ok) throw new Error('Unable to sign out.');
+			await goto('/', { invalidateAll: true });
+		} catch {
+			// Keep the current authenticated view intact when the background request fails.
+		} finally {
+			signingOut = false;
+		}
+	};
 </script>
 
 <div class="nav-dropdown-group relative">
@@ -41,17 +60,16 @@
 						{#if item.suffix}<span class="text-[0.58rem] font-bold tracking-wider text-stone-400 uppercase">{item.suffix}</span>{/if}
 					</div>
 				{:else if item.href}
-					{#if item.action === 'post'}
-						<form method="POST" action={item.href}>
-							<input type="hidden" name="csrf" value={csrfToken ?? ''} />
-							<button
-								type="submit"
-								role="menuitem"
-								class={`nav-dropdown-item nav-dropdown-danger block w-full px-3 py-2 text-stone-800 underline-offset-4 focus-visible:bg-stone-100 focus-visible:underline ${align === 'right' ? 'text-right' : 'text-left'}`}
-							>
-								{item.label}
-							</button>
-						</form>
+					{#if item.action === 'signout'}
+						<button
+							type="button"
+							role="menuitem"
+							disabled={signingOut}
+							on:click={() => runItemAction(item)}
+							class={`nav-dropdown-item nav-dropdown-danger block w-full cursor-pointer px-3 py-2 text-stone-800 underline-offset-4 focus-visible:bg-stone-100 focus-visible:underline ${align === 'right' ? 'text-right' : 'text-left'}`}
+						>
+							{signingOut ? 'Signing Out…' : item.label}
+						</button>
 					{:else}
 						<a
 							href={item.href}

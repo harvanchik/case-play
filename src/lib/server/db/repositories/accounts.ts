@@ -2,7 +2,7 @@ import { and, desc, eq, lt } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import type { Database } from '../connection';
 import { getDb } from '../index';
-import { accountIdentities, accountSessions, accounts, oauthTransactions, playBuilderDiagrams } from '../schema';
+import { accountIdentities, accountSessions, accounts, authors, casePlays, oauthTransactions, playBuilderDiagrams } from '../schema';
 
 const resolveDb = (database?: Database) => database ?? getDb();
 
@@ -130,10 +130,53 @@ export const listOwnedPlayBuilderDiagrams = async (accountId: string, database?:
 		.orderBy(desc(playBuilderDiagrams.updatedAt));
 };
 
-export const deleteAccountAndOwnedData = async (accountId: string, database?: Database) => {
+const DELETED_ACCOUNT_ID = 'deleted-user';
+const DELETED_AUTHOR_ID = 'deleted-user';
+
+export const deleteAccount = async (accountId: string, options: { deleteAuthoredContent: boolean }, database?: Database) => {
 	const db = resolveDb(database);
-	await db.delete(playBuilderDiagrams).where(eq(playBuilderDiagrams.ownerAccountId, accountId));
-	await db.delete(accounts).where(eq(accounts.id, accountId));
+	await db.transaction(async (transaction) => {
+		if (options.deleteAuthoredContent) {
+			await transaction.delete(playBuilderDiagrams).where(eq(playBuilderDiagrams.ownerAccountId, accountId));
+			await transaction.delete(casePlays).where(eq(casePlays.ownerAccountId, accountId));
+		} else {
+			const timestamp = new Date().toISOString();
+			await transaction
+				.insert(accounts)
+				.values({
+					id: DELETED_ACCOUNT_ID,
+					email: 'deleted-user@caseplay.invalid',
+					firstName: 'Deleted',
+					lastName: 'User',
+					createdAt: timestamp,
+					updatedAt: timestamp
+				})
+				.onConflictDoNothing();
+			await transaction
+				.insert(authors)
+				.values({
+					id: DELETED_AUTHOR_ID,
+					firstName: 'Deleted',
+					lastName: 'User',
+					createdAt: timestamp,
+					updatedAt: timestamp
+				})
+				.onConflictDoNothing();
+			await transaction
+				.update(playBuilderDiagrams)
+				.set({ ownerAccountId: DELETED_ACCOUNT_ID, updatedAt: timestamp })
+				.where(eq(playBuilderDiagrams.ownerAccountId, accountId));
+			await transaction
+				.update(casePlays)
+				.set({ ownerAccountId: DELETED_ACCOUNT_ID, authorId: DELETED_AUTHOR_ID, updatedAt: timestamp })
+				.where(eq(casePlays.ownerAccountId, accountId));
+		}
+		await transaction.delete(accounts).where(eq(accounts.id, accountId));
+	});
 };
+
+/** Used when rolling back a newly created OAuth account that cannot yet own content. */
+export const deleteAccountAndOwnedData = async (accountId: string, database?: Database) =>
+	deleteAccount(accountId, { deleteAuthoredContent: true }, database);
 
 export const newAccountId = () => randomUUID();

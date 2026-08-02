@@ -14,6 +14,7 @@ export type CasePlayMutationInput = {
 	difficulty: 1 | 2 | 3;
 	filmUrl?: string | null;
 	authorId?: string | null;
+	ownerAccountId?: string | null;
 	rulebookId?: string | null;
 	sportId?: string | null;
 	sourceKey?: string | null;
@@ -49,11 +50,15 @@ export const listPublicCasePlays = async (options: PublicCasePlayListOptions, da
 	if (searchTerm) {
 		const searchPattern = `%${searchTerm}%`;
 		const normalizedSearch = searchTerm.toLocaleLowerCase();
-		const matchingDifficultyValues = ([
-			[1, 'easy'],
-			[2, 'moderate'],
-			[3, 'hard']
-		] as const).filter(([, label]) => label.includes(normalizedSearch)).map(([value]) => value);
+		const matchingDifficultyValues = (
+			[
+				[1, 'easy'],
+				[2, 'moderate'],
+				[3, 'hard']
+			] as const
+		)
+			.filter(([, label]) => label.includes(normalizedSearch))
+			.map(([value]) => value);
 		const searchConditions = [
 			like(casePlays.title, searchPattern),
 			like(casePlays.prompt, searchPattern),
@@ -62,9 +67,7 @@ export const listPublicCasePlays = async (options: PublicCasePlayListOptions, da
 			like(casePlays.edition, searchPattern)
 		];
 		if (matchingDifficultyValues.length) searchConditions.push(inArray(casePlays.difficulty, matchingDifficultyValues));
-		conditions.push(
-			or(...searchConditions)!
-		);
+		conditions.push(or(...searchConditions)!);
 	}
 
 	const where = and(...conditions);
@@ -267,6 +270,7 @@ export const createCasePlay = async (input: CasePlayMutationInput, database?: Da
 		difficulty: input.difficulty,
 		filmUrl: input.filmUrl?.trim() || null,
 		authorId: input.authorId || null,
+		ownerAccountId: input.ownerAccountId || null,
 		rulebookId: input.rulebookId || null,
 		sportId: input.sportId || null,
 		isHidden,
@@ -294,6 +298,7 @@ export const updateCasePlay = async (id: string, input: CasePlayMutationInput, d
 			difficulty: input.difficulty,
 			filmUrl: input.filmUrl?.trim() || null,
 			authorId: input.authorId || null,
+			...(input.ownerAccountId !== undefined ? { ownerAccountId: input.ownerAccountId || null } : {}),
 			rulebookId: input.rulebookId || null,
 			sportId: input.sportId || null,
 			isHidden,
