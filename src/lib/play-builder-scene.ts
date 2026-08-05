@@ -34,7 +34,17 @@ export type PlayBuilderFieldSettings = {
 };
 export type Point = { x: number; y: number };
 export type FieldMarker = Point & { id: number; kind: MarkerKind; label?: string; sequence?: number; color?: GuideColor };
-export type FieldPath = { id: number; kind: PathKind; start: Point; end: Point; color: GuideColor; style: GuideStyle; startMarkerId?: number };
+export type FieldPath = {
+	id: number;
+	kind: PathKind;
+	start: Point;
+	end: Point;
+	color: GuideColor;
+	style: GuideStyle;
+	startMarkerId?: number;
+	/** Optional sampled points for a free-drawn Run arrow. Straight paths omit this. */
+	points?: Point[];
+};
 export type FieldGuide = { id: number; kind: GuideKind; x: number; color: GuideColor; style: GuideStyle; down?: DownMarkerValue };
 export type FreeStroke = { id: number; color: GuideColor; points: Point[]; width?: number };
 export type LayerType = 'guide' | 'path' | 'marker';
@@ -91,7 +101,7 @@ const fieldSettingKeys = [
 
 type LegacyMarkerTuple = [number, number, number, number, string | null, number | null];
 type MarkerTuple = [number, number, number, number, string | null, number | null, number | null];
-type PathTuple = [number, number, number, number, number, number, number, number, number | null];
+type PathTuple = [number, number, number, number, number, number, number, number, number | null, number[]?];
 type LegacyGuideTuple = [number, number, number, number, number];
 type GuideTuple = [number, number, number, number, number, number | null];
 type LegacyStrokeTuple = [number, number, number[]];
@@ -198,17 +208,33 @@ export const encodePlayBuilderScene = (scene: PlayBuilderScene): SerializedPlayB
 		marker.sequence ?? null,
 		marker.color === undefined ? null : indexOf(colors, marker.color)
 	]),
-	p: scene.paths.map((path) => [
-		path.id,
-		indexOf(pathKinds, path.kind),
-		quantize(path.start.x),
-		quantize(path.start.y),
-		quantize(path.end.x),
-		quantize(path.end.y),
-		indexOf(colors, path.color),
-		indexOf(styles, path.style),
-		path.startMarkerId ?? null
-	]),
+	p: scene.paths.map((path) => {
+		const tuple: PathTuple = [
+			path.id,
+			indexOf(pathKinds, path.kind),
+			quantize(path.start.x),
+			quantize(path.start.y),
+			quantize(path.end.x),
+			quantize(path.end.y),
+			indexOf(colors, path.color),
+			indexOf(styles, path.style),
+			path.startMarkerId ?? null
+		];
+		if (path.points && path.points.length > 1) {
+			const points: number[] = [];
+			let previousX = 0;
+			let previousY = 0;
+			path.points.forEach((point, index) => {
+				const x = quantize(point.x);
+				const y = quantize(point.y);
+				points.push(index === 0 ? x : x - previousX, index === 0 ? y : y - previousY);
+				previousX = x;
+				previousY = y;
+			});
+			tuple.push(points);
+		}
+		return tuple;
+	}),
 	g: scene.guides.map((guide) => [
 		guide.id,
 		indexOf(guideKinds, guide.kind),
@@ -259,13 +285,15 @@ export const decodePlayBuilderScene = (value: unknown): PlayBuilderScene => {
 		}
 		const label = item[4];
 		const sequence = item[5];
-		if (label !== null && (typeof label !== 'string' || label.length > 24)) throw new Error('Invalid marker label.');
+		const kind = markerKinds[item[1]];
+		const maximumLabelLength = kind === 'event' ? 40 : 24;
+		if (label !== null && (typeof label !== 'string' || label.length > maximumLabelLength)) throw new Error('Invalid marker label.');
 		if (sequence !== null && !validInteger(sequence)) throw new Error('Invalid marker sequence.');
 		const colorIndex = item.length === 7 ? item[6] : null;
 		if (colorIndex !== null && !validIndex(colorIndex, colors.length)) throw new Error('Invalid marker color.');
 		return {
 			id: item[0],
-			kind: markerKinds[item[1]],
+			kind,
 			x: dequantize(item[2]),
 			y: dequantize(item[3]),
 			...(label === null ? {} : { label }),
@@ -276,15 +304,32 @@ export const decodePlayBuilderScene = (value: unknown): PlayBuilderScene => {
 	const paths = scene.p.map((item) => {
 		if (
 			!Array.isArray(item) ||
-			item.length !== 9 ||
+			(item.length !== 9 && item.length !== 10) ||
 			!validInteger(item[0]) ||
 			!validIndex(item[1], pathKinds.length) ||
 			![item[2], item[3], item[4], item[5]].every(validCoordinate) ||
 			!validIndex(item[6], colors.length) ||
 			!validIndex(item[7], styles.length) ||
-			(item[8] !== null && !validInteger(item[8]))
+			(item[8] !== null && !validInteger(item[8])) ||
+			(item.length === 10 &&
+				item[9] !== null &&
+				(!Array.isArray(item[9]) || item[9].length < 4 || item[9].length % 2 !== 0 || !item[9].every(validCoordinate)))
 		)
 			throw new Error('Invalid path data.');
+		const pathPoints = item.length === 10 ? item[9] : null;
+		let points: Point[] | undefined;
+		if (pathPoints !== null && pathPoints !== undefined) {
+			if (pathPoints.length > 2_000) throw new Error('Play builder path is too large.');
+			let x = 0;
+			let y = 0;
+			points = [];
+			for (let index = 0; index < pathPoints.length; index += 2) {
+				x = index === 0 ? pathPoints[index] : x + pathPoints[index];
+				y = index === 0 ? pathPoints[index + 1] : y + pathPoints[index + 1];
+				if (!validCoordinate(x) || !validCoordinate(y)) throw new Error('Invalid path points.');
+				points.push({ x: dequantize(x), y: dequantize(y) });
+			}
+		}
 		return {
 			id: item[0],
 			kind: pathKinds[item[1]],
@@ -292,7 +337,8 @@ export const decodePlayBuilderScene = (value: unknown): PlayBuilderScene => {
 			end: { x: dequantize(item[4]), y: dequantize(item[5]) },
 			color: colors[item[6]],
 			style: styles[item[7]],
-			...(item[8] === null ? {} : { startMarkerId: item[8] })
+			...(item[8] === null ? {} : { startMarkerId: item[8] }),
+			...(points ? { points } : {})
 		};
 	});
 	let guides = scene.g.map((item) => {

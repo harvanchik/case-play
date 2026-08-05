@@ -14,7 +14,14 @@ import {
 	type PlayBuilderScene,
 	type Point
 } from '$lib/play-builder-scene';
-import { PLAY_BUILDER_GUIDE_COLORS, playBuilderAirborneLift, playBuilderAirborneSegments, playBuilderGuideDash } from '$lib/play-builder-rendering';
+import {
+	PLAY_BUILDER_GUIDE_COLORS,
+	playBuilderAirborneLift,
+	playBuilderAirborneSegments,
+	playBuilderGuideDash,
+	playBuilderSmoothedPath
+} from '$lib/play-builder-rendering';
+import { PLAY_BUILDER_EVENT_TAG_LINE_HEIGHT, playBuilderEventTagLayout } from '$lib/play-builder-event-tag';
 import beanBagBlackImage from './social-assets/bean-bag-black.png?inline';
 import beanBagBlueImage from './social-assets/bean-bag-blue.png?inline';
 import beanBagPinkImage from './social-assets/bean-bag-pink.png?inline';
@@ -254,8 +261,10 @@ const renderMarker = (marker: FieldMarker) => {
 	const renderImageMarker = (asset: string, size: number) =>
 		`<g><image href="${asset}" x="${marker.x - size / 2}" y="${marker.y - size / 2}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid meet"/>${label ? `<text x="${marker.x}" y="${marker.y + size / 2 + 9}" text-anchor="middle" fill="#fff" stroke="#111827" stroke-width="2" paint-order="stroke" font-size="8" font-weight="900">${label}</text>` : ''}</g>`;
 	if (marker.kind === 'team-a' || marker.kind === 'team-k' || marker.kind === 'team-b' || marker.kind === 'team-r') {
-		const dark = marker.kind === 'team-a' || marker.kind === 'team-k';
-		return `<g><circle cx="${marker.x}" cy="${marker.y}" r="14" fill="${dark ? '#1c1917' : '#ffffff'}" stroke="${dark ? '#ffffff' : '#1c1917'}" stroke-width="2.6"/><text x="${marker.x}" y="${marker.y + 4}" text-anchor="middle" fill="${dark ? '#ffffff' : '#1c1917'}" font-size="9" font-weight="900">${label}</text></g>`;
+		const color = marker.color ?? (marker.kind === 'team-a' || marker.kind === 'team-k' ? 'black' : 'white');
+		const fill = color === 'white' ? '#ffffff' : color === 'black' ? '#1c1917' : PLAY_BUILDER_GUIDE_COLORS[color];
+		const text = color === 'white' || color === 'yellow' || color === 'green' ? '#1c1917' : '#ffffff';
+		return `<g><circle cx="${marker.x}" cy="${marker.y}" r="14" fill="${fill}" stroke="${text}" stroke-width="2.6"/><text x="${marker.x}" y="${marker.y + 4}" text-anchor="middle" fill="${text}" font-size="9" font-weight="900">${label}</text></g>`;
 	}
 	if (marker.kind.startsWith('official-')) {
 		return renderImageMarker(officialMarkerImages[marker.kind as keyof typeof officialMarkerImages], 46.28);
@@ -264,8 +273,14 @@ const renderMarker = (marker: FieldMarker) => {
 		return renderImageMarker(footballImage, 30);
 	}
 	if (marker.kind === 'event') {
-		const width = Math.max(47, Math.min(154, (marker.label?.length ?? 5) * 6.6 + 16));
-		return `<g><rect x="${marker.x - width / 2}" y="${marker.y - 10.5}" width="${width}" height="21" fill="#fff" stroke="#1c1917" stroke-width="2"/><text x="${marker.x}" y="${marker.y + 3.5}" text-anchor="middle" fill="#1c1917" font-size="8.5" font-weight="900">${label || 'EVENT'}</text></g>`;
+		const layout = playBuilderEventTagLayout(marker.label);
+		const text = layout.lines
+			.map(
+				(line, index) =>
+					`<tspan x="${marker.x}" y="${marker.y - ((layout.lines.length - 1) * PLAY_BUILDER_EVENT_TAG_LINE_HEIGHT) / 2 + 3.5 + index * PLAY_BUILDER_EVENT_TAG_LINE_HEIGHT}">${escapeXml(line)}</tspan>`
+			)
+			.join('');
+		return `<g><rect x="${marker.x - layout.width / 2}" y="${marker.y - layout.height / 2}" width="${layout.width}" height="${layout.height}" fill="#fff" stroke="#1c1917" stroke-width="2"/><text x="${marker.x}" text-anchor="middle" fill="#1c1917" font-size="8.5" font-weight="900">${text}</text></g>`;
 	}
 	if (marker.kind === 'flag') {
 		return renderImageMarker(penaltyFlagImage, 31.5);
@@ -284,7 +299,15 @@ const renderPath = (path: FieldPath, scene: PlayBuilderScene, fieldTop: number, 
 		return `<line x1="${start.x}" y1="${start.y}" x2="${path.end.x}" y2="${path.end.y}" stroke="${color}" stroke-width="7.5" stroke-linecap="${path.style === 'dotted' ? 'round' : 'square'}"${dashAttribute(path.style)}/>`;
 	}
 	if (path.kind === 'run') {
-		return `<line x1="${start.x}" y1="${start.y}" x2="${path.end.x}" y2="${path.end.y}" stroke="${color}" stroke-width="5" stroke-linecap="${path.style === 'dotted' ? 'round' : 'square'}"${dashAttribute(path.style)} marker-end="url(#arrow-${path.color})"/>`;
+		const firstPoint = path.points?.[0] ?? path.start;
+		const offsetX = start.x - firstPoint.x;
+		const offsetY = start.y - firstPoint.y;
+		const points =
+			path.points && path.points.length > 1
+				? path.points.map((point, index) => (index === 0 ? { ...start } : { x: point.x + offsetX, y: point.y + offsetY }))
+				: undefined;
+		const data = points ? playBuilderSmoothedPath(points) : `M ${start.x} ${start.y} L ${path.end.x} ${path.end.y}`;
+		return `<path d="${data}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="${path.style === 'dotted' ? 'round' : 'square'}"${dashAttribute(path.style)} marker-end="url(#arrow-${path.color})"/>`;
 	}
 	const controlY = (start.y + path.end.y) / 2 - playBuilderAirborneLift(path.kind, start, path.end, fieldTop) * 2;
 	const shadowStartY = Math.min(fieldBottom - 5, start.y + 9);

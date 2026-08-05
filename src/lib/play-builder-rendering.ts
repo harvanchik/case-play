@@ -19,6 +19,83 @@ export const playBuilderGuideColor = (color: GuideColor) => PLAY_BUILDER_GUIDE_C
 
 export const playBuilderGuideDash = (style: GuideStyle) => (style === 'dashed' ? '16 10' : style === 'dotted' ? '0.01 12' : undefined);
 
+const squaredDistanceToSegment = (point: Point, start: Point, end: Point) => {
+	const dx = end.x - start.x;
+	const dy = end.y - start.y;
+	if (dx === 0 && dy === 0) return (point.x - start.x) ** 2 + (point.y - start.y) ** 2;
+	const projected = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy)));
+	const nearestX = start.x + dx * projected;
+	const nearestY = start.y + dy * projected;
+	return (point.x - nearestX) ** 2 + (point.y - nearestY) ** 2;
+};
+
+// Pointer events capture a lot of nearly identical hand movement. First retain
+// only meaningful direction changes, then round those turns into a clean route.
+export const playBuilderSimplifyPathPoints = (points: readonly Point[], tolerance = 7): Point[] => {
+	if (points.length < 3) return points.map((point) => ({ ...point }));
+	const retained = new Set<number>([0, points.length - 1]);
+	const threshold = tolerance ** 2;
+	const retainSignificantPoint = (startIndex: number, endIndex: number): void => {
+		let farthestIndex = -1;
+		let farthestDistance = threshold;
+		for (let index = startIndex + 1; index < endIndex; index += 1) {
+			const distance = squaredDistanceToSegment(points[index], points[startIndex], points[endIndex]);
+			if (distance > farthestDistance) {
+				farthestDistance = distance;
+				farthestIndex = index;
+			}
+		}
+		if (farthestIndex === -1) return;
+		retained.add(farthestIndex);
+		retainSignificantPoint(startIndex, farthestIndex);
+		retainSignificantPoint(farthestIndex, endIndex);
+	};
+	retainSignificantPoint(0, points.length - 1);
+	return [...retained].sort((left, right) => left - right).map((index) => ({ ...points[index] }));
+};
+
+export const playBuilderSmoothPathPoints = (points: readonly Point[], iterations = 2): Point[] => {
+	if (points.length < 3) return points.map((point) => ({ ...point }));
+	let smoothed = playBuilderSimplifyPathPoints(points);
+	for (let pass = 0; pass < iterations; pass += 1) {
+		const next: Point[] = [{ ...smoothed[0] }];
+		for (let index = 0; index < smoothed.length - 1; index += 1) {
+			const current = smoothed[index];
+			const following = smoothed[index + 1];
+			next.push(
+				{ x: current.x * 0.75 + following.x * 0.25, y: current.y * 0.75 + following.y * 0.25 },
+				{ x: current.x * 0.25 + following.x * 0.75, y: current.y * 0.25 + following.y * 0.75 }
+			);
+		}
+		next.push({ ...smoothed.at(-1)! });
+		smoothed = next;
+	}
+	return smoothed;
+};
+
+export const playBuilderSmoothedPath = (points: readonly Point[]) => {
+	const smoothed = playBuilderSmoothPathPoints(points);
+	if (smoothed.length === 0) return '';
+	if (smoothed.length === 1) return `M ${smoothed[0].x} ${smoothed[0].y}`;
+	let data = `M ${smoothed[0].x} ${smoothed[0].y}`;
+	for (let index = 0; index < smoothed.length - 1; index += 1) {
+		const previous = smoothed[Math.max(0, index - 1)];
+		const current = smoothed[index];
+		const next = smoothed[index + 1];
+		const following = smoothed[Math.min(smoothed.length - 1, index + 2)];
+		const controlOne = {
+			x: current.x + (next.x - previous.x) / 6,
+			y: current.y + (next.y - previous.y) / 6
+		};
+		const controlTwo = {
+			x: next.x - (following.x - current.x) / 6,
+			y: next.y - (following.y - current.y) / 6
+		};
+		data += ` C ${controlOne.x} ${controlOne.y} ${controlTwo.x} ${controlTwo.y} ${next.x} ${next.y}`;
+	}
+	return data;
+};
+
 export const playBuilderAirborneLift = (kind: 'pass' | 'kick', start: Point, end: Point, fieldTop: number) => {
 	const distance = Math.hypot(end.x - start.x, end.y - start.y);
 	const desiredLift = kind === 'kick' ? Math.max(46, Math.min(160, distance * 0.52)) : Math.max(20, Math.min(58, distance * 0.18));
