@@ -51,29 +51,32 @@
 		playBuilderAirborneSegments,
 		playBuilderGuideColor,
 		playBuilderGuideDash,
+		playBuilderSmoothedPath,
+		playBuilderSmoothPathPoints,
 		type PlayBuilderAirborneSegment
 	} from '$lib/play-builder-rendering';
+	import {
+		PLAY_BUILDER_EVENT_TAG_HEIGHT,
+		PLAY_BUILDER_EVENT_TAG_LINE_HEIGHT,
+		PLAY_BUILDER_EVENT_TAG_WIDTH,
+		playBuilderEventTagLayout,
+		playBuilderEventTagLines
+	} from '$lib/play-builder-event-tag';
+	import {
+		FLAG_FOOTBALL_PLAY_BUILDER_DEFINITION,
+		type FlagFootballTool,
+		type FlagFootballToolDefinition
+	} from '$lib/flag-football-play-builder-definition';
 	import HoverTooltip from './HoverTooltip.svelte';
+	import BuilderActionButton from './play-builder/BuilderActionButton.svelte';
+	import BuilderToggleCard from './play-builder/BuilderToggleCard.svelte';
+	import ColorSwatchPalette from './play-builder/ColorSwatchPalette.svelte';
 	import FieldSideToggle from './play-builder/FieldSideToggle.svelte';
 	import LineFormatControls from './play-builder/LineFormatControls.svelte';
 	import ModalCloseButton from './play-builder/ModalCloseButton.svelte';
 	import YardageInput from './play-builder/YardageInput.svelte';
 
-	type Tool =
-		| PlayerKind
-		| OfficialKind
-		| 'ball'
-		| 'flag'
-		| 'bean-bag'
-		| 'deflag'
-		| 'event'
-		| 'laser'
-		| 'free-draw'
-		| 'run'
-		| 'pass'
-		| 'kick'
-		| 'line-of-scrimmage'
-		| 'line-to-gain';
+	type Tool = FlagFootballTool;
 	type ActiveTool = Tool | 'select';
 	type SelectedTarget = { type: 'marker' | 'path' | 'guide'; id: number };
 	type SelectionBounds = { left: number; top: number; right: number; bottom: number };
@@ -96,6 +99,7 @@
 				start: Point;
 				end: Point;
 				startMarkerId?: number;
+				points?: Point[];
 				mode: 'whole' | 'start' | 'end';
 				moved: boolean;
 		  }
@@ -105,7 +109,7 @@
 				targets: SelectedTarget[];
 				bounds: SelectionBounds;
 				markerStarts: { id: number; x: number; y: number }[];
-				pathStarts: { id: number; start: Point; end: Point; startMarkerId?: number }[];
+				pathStarts: { id: number; start: Point; end: Point; startMarkerId?: number; points?: Point[] }[];
 				guideStarts: { id: number; x: number }[];
 				moved: boolean;
 		  };
@@ -113,7 +117,7 @@
 	type ArrowKind = Extract<PathKind, 'run' | 'pass' | 'kick'>;
 	type LaserColor = Extract<GuideColor, 'red' | 'green' | 'blue' | 'purple'>;
 	type LaserRenderColor = LaserColor | 'rainbow';
-	type ToolbarPresetTool = 'deflag' | 'bean-bag' | 'laser' | ArrowKind | 'line-of-scrimmage' | 'line-to-gain';
+	type ToolbarPresetTool = PlayerKind | 'deflag' | 'bean-bag' | 'laser' | ArrowKind | 'line-of-scrimmage' | 'line-to-gain';
 	type FieldSide = 'a' | 'b';
 	type ExportBackground = 'transparent' | 'grass' | 'color';
 	type LaserDrawing = { points: Point[]; color: LaserRenderColor; releasedAt: number | null; appearedAt?: number | null };
@@ -146,93 +150,8 @@
 	export let accountSessionActive = false;
 	export let accountCsrfToken: string | null = null;
 
-	type ToolIcon = 'event' | 'line-of-scrimmage' | 'line-to-gain';
-	type ToolOption = {
-		id: Tool;
-		label: string;
-		symbol: string;
-		shortcut: string;
-		shortcutKeys: string[];
-		caption?: string;
-		image?: string;
-		icon?: ToolIcon;
-	};
-	const toolRows: ToolOption[][] = [
-		[
-			{ id: 'team-a', label: 'Team A', symbol: 'A', shortcut: 'a', shortcutKeys: ['A'] },
-			{ id: 'team-b', label: 'Team B', symbol: 'B', shortcut: 'b', shortcutKeys: ['B'] }
-		],
-		[
-			{ id: 'team-k', label: 'Team K', symbol: 'K', shortcut: 'k', shortcutKeys: ['K'] },
-			{ id: 'team-r', label: 'Team R', symbol: 'R', shortcut: 'r', shortcutKeys: ['R'] }
-		],
-		[
-			{
-				id: 'official-r',
-				label: 'Referee',
-				symbol: 'R',
-				shortcut: 'alt+r',
-				shortcutKeys: ['Alt', 'R'],
-				image: '/images/official-referee.webp'
-			},
-			{
-				id: 'official-l',
-				label: 'Line Judge',
-				symbol: 'L',
-				shortcut: 'alt+l',
-				shortcutKeys: ['Alt', 'L'],
-				image: '/images/official-line-judge.webp'
-			},
-			{
-				id: 'official-b',
-				label: 'Back Judge',
-				symbol: 'B',
-				shortcut: 'alt+b',
-				shortcutKeys: ['Alt', 'B'],
-				image: '/images/official-back-judge.webp'
-			},
-			{
-				id: 'official-f',
-				label: 'Field Judge',
-				symbol: 'F',
-				shortcut: 'alt+f',
-				shortcutKeys: ['Alt', 'F'],
-				image: '/images/official-field-judge.webp'
-			}
-		],
-		[{ id: 'ball', label: 'Football', symbol: '', shortcut: 'o', shortcutKeys: ['O'], caption: 'Football', image: '/images/football.webp' }],
-		[{ id: 'flag', label: 'Penalty Flag', symbol: '', shortcut: 'f', shortcutKeys: ['F'], caption: 'Penalty', image: '/images/penalty-flag.webp' }],
-		[{ id: 'bean-bag', label: 'Bean Bag', symbol: '', shortcut: 't', shortcutKeys: ['T'], caption: 'Bean Bag', image: '/images/bean-bag-blue.webp' }],
-		[{ id: 'deflag', label: 'Flag Belt', symbol: '', shortcut: 'l', shortcutKeys: ['L'], caption: 'Flag Belt', image: '/images/flag-belt.webp' }],
-		[{ id: 'event', label: 'Event Tag', symbol: '', shortcut: 'e', shortcutKeys: ['E'], caption: 'Event Tag', icon: 'event' }],
-		[
-			{ id: 'run', label: 'Run Arrow', symbol: '', shortcut: 'shift+r', shortcutKeys: ['Shift', 'R'], caption: 'Run', image: '/images/run-arrow.png' }
-		],
-		[{ id: 'pass', label: 'Forward Pass', symbol: '', shortcut: 'p', shortcutKeys: ['P'], caption: 'Pass', image: '/images/punt-arrow.png' }],
-		[{ id: 'kick', label: 'Punt / Kick', symbol: '', shortcut: 'u', shortcutKeys: ['U'], caption: 'Punt/Kick', image: '/images/pass-arrow.png' }],
-		[
-			{
-				id: 'line-of-scrimmage',
-				label: 'Line of Scrimmage',
-				symbol: '',
-				shortcut: 's',
-				shortcutKeys: ['S'],
-				caption: 'L.O.S.',
-				icon: 'line-of-scrimmage'
-			},
-			{
-				id: 'line-to-gain',
-				label: 'Line to Gain',
-				symbol: '',
-				shortcut: 'g',
-				shortcutKeys: ['G'],
-				caption: 'L.T.G.',
-				icon: 'line-to-gain'
-			}
-		],
-		[{ id: 'laser', label: 'Laser Pointer', symbol: '', shortcut: 'shift+l', shortcutKeys: ['Shift', 'L'], image: '/images/laser-pointer.png' }],
-		[{ id: 'free-draw', label: 'Free Draw', symbol: '', shortcut: 'd', shortcutKeys: ['D'], caption: 'Draw', image: '/images/draw-pen.webp' }]
-	];
+	type ToolOption = FlagFootballToolDefinition;
+	const toolRows = FLAG_FOOTBALL_PLAY_BUILDER_DEFINITION.toolGroups;
 	const tools = toolRows.flat();
 	const helpPlayerTools = tools.filter((item) => ['team-a', 'team-k', 'team-b', 'team-r'].includes(item.id));
 	const helpOfficialTools = tools.filter((item) => ['official-r', 'official-l', 'official-b', 'official-f'].includes(item.id));
@@ -422,7 +341,16 @@
 	let playMenuElement: HTMLElement;
 	let playStripElement: HTMLElement;
 	let playMenuLeft = 0;
-	let drawing: { kind: PathKind; start: Point; end: Point; pointerStart: Point; startMarkerId?: number; hasDragged: boolean } | null = null;
+	let drawing: {
+		kind: PathKind;
+		start: Point;
+		end: Point;
+		pointerStart: Point;
+		startMarkerId?: number;
+		points?: Point[];
+		hasDragged: boolean;
+	} | null = null;
+	let runArrowMode: 'straight' | 'free' = 'straight';
 	let activeFreeStroke: FreeStroke | null = null;
 	let freeDrawColor: GuideColor = 'red';
 	let freeDrawMode: 'draw' | 'erase' = 'draw';
@@ -436,6 +364,12 @@
 	let lastErasePoint: Point | null = null;
 	let deflagPlacementColor: GuideColor = 'red';
 	let beanBagPlacementColor: GuideColor = 'blue';
+	let playerPlacementColors: Record<PlayerKind, GuideColor> = {
+		'team-a': 'black',
+		'team-k': 'black',
+		'team-b': 'white',
+		'team-r': 'white'
+	};
 	let arrowPlacementColors: Record<ArrowKind, GuideColor> = { run: 'white', pass: 'cyan', kick: 'blue' };
 	let arrowPlacementStyles: Record<ArrowKind, GuideStyle> = { run: 'solid', pass: 'dashed', kick: 'dashed' };
 	let guidePlacementColors: Record<'line-of-scrimmage' | 'line-to-gain', GuideColor> = { 'line-of-scrimmage': 'white', 'line-to-gain': 'yellow' };
@@ -454,10 +388,12 @@
 	let dragTarget: DragTarget | null = null;
 	let draggedYardMarker: FieldMarker | undefined;
 	let draggedYardPath: FieldPath | undefined;
+	let draggedYardPathMode: 'whole' | 'start' | 'end' = 'whole';
 	$: {
 		const target = dragTarget;
 		draggedYardMarker = target?.type === 'marker' && target.moved ? markers.find((marker) => marker.id === target.id) : undefined;
 		draggedYardPath = target?.type === 'path' && target.moved ? paths.find((path) => path.id === target.id) : undefined;
+		draggedYardPathMode = target?.type === 'path' && target.moved ? target.mode : 'whole';
 	}
 	let editingMarkerId: number | null = null;
 	let editingMarker: FieldMarker | undefined;
@@ -536,6 +472,7 @@
 		| 'place:official'
 		| `edit:${MarkerKind | PathKind | GuideKind}`
 		| `label:${MarkerKind}`
+		| `color:${PlayerKind}`
 		| 'color:bean-bag'
 		| 'format-line'
 		| 'draw-stroke'
@@ -586,8 +523,10 @@
 					drawThickness: Number(freeDrawThickness),
 					flagBeltColor: deflagPlacementColor,
 					beanBagColor: beanBagPlacementColor,
+					playerColors: playerPlacementColors,
 					arrowColors: arrowPlacementColors,
 					arrowStyles: arrowPlacementStyles,
+					runArrowMode,
 					guideColors: guidePlacementColors,
 					guideStyles: guidePlacementStyles,
 					laserColor
@@ -678,8 +617,9 @@
 	const deflagSize = 33.75;
 	const foulFlagSize = 31.5;
 	const beanBagSize = 31.5;
-	const eventTagWidth = 46.5;
-	const eventTagHeight = 21;
+	const eventTagWidth = PLAY_BUILDER_EVENT_TAG_WIDTH;
+	const eventTagHeight = PLAY_BUILDER_EVENT_TAG_HEIGHT;
+	const eventTagLineHeight = PLAY_BUILDER_EVENT_TAG_LINE_HEIGHT;
 	const markerHitPadding = 3;
 	const pathStrokeWidth = 5;
 	const plainLineStrokeWidth = 7.5;
@@ -1238,7 +1178,12 @@
 	};
 	const sceneSnapshot = (): Scene => ({
 		markers: markers.map((marker) => ({ ...marker })),
-		paths: paths.map((path) => ({ ...path, start: { ...path.start }, end: { ...path.end } })),
+		paths: paths.map((path) => ({
+			...path,
+			start: { ...path.start },
+			end: { ...path.end },
+			points: path.points?.map((point) => ({ ...point }))
+		})),
 		guides: guides.map((guide) => ({ ...guide })),
 		freeStrokes: freeStrokes.map((stroke) => ({ ...stroke, points: stroke.points.map((point) => ({ ...point })) })),
 		layerOrder: layerOrder.map((layer) => ({ ...layer }))
@@ -1288,7 +1233,12 @@
 		stylusEraserPointerId = null;
 		lastErasePoint = null;
 		markers = scene.markers.map((marker) => ({ ...marker }));
-		paths = scene.paths.map((path) => ({ ...path, start: { ...path.start }, end: { ...path.end } }));
+		paths = scene.paths.map((path) => ({
+			...path,
+			start: { ...path.start },
+			end: { ...path.end },
+			points: path.points?.map((point) => ({ ...point }))
+		}));
 		guides = scene.guides.map((guide) => ({ ...guide }));
 		freeStrokes = scene.freeStrokes.map((stroke) => ({ ...stroke, points: stroke.points.map((point) => ({ ...point })) }));
 		layerOrder = scene.layerOrder.map((layer) => ({ ...layer }));
@@ -1296,7 +1246,12 @@
 	};
 	const cloneScene = (scene: Scene): Scene => ({
 		markers: scene.markers.map((marker) => ({ ...marker })),
-		paths: scene.paths.map((path) => ({ ...path, start: { ...path.start }, end: { ...path.end } })),
+		paths: scene.paths.map((path) => ({
+			...path,
+			start: { ...path.start },
+			end: { ...path.end },
+			points: path.points?.map((point) => ({ ...point }))
+		})),
 		guides: scene.guides.map((guide) => ({ ...guide })),
 		freeStrokes: scene.freeStrokes.map((stroke) => ({ ...stroke, points: stroke.points.map((point) => ({ ...point })) })),
 		layerOrder: scene.layerOrder.map((layer) => ({ ...layer }))
@@ -2169,8 +2124,16 @@
 		Math.max(0, ...markers.filter((marker) => marker.kind === kind).map((marker) => marker.sequence ?? 0)) + 1;
 	const createMarker = (kind: MarkerKind, point: Point): FieldMarker => {
 		if (playerKinds.includes(kind as PlayerKind)) {
-			const sequence = nextPlayerSequence(kind as PlayerKind);
-			return { id: nextId++, kind, sequence, label: `${kind.slice(-1).toUpperCase()}-${sequence}`, ...point };
+			const playerKind = kind as PlayerKind;
+			const sequence = nextPlayerSequence(playerKind);
+			return {
+				id: nextId++,
+				kind,
+				sequence,
+				color: playerPlacementColors[playerKind],
+				label: `${kind.slice(-1).toUpperCase()}-${sequence}`,
+				...point
+			};
 		}
 		if (kind === 'event') return { id: nextId++, kind, label: 'EVENT', ...point };
 		if (kind === 'deflag') return { id: nextId++, kind, color: deflagPlacementColor, ...point };
@@ -2203,6 +2166,12 @@
 	};
 	const toolbarArrowDash = (style: GuideStyle) => (style === 'dashed' ? '4 2.5' : style === 'dotted' ? '0.01 3.5' : undefined);
 	const deflagColors = freeDrawColors.filter((option) => !['white', 'gray', 'black'].includes(option.id));
+	// Keep player-circle colors in the same familiar order as the drawing tool.
+	// The black/white defaults remain available, but belong at the end of the palette.
+	const playerColors = freeDrawColors;
+	const defaultPlayerColor = (kind: PlayerKind): GuideColor => (kind === 'team-a' || kind === 'team-k' ? 'black' : 'white');
+	const playerMarkerColor = (marker: FieldMarker & { kind: PlayerKind }) => marker.color ?? defaultPlayerColor(marker.kind);
+	const playerTextColor = (color: GuideColor) => (color === 'white' || color === 'yellow' || color === 'green' ? '#1c1917' : '#fff');
 	const deflagImage = (color: GuideColor | undefined) =>
 		color && color !== 'red' && deflagColors.some((option) => option.id === color) ? `/images/flag-belt-${color}.webp` : '/images/flag-belt.webp';
 	const beanBagColors: { id: GuideColor; label: string; value: string }[] = [
@@ -2224,7 +2193,10 @@
 							? beanBagImage(selectedBeanBagColor)
 							: (item.image ?? '/images/football.webp')
 				);
-	const eventWidth = (label = 'EVENT') => Math.max(eventTagWidth, Math.min(154, label.length * 6.6 + 16));
+	const eventTagLines = playBuilderEventTagLines;
+	const eventTagLayout = playBuilderEventTagLayout;
+	const eventWidth = (label = 'EVENT') => eventTagLayout(label).width;
+	const eventHeight = (label = 'EVENT') => eventTagLayout(label).height;
 	const penaltyLabelLines = (label = '') => {
 		const maxCharacters = 12;
 		const lines: string[] = [];
@@ -2252,7 +2224,7 @@
 		isTeamMarker(marker)
 			? 4
 			: marker.kind === 'event'
-				? 20
+				? 40
 				: isOfficialMarker(marker) || ['ball', 'flag', 'bean-bag', 'deflag'].includes(marker.kind)
 					? 24
 					: 0;
@@ -2291,13 +2263,15 @@
 		9;
 	const markerYardLinePreviewY = (marker: FieldMarker) => {
 		if (isTeamMarker(marker)) return marker.y + playerRadius + yardLinePreviewGap;
-		if (marker.kind === 'event') return marker.y + eventTagHeight / 2 + yardLinePreviewGap;
+		if (marker.kind === 'event') return marker.y + eventHeight(marker.label) / 2 + yardLinePreviewGap;
 		const descriptionY = markerDescriptionY(marker);
 		const descriptionLines = marker.label ? penaltyLabelLines(marker.label).length : 0;
 		return descriptionLines > 0 ? descriptionY + (descriptionLines - 1) * 9 + yardLinePreviewGap : descriptionY - 9 + yardLinePreviewGap;
 	};
 	const toolYardLinePreviewY = (activeTool: ActiveTool, point: Point) => {
-		if (isPathTool(activeTool)) return point.y + yardLinePreviewGap;
+		// Arrow endpoints need a larger drop than point markers so the cursor and arrowhead
+		// do not obscure the yard-line label while an arrow is being placed or moved.
+		if (isPathTool(activeTool)) return point.y + yardLinePreviewGap + 20;
 		if (playerKinds.includes(activeTool as PlayerKind)) return point.y + playerRadius + yardLinePreviewGap;
 		if (isOfficialKind(activeTool)) return point.y + officialSize / 2 + yardLinePreviewGap;
 		if (activeTool === 'ball') return point.y + footballSize / 2 + yardLinePreviewGap;
@@ -2439,7 +2413,7 @@
 			const snappedPoint = markers.find((marker) => marker.id === targetId);
 			if (!snappedPoint || snappedPoint.kind !== 'ball') return;
 			markers = markers.map((marker) => (marker.id === targetId ? { ...marker, x: targetX } : marker));
-			paths = paths.map((path) => (path.startMarkerId === targetId ? { ...path, start: { ...path.start, x: targetX } } : path));
+			paths = paths.map((path) => (path.startMarkerId === targetId ? withPathStart(path, { ...pathStart(path), x: targetX }) : path));
 		};
 		if (instant) {
 			applySnap();
@@ -2466,6 +2440,32 @@
 		const marker = path.startMarkerId === undefined ? undefined : markers.find((item) => item.id === path.startMarkerId);
 		return marker ? { x: marker.x, y: marker.y } : path.start;
 	};
+	const pathPoints = (path: FieldPath, start = pathStart(path)): Point[] | undefined => {
+		if (!path.points || path.points.length < 2) return undefined;
+		// The attached marker can move independently of the serialized path. Use
+		// the first sampled point as the source of truth so the rest of a free-draw
+		// arrow follows the marker even before the path's own start is persisted.
+		const first = path.points[0] ?? path.start;
+		const dx = start.x - first.x;
+		const dy = start.y - first.y;
+		return path.points.map((point, index) => (index === 0 ? { ...start } : { x: point.x + dx, y: point.y + dy }));
+	};
+	const withPathStart = (path: FieldPath, start: Point): FieldPath => {
+		const current = path.points?.[0] ?? pathStart(path);
+		const dx = start.x - current.x;
+		const dy = start.y - current.y;
+		return {
+			...path,
+			start,
+			points: path.points?.map((point, index) => (index === 0 ? { ...start } : { x: point.x + dx, y: point.y + dy }))
+		};
+	};
+	const withPathOffset = (path: FieldPath, dx: number, dy: number): FieldPath => ({
+		...path,
+		start: { x: path.start.x + dx, y: path.start.y + dy },
+		end: { x: path.end.x + dx, y: path.end.y + dy },
+		points: path.points?.map((point) => ({ x: point.x + dx, y: point.y + dy }))
+	});
 	const sameTarget = (left: SelectedTarget, right: SelectedTarget) => left.type === right.type && left.id === right.id;
 	const targetExists = (target: SelectedTarget) =>
 		target.type === 'marker'
@@ -2477,31 +2477,33 @@
 		if (target.type === 'marker') {
 			const marker = markers.find((item) => item.id === target.id);
 			if (!marker) return null;
+			const eventLayout = marker.kind === 'event' ? eventTagLayout(marker.label) : null;
 			const halfWidth = isOfficialMarker(marker)
 				? officialSize / 2
 				: isTeamMarker(marker)
 					? playerRadius + markerHitPadding
 					: marker.kind === 'ball'
 						? footballSize / 2
-						: marker.kind === 'event'
-							? eventTagWidth / 2
+						: eventLayout
+							? eventLayout.width / 2
 							: marker.kind === 'deflag'
 								? deflagSize / 2
 								: marker.kind === 'bean-bag'
 									? beanBagSize / 2
 									: foulFlagSize / 2;
-			const halfHeight = marker.kind === 'event' ? eventTagHeight / 2 : halfWidth;
+			const halfHeight = eventLayout ? eventLayout.height / 2 : halfWidth;
 			return { left: marker.x - halfWidth, top: marker.y - halfHeight, right: marker.x + halfWidth, bottom: marker.y + halfHeight };
 		}
 		if (target.type === 'path') {
 			const path = paths.find((item) => item.id === target.id);
 			if (!path) return null;
 			const start = pathStart(path);
+			const points = pathPoints(path, start) ?? [start, path.end];
 			return {
-				left: Math.min(start.x, path.end.x) - 8,
-				top: Math.min(start.y, path.end.y) - (path.kind === 'pass' || path.kind === 'kick' ? 48 : 8),
-				right: Math.max(start.x, path.end.x) + 8,
-				bottom: Math.max(start.y, path.end.y) + 8
+				left: Math.min(...points.map((point) => point.x)) - 8,
+				top: Math.min(...points.map((point) => point.y)) - (path.kind === 'pass' || path.kind === 'kick' ? 48 : 8),
+				right: Math.max(...points.map((point) => point.x)) + 8,
+				bottom: Math.max(...points.map((point) => point.y)) + 8
 			};
 		}
 		const guide = guides.find((item) => item.id === target.id);
@@ -2623,15 +2625,14 @@
 			if (selectedPathIds.has(path.id)) {
 				const start = selectedPathStarts.get(path.id) ?? path.start;
 				return {
-					...path,
+					...withPathOffset(path, dx, dy),
 					start: { x: start.x + dx, y: start.y + dy },
-					end: { x: path.end.x + dx, y: path.end.y + dy },
 					startMarkerId: path.startMarkerId !== undefined && selectedMarkerIds.has(path.startMarkerId) ? path.startMarkerId : undefined
 				};
 			}
 			if (path.startMarkerId !== undefined && selectedMarkerIds.has(path.startMarkerId)) {
 				const marker = markers.find((item) => item.id === path.startMarkerId);
-				return marker ? { ...path, start: { x: marker.x, y: marker.y } } : path;
+				return marker ? withPathStart(path, { x: marker.x, y: marker.y }) : path;
 			}
 			return path;
 		});
@@ -2648,7 +2649,7 @@
 			markers: markers.filter((marker) => selectedKeys.has(targetKey({ type: 'marker', id: marker.id }))).map((marker) => ({ ...marker })),
 			paths: paths
 				.filter((path) => selectedKeys.has(targetKey({ type: 'path', id: path.id })))
-				.map((path) => ({ ...path, start: { ...pathStart(path) }, end: { ...path.end } })),
+				.map((path) => ({ ...path, start: { ...pathStart(path) }, end: { ...path.end }, points: pathPoints(path)?.map((point) => ({ ...point })) })),
 			guides: guides.filter((guide) => selectedKeys.has(targetKey({ type: 'guide', id: guide.id }))).map((guide) => ({ ...guide })),
 			layerOrder: selected.map((target) => ({ ...target })),
 			bounds: { ...selectedGroupBounds },
@@ -2682,6 +2683,7 @@
 			id: idMap.get(targetKey({ type: 'path', id: path.id }))!,
 			start: { x: path.start.x + dx, y: path.start.y + dy },
 			end: { x: path.end.x + dx, y: path.end.y + dy },
+			points: path.points?.map((point) => ({ x: point.x + dx, y: point.y + dy })),
 			startMarkerId: path.startMarkerId === undefined ? undefined : idMap.get(targetKey({ type: 'marker', id: path.startMarkerId }))
 		}));
 		const pastedGuides = elementClipboard.guides.map((guide) => ({
@@ -2722,7 +2724,13 @@
 				.map(({ id, x, y }) => ({ id, x, y })),
 			pathStarts: paths
 				.filter((path) => selectedTargets.some((target) => target.type === 'path' && target.id === path.id))
-				.map((path) => ({ id: path.id, start: { ...pathStart(path) }, end: { ...path.end }, startMarkerId: path.startMarkerId })),
+				.map((path) => ({
+					id: path.id,
+					start: { ...pathStart(path) },
+					end: { ...path.end },
+					startMarkerId: path.startMarkerId,
+					points: pathPoints(path)?.map((point) => ({ ...point }))
+				})),
 			guideStarts: guides
 				.filter((guide) => selectedTargets.some((target) => target.type === 'guide' && target.id === guide.id))
 				.map(({ id, x }) => ({ id, x })),
@@ -2787,6 +2795,20 @@
 		editingMarkerId = null;
 		restoreSelectedElementControls();
 		completeTutorialAction('color:bean-bag');
+	};
+	const updatePlayerColor = (color: GuideColor) => {
+		if (!editingMarker || !isTeamMarker(editingMarker)) return;
+		const markerId = editingMarker.id;
+		const kind = editingMarker.kind;
+		const nextLabel = editValue.trim() || editingMarker.label;
+		playerPlacementColors = { ...playerPlacementColors, [kind]: color };
+		if ((editingMarker.color ?? defaultPlayerColor(kind)) !== color || editingMarker.label !== nextLabel) {
+			saveHistory();
+			markers = markers.map((marker) => (marker.id === markerId ? { ...marker, color, label: nextLabel } : marker));
+		}
+		editingMarkerId = null;
+		restoreSelectedElementControls();
+		completeTutorialAction(`color:${kind}`);
 	};
 	const commitGuideEditor = () => {
 		editingGuideId = null;
@@ -3141,7 +3163,7 @@
 	};
 	const startEditingMarker = async (event: Event, marker: FieldMarker, preserveSelection = false) => {
 		if (viewOnly) return;
-		if (!isEditableMarker(marker) || tool === 'laser' || (tool === 'event' && marker.kind !== 'ball')) return;
+		if (!isEditableMarker(marker) || tool === 'laser' || (tool === 'event' && marker.kind !== 'ball' && marker.kind !== 'event')) return;
 		event.preventDefault();
 		if (preserveSelection) hideDeleteButton();
 		else clearDeleteState();
@@ -3245,6 +3267,7 @@
 		return true;
 	};
 	const isToolbarPresetTool = (value: Tool): value is ToolbarPresetTool =>
+		playerKinds.includes(value as PlayerKind) ||
 		value === 'deflag' ||
 		value === 'bean-bag' ||
 		value === 'laser' ||
@@ -3256,6 +3279,9 @@
 		if (selectedTool === 'laser' && performance.now() < suppressLaserPresetOpenUntil) return;
 		event.preventDefault();
 		event.stopPropagation();
+		// The toolbar tooltip is portaled to the page body, so close it explicitly before
+		// revealing a popout from the same button.
+		window.dispatchEvent(new CustomEvent('case-play-tooltip-open', { detail: -1 }));
 		clearEditorState();
 		clearDeleteState();
 		if (tool === 'laser' && selectedTool !== 'laser') releaseLaserDrawings();
@@ -3302,6 +3328,11 @@
 			toolbarEditorTool = null;
 			return;
 		}
+		if (playerKinds.includes(toolbarEditorTool as PlayerKind)) {
+			playerPlacementColors = { ...playerPlacementColors, [toolbarEditorTool as PlayerKind]: color };
+			toolbarEditorTool = null;
+			return;
+		}
 		if (isArrowKind(toolbarEditorTool)) {
 			arrowPlacementColors = { ...arrowPlacementColors, [toolbarEditorTool]: color };
 			return;
@@ -3315,7 +3346,14 @@
 		}
 	};
 	const updateToolbarPresetStyle = (style: GuideStyle) => {
-		if (!toolbarEditorTool || toolbarEditorTool === 'deflag' || toolbarEditorTool === 'bean-bag' || toolbarEditorTool === 'laser') return;
+		if (
+			!toolbarEditorTool ||
+			playerKinds.includes(toolbarEditorTool as PlayerKind) ||
+			toolbarEditorTool === 'deflag' ||
+			toolbarEditorTool === 'bean-bag' ||
+			toolbarEditorTool === 'laser'
+		)
+			return;
 		if (isArrowKind(toolbarEditorTool)) {
 			arrowPlacementStyles = { ...arrowPlacementStyles, [toolbarEditorTool]: style };
 			return;
@@ -3333,6 +3371,7 @@
 		const defaultFormat = toolbarLineFormatDefaultFor(selectedTool);
 		if (!selectedTool || !defaultFormat) return;
 		const { color, style } = defaultFormat;
+		if (style === null) return;
 		if (isArrowKind(selectedTool)) {
 			arrowPlacementColors = { ...arrowPlacementColors, [selectedTool]: color };
 			arrowPlacementStyles = { ...arrowPlacementStyles, [selectedTool]: style };
@@ -3518,6 +3557,18 @@
 			}
 			return;
 		}
+		if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+			const key = event.key.toLowerCase();
+			const isRedoShortcut = (key === 'z' && event.shiftKey) || (key === 'y' && !event.shiftKey);
+			const isUndoShortcut = key === 'z' && !event.shiftKey;
+			if (isRedoShortcut || isUndoShortcut) {
+				event.preventDefault();
+				if (isRedoShortcut) {
+					if (future.length > 0) redo();
+				} else if (history.length > 0) undo();
+				return;
+			}
+		}
 		if (editingPlayId !== null) {
 			if (event.key === 'Escape') {
 				event.preventDefault();
@@ -3648,18 +3699,6 @@
 			if (!event.shiftKey && key === 'v') {
 				event.preventDefault();
 				if (!pasteElements()) showActionMessage('Copy an element or group before pasting');
-				return;
-			}
-			if ((key === 'z' && event.shiftKey) || (key === 'y' && !event.shiftKey)) {
-				if (future.length === 0) return;
-				event.preventDefault();
-				redo();
-				return;
-			}
-			if (key === 'z' && !event.shiftKey) {
-				if (history.length === 0) return;
-				event.preventDefault();
-				undo();
 				return;
 			}
 		}
@@ -4020,7 +4059,7 @@
 			if (movable) {
 				saveHistory();
 				markers = markers.map((marker) => (marker.id === movable.id ? { ...marker, x: movable.x + 20, y: movable.y + 12 } : marker));
-				paths = paths.map((path) => (path.startMarkerId === movable.id ? { ...path, start: { x: movable.x + 20, y: movable.y + 12 } } : path));
+				paths = paths.map((path) => (path.startMarkerId === movable.id ? withPathStart(path, { x: movable.x + 20, y: movable.y + 12 }) : path));
 			}
 			const removable = markers.find((marker) => marker.id !== movable?.id) ?? markers[0];
 			if (removable) {
@@ -4431,7 +4470,7 @@
 		clearDeleteState();
 		clearPlacementSnap();
 		markers = markers.map((marker) => ({ ...marker, ...flipPoint(marker) }));
-		paths = paths.map((path) => ({ ...path, start: flipPoint(path.start), end: flipPoint(path.end) }));
+		paths = paths.map((path) => ({ ...path, start: flipPoint(path.start), end: flipPoint(path.end), points: path.points?.map(flipPoint) }));
 		guides = guides.map((guide) => ({ ...guide, x: fieldLeft + fieldRight - guide.x }));
 		freeStrokes = freeStrokes.map((stroke) => ({ ...stroke, points: stroke.points.map(flipPoint) }));
 		laserDrawings = laserDrawings.map((drawing) => ({ ...drawing, points: drawing.points.map(flipPoint) }));
@@ -4767,7 +4806,14 @@
 
 		if (isPathTool(tool)) {
 			const preview = previewPathFrom(point);
-			drawing = { kind: tool, start: preview.start, end: preview.end, pointerStart: point, hasDragged: false };
+			drawing = {
+				kind: tool,
+				start: preview.start,
+				end: preview.end,
+				pointerStart: point,
+				points: tool === 'run' && runArrowMode === 'free' ? [preview.start] : undefined,
+				hasDragged: false
+			};
 			svg.setPointerCapture(event.pointerId);
 		}
 	};
@@ -4804,6 +4850,7 @@
 				end: preview.end,
 				pointerStart: pointFromEvent(event),
 				startMarkerId: marker.id,
+				points: tool === 'run' && runArrowMode === 'free' ? [preview.start] : undefined,
 				hasDragged: false
 			};
 			svg.setPointerCapture(event.pointerId);
@@ -4876,6 +4923,7 @@
 			end: { ...path.end },
 			startMarkerId: path.startMarkerId,
 			mode,
+			points: pathPoints(path)?.map((point) => ({ ...point })),
 			moved: false
 		};
 	};
@@ -5009,7 +5057,18 @@
 		if (!drawing && !dragTarget) return;
 		if (drawing) {
 			const pointerDistance = Math.hypot(point.x - drawing.pointerStart.x, point.y - drawing.pointerStart.y);
-			drawing = { ...drawing, end: drawingPathEnd(drawing, point), hasDragged: drawing.hasDragged || pointerDistance >= 4 };
+			if (drawing.kind === 'run' && drawing.points) {
+				const last = drawing.points.at(-1)!;
+				const nextPoints = Math.hypot(point.x - last.x, point.y - last.y) >= 1.5 ? [...drawing.points, point] : drawing.points;
+				drawing = {
+					...drawing,
+					points: nextPoints,
+					end: nextPoints.at(-1) ?? drawing.end,
+					hasDragged: drawing.hasDragged || pointerDistance >= 4
+				};
+			} else {
+				drawing = { ...drawing, end: drawingPathEnd(drawing, point), hasDragged: drawing.hasDragged || pointerDistance >= 4 };
+			}
 		}
 		if (!dragTarget) return;
 		const dragPoint = dragTarget.type === 'group' ? canvasPoint : point;
@@ -5039,12 +5098,13 @@
 						...path,
 						start: { x: start.start.x + dx, y: start.start.y + dy },
 						end: { x: start.end.x + dx, y: start.end.y + dy },
+						points: start.points?.map((point) => ({ x: point.x + dx, y: point.y + dy })),
 						startMarkerId: start.startMarkerId && selectedMarkerIds.has(start.startMarkerId) ? start.startMarkerId : undefined
 					};
 				}
 				if (path.startMarkerId !== undefined && selectedMarkerIds.has(path.startMarkerId) && !selectedPathIds.has(path.id)) {
 					const marker = markers.find((item) => item.id === path.startMarkerId);
-					return marker ? { ...path, start: { x: marker.x, y: marker.y } } : path;
+					return marker ? withPathStart(path, { x: marker.x, y: marker.y }) : path;
 				}
 				return path;
 			});
@@ -5064,7 +5124,7 @@
 			const snappedMarker = shouldSnapElements(event) && dragTarget.snapToMarkers ? nearestMarkerToPoint(candidate, dragTarget.id) : null;
 			const next = snappedMarker ? { x: snappedMarker.x, y: snappedMarker.y } : candidate;
 			markers = markers.map((marker) => (marker.id === target.id ? { ...marker, ...next } : marker));
-			paths = paths.map((path) => (path.startMarkerId === target.id ? { ...path, start: { ...next } } : path));
+			paths = paths.map((path) => (path.startMarkerId === target.id ? withPathStart(path, { ...next }) : path));
 			if (!snappedMarker && placementPointerMoved) {
 				if (shouldSnapElements(event)) scheduleDragSnap(target, next.x, true);
 				else clearPlacementSnap();
@@ -5091,20 +5151,25 @@
 			if (target.mode === 'end') {
 				const candidate = clampPoint({ x: target.end.x + rawDx, y: target.end.y + rawDy });
 				const end = pointWithMinimumDistance(target.start, candidate, target.end);
-				paths = paths.map((path) => (path.id === target.id ? { ...path, end } : path));
+				paths = paths.map((path) =>
+					path.id === target.id
+						? { ...path, end, points: path.points?.map((point, index) => (index === path.points!.length - 1 ? { ...end } : point)) }
+						: path
+				);
 				return;
 			}
 			if (target.mode === 'start') {
 				const candidate = clampPoint({ x: target.start.x + rawDx, y: target.start.y + rawDy });
 				const snappedMarker = shouldSnapElements(event) ? nearestMarkerToPoint(candidate) : null;
 				const start = snappedMarker ? { x: snappedMarker.x, y: snappedMarker.y } : pointWithMinimumDistance(target.end, candidate, target.start);
-				paths = paths.map((path) => (path.id === target.id ? { ...path, start, startMarkerId: snappedMarker?.id } : path));
+				paths = paths.map((path) => (path.id === target.id ? { ...withPathStart(path, start), startMarkerId: snappedMarker?.id } : path));
 				return;
 			}
-			const minX = Math.min(target.start.x, target.end.x);
-			const maxX = Math.max(target.start.x, target.end.x);
-			const minY = Math.min(target.start.y, target.end.y);
-			const maxY = Math.max(target.start.y, target.end.y);
+			const draggedPathPoints = target.points ?? [target.start, target.end];
+			const minX = Math.min(...draggedPathPoints.map((point) => point.x));
+			const maxX = Math.max(...draggedPathPoints.map((point) => point.x));
+			const minY = Math.min(...draggedPathPoints.map((point) => point.y));
+			const maxY = Math.max(...draggedPathPoints.map((point) => point.y));
 			const dx = Math.max(fieldLeft - minX, Math.min(fieldRight - maxX, rawDx));
 			const dy = Math.max(fieldTop - minY, Math.min(fieldBottom - maxY, rawDy));
 			paths = paths.map((path) =>
@@ -5113,6 +5178,7 @@
 							...path,
 							start: { x: target.start.x + dx, y: target.start.y + dy },
 							end: { x: target.end.x + dx, y: target.end.y + dy },
+							points: target.points?.map((point) => ({ x: point.x + dx, y: point.y + dy })),
 							startMarkerId: undefined
 						}
 					: path
@@ -5185,7 +5251,12 @@
 		if (dragTarget?.moved) {
 			droppedTargets = dragTarget.type === 'group' ? dragTarget.targets : [{ type: dragTarget.type, id: dragTarget.id }];
 		}
-		if (drawing && (!drawing.hasDragged || Math.hypot(drawing.end.x - drawing.start.x, drawing.end.y - drawing.start.y) >= minimumArrowLength())) {
+		const canPlaceDrawing =
+			drawing &&
+			(drawing.kind === 'run' && drawing.points
+				? drawing.hasDragged && drawing.points.length > 1
+				: !drawing.hasDragged || Math.hypot(drawing.end.x - drawing.start.x, drawing.end.y - drawing.start.y) >= minimumArrowLength());
+		if (drawing && canPlaceDrawing) {
 			saveHistory();
 			const pathId = nextId++;
 			const placedPathKind = drawing.kind;
@@ -5197,6 +5268,7 @@
 					start: drawing.start,
 					end: drawing.end,
 					startMarkerId: drawing.startMarkerId,
+					points: drawing.points,
 					color: isArrowKind(drawing.kind) ? arrowPlacementColor(drawing.kind) : 'yellow',
 					style: isArrowKind(drawing.kind) ? arrowPlacementStyles[drawing.kind] : 'solid'
 				}
@@ -5243,8 +5315,9 @@
 	const airborneLift = (kind: 'pass' | 'kick', start: Point, end: Point) => playBuilderAirborneLift(kind, start, end, fieldTop);
 	const airbornePoint = (kind: 'pass' | 'kick', start: Point, end: Point, t: number): Point =>
 		playBuilderAirbornePoint(kind, start, end, t, fieldTop);
-	const arrowHitTip = (kind: Exclude<PathKind, 'line'>, start: Point, end: Point): Point => {
-		const beforeEnd = kind === 'pass' || kind === 'kick' ? airbornePoint(kind, start, end, 0.98) : start;
+	const arrowHitTip = (kind: Exclude<PathKind, 'line'>, start: Point, end: Point, points?: Point[]): Point => {
+		const resolvedPoints = points && points.length > 1 ? playBuilderSmoothPathPoints(points) : undefined;
+		const beforeEnd = resolvedPoints ? resolvedPoints.at(-2)! : kind === 'pass' || kind === 'kick' ? airbornePoint(kind, start, end, 0.98) : start;
 		const dx = end.x - beforeEnd.x;
 		const dy = end.y - beforeEnd.y;
 		const distance = Math.hypot(dx, dy) || 1;
@@ -5253,6 +5326,10 @@
 	const pathData = (kind: 'pass' | 'kick', start: Point, end: Point) => {
 		const controlY = (start.y + end.y) / 2 - airborneLift(kind, start, end) * 2;
 		return `M ${start.x} ${start.y} Q ${(start.x + end.x) / 2} ${controlY} ${end.x} ${end.y}`;
+	};
+	const runPathData = (start: Point, end: Point, points?: Point[]) => {
+		const resolvedPoints = points && points.length > 1 ? points : [start, end];
+		return playBuilderSmoothedPath(resolvedPoints);
 	};
 	const airborneSegments = (kind: 'pass' | 'kick', start: Point, end: Point, style: GuideStyle): PlayBuilderAirborneSegment[] =>
 		playBuilderAirborneSegments(kind, start, end, style, fieldTop, pathStrokeWidth);
@@ -5311,6 +5388,16 @@
 				deflagPlacementColor = stored.flagBeltColor;
 			if (typeof stored.beanBagColor === 'string' && beanBagColors.some((option) => option.id === stored.beanBagColor))
 				beanBagPlacementColor = stored.beanBagColor as GuideColor;
+			if (stored.runArrowMode === 'straight' || stored.runArrowMode === 'free') runArrowMode = stored.runArrowMode;
+			if (stored.playerColors && typeof stored.playerColors === 'object') {
+				const colors = stored.playerColors as Record<string, unknown>;
+				playerPlacementColors = {
+					'team-a': isGuideColor(colors['team-a']) ? colors['team-a'] : playerPlacementColors['team-a'],
+					'team-k': isGuideColor(colors['team-k']) ? colors['team-k'] : playerPlacementColors['team-k'],
+					'team-b': isGuideColor(colors['team-b']) ? colors['team-b'] : playerPlacementColors['team-b'],
+					'team-r': isGuideColor(colors['team-r']) ? colors['team-r'] : playerPlacementColors['team-r']
+				};
+			}
 			if (isLaserColor(stored.laserColor)) laserColor = stored.laserColor;
 			if (stored.arrowColors && typeof stored.arrowColors === 'object') {
 				const colors = stored.arrowColors as Record<string, unknown>;
@@ -5445,7 +5532,7 @@
 	aria-label={viewOnly ? 'Shared flag football play diagram' : 'Flag football play builder'}
 >
 	<div data-tutorial="draw-workspace" class="flex gap-2 p-2" aria-hidden={viewOnly}>
-		<div class="tool-column relative my-auto w-10 shrink-0 sm:w-12">
+		<div class="tool-column relative z-[60] my-auto w-10 shrink-0 sm:w-12">
 			<div class="flex w-full flex-col gap-px bg-stone-500 p-px" role="toolbar" aria-label="Drawing tools">
 				{#each toolRows as row}
 					{@const officialRow = row.some((item) => item.id === 'official-r')}
@@ -5526,6 +5613,16 @@
 												style:border-left-color={guideColor(guidePlacementColors[guideToolId])}
 											></span>
 										</span>
+									{:else if playerKinds.includes(item.id as PlayerKind)}
+										{@const playerToolKind = item.id as PlayerKind}
+										{@const playerToolColor = playerPlacementColors[playerToolKind]}
+										<span
+											class="flex h-full w-full items-center justify-center text-lg font-bold"
+											style:background-color={guideColor(playerToolColor)}
+											style:color={playerTextColor(playerToolColor)}
+											style:box-shadow={tool === item.id ? `inset 0 0 0 2px ${playerToolColor === 'white' ? '#1c1917' : '#ffffff'}` : undefined}
+											aria-hidden="true">{item.symbol}</span
+										>
 									{:else}
 										<span class="text-lg" aria-hidden="true">{item.symbol}</span>
 									{/if}
@@ -5544,8 +5641,9 @@
 			</div>
 
 			{#if toolbarEditorTool}
-				{@const toolbarPresetColor =
-					toolbarEditorTool === 'deflag'
+				{@const toolbarPresetColor = playerKinds.includes(toolbarEditorTool as PlayerKind)
+					? playerPlacementColors[toolbarEditorTool as PlayerKind]
+					: toolbarEditorTool === 'deflag'
 						? deflagPlacementColor
 						: toolbarEditorTool === 'bean-bag'
 							? beanBagPlacementColor
@@ -5553,20 +5651,23 @@
 								? laserColor
 								: isArrowKind(toolbarEditorTool)
 									? arrowPlacementColors[toolbarEditorTool]
-									: guidePlacementColors[toolbarEditorTool]}
+									: guidePlacementColors[toolbarEditorTool as 'line-of-scrimmage' | 'line-to-gain']}
 				{@const toolbarPresetStyle =
-					toolbarEditorTool === 'deflag' || toolbarEditorTool === 'bean-bag' || toolbarEditorTool === 'laser'
+					playerKinds.includes(toolbarEditorTool as PlayerKind) ||
+					toolbarEditorTool === 'deflag' ||
+					toolbarEditorTool === 'bean-bag' ||
+					toolbarEditorTool === 'laser'
 						? null
 						: isArrowKind(toolbarEditorTool)
 							? arrowPlacementStyles[toolbarEditorTool]
-							: guidePlacementStyles[toolbarEditorTool]}
+							: guidePlacementStyles[toolbarEditorTool as 'line-of-scrimmage' | 'line-to-gain']}
 				{@const toolbarDefaultFormat = toolbarLineFormatDefaultFor(toolbarEditorTool)}
 				{@const showToolbarLineFormatReset =
 					toolbarDefaultFormat !== null && (toolbarPresetColor !== toolbarDefaultFormat.color || toolbarPresetStyle !== toolbarDefaultFormat.style)}
 				<div
 					bind:this={toolbarEditorElement}
 					data-line-format-editor
-					class="absolute left-full z-50 ml-px flex items-center gap-2 bg-white p-2 shadow-xl ring-2 ring-stone-900"
+					class="absolute left-full z-[70] ml-px flex items-center gap-2 bg-white p-2 shadow-xl ring-2 ring-stone-900"
 					style:top={`${toolbarEditorTop}px`}
 					role="dialog"
 					aria-label={`${toolbarEditorTool} default format`}
@@ -5593,6 +5694,38 @@
 							onEscape={() => (toolbarEditorTool = null)}
 						/>
 					{/if}
+					{#if toolbarEditorTool === 'run'}
+						<div class="flex items-center gap-px bg-stone-950 p-px" role="group" aria-label="Run arrow path mode">
+							<HoverTooltip text="Straight Run Arrow" placement="above" minWidthPx={0} wrapperClass="flex h-5 w-8">
+								<button
+									type="button"
+									aria-label="Straight run arrow"
+									aria-pressed={runArrowMode === 'straight'}
+									on:click={() => (runArrowMode = 'straight')}
+									class="flex h-5 w-full cursor-pointer items-center justify-center bg-white text-stone-900 hover:bg-stone-200 aria-pressed:bg-stone-800 aria-pressed:text-white"
+								>
+									<svg viewBox="0 0 24 12" class="h-3 w-5" aria-hidden="true">
+										<path d="M2 10 17.5 4.2" fill="none" stroke="currentColor" stroke-width="2.25" />
+										<path d="m15.8 1.4 6.2 1.5-4 5.1z" fill="currentColor" />
+									</svg>
+								</button>
+							</HoverTooltip>
+							<HoverTooltip text="Free Draw Run Arrow" placement="above" minWidthPx={0} wrapperClass="flex h-5 w-8">
+								<button
+									type="button"
+									aria-label="Free draw run arrow"
+									aria-pressed={runArrowMode === 'free'}
+									on:click={() => (runArrowMode = 'free')}
+									class="flex h-5 w-full cursor-pointer items-center justify-center bg-white text-stone-900 hover:bg-stone-200 aria-pressed:bg-stone-800 aria-pressed:text-white"
+								>
+									<svg viewBox="0 0 24 12" class="h-3 w-5" aria-hidden="true">
+										<path d="M2 9c3.5-6 5.5 4 9-1s5 2.5 7.5-3.5" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" />
+										<path d="m16.8 1.4 5.2 1.5-3.7 4.6z" fill="currentColor" />
+									</svg>
+								</button>
+							</HoverTooltip>
+						</div>
+					{/if}
 					<LineFormatControls
 						colorOptions={toolbarEditorTool === 'deflag'
 							? deflagColors
@@ -5600,7 +5733,9 @@
 								? beanBagColors
 								: toolbarEditorTool === 'laser'
 									? laserColors
-									: guideColors}
+									: playerKinds.includes(toolbarEditorTool as PlayerKind)
+										? playerColors
+										: guideColors}
 						selectedColor={toolbarPresetColor}
 						colorLabel="Preset color"
 						styleOptions={guideStyles}
@@ -5760,126 +5895,113 @@
 				aria-label="Play actions"
 			>
 				<div data-tutorial="history-actions" class="flex gap-1.5">
-					<HoverTooltip text="Undo" shortcutKeys={[primaryModifierKey, 'Z']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-						<button
-							type="button"
-							aria-label="Undo"
-							disabled={tutorialActive || history.length === 0}
-							on:click={() => runGuardedAction(undo)}
-							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-35"
-						>
-							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-								<path
-									d="M9 7 4 12l5 5M5 12h8a6 6 0 0 1 6 6"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="square"
-									stroke-linejoin="miter"
-								/>
-							</svg>
-							<span class="text-[8px] leading-none font-semibold">Undo</span>
-						</button>
-					</HoverTooltip>
-					<HoverTooltip text="Redo" shortcutKeys={[primaryModifierKey, 'Shift', 'Z']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-						<button
-							type="button"
-							aria-label="Redo"
-							disabled={tutorialActive || future.length === 0}
-							on:click={() => runGuardedAction(redo)}
-							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-35"
-						>
-							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-								<path
-									d="m15 7 5 5-5 5m4-5h-8a6 6 0 0 0-6 6"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="square"
-									stroke-linejoin="miter"
-								/>
-							</svg>
-							<span class="text-[8px] leading-none font-semibold">Redo</span>
-						</button>
-					</HoverTooltip>
-					<HoverTooltip text="Clear All" shortcutKeys={['Shift', 'Del']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-						<button
-							type="button"
-							aria-label="Clear all"
-							disabled={tutorialActive || (markers.length === 0 && paths.length === 0 && guides.length === 0 && freeStrokes.length === 0)}
-							on:click={() => runGuardedAction(clear)}
-							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-35"
-						>
-							<img src="/images/toolbar/trash-can.webp" alt="" class="h-4 w-4 object-contain" draggable="false" loading="lazy" />
-							<span class="text-[8px] leading-none font-semibold">Clear All</span>
-						</button>
-					</HoverTooltip>
+					<BuilderActionButton
+						tooltip="Undo"
+						shortcutKeys={[primaryModifierKey, 'Z']}
+						ariaLabel="Undo"
+						label="Undo"
+						disabled={tutorialActive || history.length === 0}
+						disabledOpacity="35"
+						onclick={() => runGuardedAction(undo)}
+					>
+						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+							<path
+								d="M9 7 4 12l5 5M5 12h8a6 6 0 0 1 6 6"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="square"
+								stroke-linejoin="miter"
+							/>
+						</svg>
+					</BuilderActionButton>
+					<BuilderActionButton
+						tooltip="Redo"
+						shortcutKeys={[primaryModifierKey, 'Shift', 'Z']}
+						ariaLabel="Redo"
+						label="Redo"
+						disabled={tutorialActive || future.length === 0}
+						disabledOpacity="35"
+						onclick={() => runGuardedAction(redo)}
+					>
+						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+							<path
+								d="m15 7 5 5-5 5m4-5h-8a6 6 0 0 0-6 6"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="square"
+								stroke-linejoin="miter"
+							/>
+						</svg>
+					</BuilderActionButton>
+					<BuilderActionButton
+						tooltip="Clear All"
+						shortcutKeys={['Shift', 'Del']}
+						ariaLabel="Clear all"
+						label="Clear All"
+						disabled={tutorialActive || (markers.length === 0 && paths.length === 0 && guides.length === 0 && freeStrokes.length === 0)}
+						disabledOpacity="35"
+						onclick={() => runGuardedAction(clear)}
+					>
+						<img src="/images/toolbar/trash-can.webp" alt="" class="h-4 w-4 object-contain" draggable="false" loading="lazy" />
+					</BuilderActionButton>
 				</div>
 
 				<div data-tutorial="file-actions" class="ml-2 flex gap-1.5">
-					<HoverTooltip text="New Play" shortcutKeys={['Shift', 'N']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-						<button
-							data-tutorial="new-button"
-							type="button"
-							aria-label="Start a new play"
-							disabled={(tutorialActive && activeTutorialSteps[tutorialStepIndex]?.data?.waitFor !== 'tutorial-new-play') ||
-								actionInProgress !== null}
-							on:click={requestNewBoard}
-							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-						>
-							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-								<path d="M5 3h10l4 4v14H5zM15 3v5h4M12 11v7M8.5 14.5h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
-							</svg>
-							<span class="text-[8px] leading-none font-semibold">New</span>
-						</button>
-					</HoverTooltip>
-					<HoverTooltip text={saveActionLabel} shortcutKeys={[primaryModifierKey, 'S']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-						<button
-							type="button"
-							aria-label={ownershipResolved
-								? actionInProgress === 'save'
-									? 'Saving play'
-									: saveFeedbackState === 'saved'
-										? 'Play saved'
-										: saveActionLabel === 'Make Copy'
-											? 'Make a copy of this play builder'
-											: 'Save play'
-								: 'Determining save access'}
-							aria-busy={!ownershipResolved || actionInProgress === 'save'}
-							disabled={!ownershipResolved || !hasUnsavedChanges || tutorialActive || actionInProgress !== null}
-							on:click={savePlay}
-							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-							class:!cursor-wait={actionInProgress === 'save'}
-						>
-							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-								<path d="M4 3h13l3 3v15H4zM8 3v6h8V3M8 20v-7h8v7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
-							</svg>
-							<span
-								class="leading-none font-semibold whitespace-nowrap"
-								style:font-size={saveActionLabel === 'Make Copy' ? '7.25px' : '8px'}
-								style:margin-top={saveActionLabel === 'Make Copy' ? '0.04em' : undefined}>{saveActionLabel || '\u00a0'}</span
-							>
-						</button>
-					</HoverTooltip>
+					<BuilderActionButton
+						tooltip="New Play"
+						shortcutKeys={['Shift', 'N']}
+						ariaLabel="Start a new play"
+						label="New"
+						tutorial="new-button"
+						disabled={(tutorialActive && activeTutorialSteps[tutorialStepIndex]?.data?.waitFor !== 'tutorial-new-play') || actionInProgress !== null}
+						onclick={requestNewBoard}
+					>
+						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+							<path d="M5 3h10l4 4v14H5zM15 3v5h4M12 11v7M8.5 14.5h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
+						</svg>
+					</BuilderActionButton>
+					<BuilderActionButton
+						tooltip={saveActionLabel}
+						shortcutKeys={[primaryModifierKey, 'S']}
+						ariaLabel={ownershipResolved
+							? actionInProgress === 'save'
+								? 'Saving play'
+								: saveFeedbackState === 'saved'
+									? 'Play saved'
+									: saveActionLabel === 'Make Copy'
+										? 'Make a copy of this play builder'
+										: 'Save play'
+							: 'Determining save access'}
+						label={saveActionLabel}
+						busy={!ownershipResolved || actionInProgress === 'save'}
+						disabled={!ownershipResolved || !hasUnsavedChanges || tutorialActive || actionInProgress !== null}
+						labelClass="leading-none font-semibold whitespace-nowrap"
+						labelStyle={`font-size: ${saveActionLabel === 'Make Copy' ? '7.25px' : '8px'};${saveActionLabel === 'Make Copy' ? ' margin-top: 0.04em;' : ''}`}
+						onclick={savePlay}
+					>
+						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+							<path d="M4 3h13l3 3v15H4zM8 3v6h8V3M8 20v-7h8v7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
+						</svg>
+					</BuilderActionButton>
 					{#if savedPlayId}
-						<HoverTooltip text="Share" shortcutKeys={[primaryModifierKey, 'L']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-							<button
-								type="button"
-								aria-label="Share play builder"
-								aria-keyshortcuts="Control+L Meta+L"
-								disabled={tutorialActive}
-								on:click={openShare}
-								class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-							>
-								<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-									<circle cx="18" cy="5" r="2.5" fill="none" stroke="currentColor" stroke-width="2" />
-									<circle cx="6" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="2" />
-									<circle cx="18" cy="19" r="2.5" fill="none" stroke="currentColor" stroke-width="2" />
-									<path d="m8.3 10.8 7.4-4.5M8.3 13.2l7.4 4.5" fill="none" stroke="currentColor" stroke-width="2" />
-								</svg>
-								<span class="text-[8px] leading-none font-semibold">Share</span>
-							</button>
-						</HoverTooltip>
+						<BuilderActionButton
+							tooltip="Share"
+							shortcutKeys={[primaryModifierKey, 'L']}
+							ariaLabel="Share play builder"
+							ariaKeyshortcuts="Control+L Meta+L"
+							label="Share"
+							disabled={tutorialActive}
+							onclick={openShare}
+						>
+							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+								<circle cx="18" cy="5" r="2.5" fill="none" stroke="currentColor" stroke-width="2" />
+								<circle cx="6" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="2" />
+								<circle cx="18" cy="19" r="2.5" fill="none" stroke="currentColor" stroke-width="2" />
+								<path d="m8.3 10.8 7.4-4.5M8.3 13.2l7.4 4.5" fill="none" stroke="currentColor" stroke-width="2" />
+							</svg>
+						</BuilderActionButton>
 					{/if}
 				</div>
 			</div>
@@ -5890,58 +6012,46 @@
 				aria-label="Export controls"
 			>
 				{#each [{ format: 'png' as const, label: 'PNG', ariaLabel: 'Export PNG image' }, { format: 'jpg' as const, label: 'JPG', ariaLabel: 'Export JPG image' }, { format: 'webp' as const, label: 'WebP', ariaLabel: 'Export WebP image' }] as exportOption}
-					<HoverTooltip text={`Export ${exportOption.label}`} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-						<button
-							type="button"
-							aria-label={exportOption.ariaLabel}
-							disabled={tutorialActive || actionInProgress !== null}
-							on:click={() => exportImage(exportOption.format)}
-							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-						>
-							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-								<rect x="3" y="4" width="18" height="16" fill="none" stroke="currentColor" stroke-width="2" />
-								<circle cx="8" cy="9" r="1.5" fill="currentColor" />
-								<path d="m5 18 5-5 3 3 2-2 4 4" fill="none" stroke="currentColor" stroke-width="2" />
-							</svg>
-							<span class="text-[8px] leading-none font-semibold">{exportOption.label}</span>
-						</button>
-					</HoverTooltip>
+					<BuilderActionButton
+						tooltip={`Export ${exportOption.label}`}
+						ariaLabel={exportOption.ariaLabel}
+						label={exportOption.label}
+						disabled={tutorialActive || actionInProgress !== null}
+						onclick={() => exportImage(exportOption.format)}
+					>
+						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+							<rect x="3" y="4" width="18" height="16" fill="none" stroke="currentColor" stroke-width="2" />
+							<circle cx="8" cy="9" r="1.5" fill="currentColor" />
+							<path d="m5 18 5-5 3 3 2-2 4 4" fill="none" stroke="currentColor" stroke-width="2" />
+						</svg>
+					</BuilderActionButton>
 				{/each}
-				<HoverTooltip text="Export PDF" minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-					<button
-						type="button"
-						aria-label="Export PDF"
-						disabled={tutorialActive || actionInProgress !== null}
-						on:click={() => exportImage('pdf')}
-						class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-					>
-						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-							<path d="M6 2h8l4 4v16H6zM14 2v5h4" fill="none" stroke="currentColor" stroke-width="2" />
-							<path d="M8 16h8M8 12h8" stroke="currentColor" stroke-width="2" />
-						</svg>
-						<span class="text-[8px] leading-none font-semibold">PDF</span>
-					</button>
-				</HoverTooltip>
-				<HoverTooltip
-					text="Export Settings"
-					shortcutKeys={[primaryModifierKey, 'Shift', 'O']}
-					minWidthPx={0}
-					wrapperClass="ml-2 flex h-9 w-10 shrink-0"
+				<BuilderActionButton
+					tooltip="Export PDF"
+					ariaLabel="Export PDF"
+					label="PDF"
+					disabled={tutorialActive || actionInProgress !== null}
+					onclick={() => exportImage('pdf')}
 				>
-					<button
-						type="button"
-						aria-label="Open export settings"
-						aria-expanded={showExportSettings}
-						disabled={tutorialActive || actionInProgress !== null}
-						on:click={openExportSettings}
-						class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-					>
-						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-							<path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" fill="none" stroke="currentColor" stroke-width="2" />
-						</svg>
-						<span class="text-[8px] leading-none font-semibold">Options</span>
-					</button>
-				</HoverTooltip>
+					<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+						<path d="M6 2h8l4 4v16H6zM14 2v5h4" fill="none" stroke="currentColor" stroke-width="2" />
+						<path d="M8 16h8M8 12h8" stroke="currentColor" stroke-width="2" />
+					</svg>
+				</BuilderActionButton>
+				<BuilderActionButton
+					tooltip="Export Settings"
+					shortcutKeys={[primaryModifierKey, 'Shift', 'O']}
+					ariaLabel="Open export settings"
+					label="Options"
+					wrapperClass="ml-2 flex h-9 w-10 shrink-0"
+					expanded={showExportSettings}
+					disabled={tutorialActive || actionInProgress !== null}
+					onclick={openExportSettings}
+				>
+					<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+						<path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" fill="none" stroke="currentColor" stroke-width="2" />
+					</svg>
+				</BuilderActionButton>
 			</div>
 
 			<div
@@ -6064,115 +6174,97 @@
 					</span>
 				{/if}
 				<div class="flex gap-1.5" aria-label="Field setup controls">
-					<HoverTooltip text="Flip Field Direction" shortcutKeys={['Shift', 'F']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-						<button
-							type="button"
-							aria-label="Flip field direction"
-							aria-keyshortcuts="Shift+F"
-							on:click={flipFieldDirection}
-							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-						>
-							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-								<path
-									d="M4 7h11M15 4l3 3-3 3M20 17H9M9 14l-3 3 3 3"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="1.8"
-									stroke-linecap="square"
-									stroke-linejoin="miter"
-								/>
-							</svg>
-							<span class="text-[8px] leading-none font-semibold">Flip</span>
-						</button>
-					</HoverTooltip>
-					<HoverTooltip text="Default Setup" shortcutKeys={[primaryModifierKey, 'Shift', 'S']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-						<button
-							data-tutorial="setup-button"
-							type="button"
-							aria-label="Set up default play"
-							on:click={setupDefaultScenario}
-							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-						>
-							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-								<path d="M4 5h16v14H4zM8 5v14M13 5v14M18 5v14" fill="none" stroke="currentColor" stroke-width="1.6" />
-								<circle cx="10.5" cy="12" r="1.5" fill="currentColor" />
-								<path d="M10.5 12h4" stroke="currentColor" stroke-width="1.6" stroke-dasharray="1.5 1" />
-							</svg>
-							<span class="text-[8px] leading-none font-semibold">Setup</span>
-						</button>
-					</HoverTooltip>
-					<HoverTooltip
-						text="Field Settings"
-						shortcutKeys={[primaryModifierKey, alternateModifierKey, 'S']}
-						minWidthPx={0}
-						wrapperClass="flex h-9 w-10 shrink-0"
+					<BuilderActionButton
+						tooltip="Flip Field Direction"
+						shortcutKeys={['Shift', 'F']}
+						ariaLabel="Flip field direction"
+						ariaKeyshortcuts="Shift+F"
+						label="Flip"
+						onclick={flipFieldDirection}
 					>
-						<button
-							data-tutorial="settings-button"
-							type="button"
-							aria-label="Open field settings"
-							on:click={openSettings}
-							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-						>
-							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-								<path
-									d="M9.6 3h4.8l.7 2.2 2 .8 2.1-1 2.4 4.1-1.7 1.5.2 2.2 1.5 1.7-2.4 4.1-2.1-1-2 .8-.7 2.2H9.6l-.7-2.2-2-.8-2.1 1-2.4-4.1 1.7-1.7.2-2.2-1.7-1.5L4.8 5l2.1 1 2-.8z"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="1.7"
-									stroke-linejoin="miter"
-								/>
-								<circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.7" />
-							</svg>
-							<span class="text-[8px] leading-none font-semibold">Settings</span>
-						</button>
-					</HoverTooltip>
+						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+							<path
+								d="M4 7h11M15 4l3 3-3 3M20 17H9M9 14l-3 3 3 3"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.8"
+								stroke-linecap="square"
+								stroke-linejoin="miter"
+							/>
+						</svg>
+					</BuilderActionButton>
+					<BuilderActionButton
+						tooltip="Default Setup"
+						shortcutKeys={[primaryModifierKey, 'Shift', 'S']}
+						ariaLabel="Set up default play"
+						label="Setup"
+						tutorial="setup-button"
+						onclick={setupDefaultScenario}
+					>
+						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+							<path d="M4 5h16v14H4zM8 5v14M13 5v14M18 5v14" fill="none" stroke="currentColor" stroke-width="1.6" />
+							<circle cx="10.5" cy="12" r="1.5" fill="currentColor" />
+							<path d="M10.5 12h4" stroke="currentColor" stroke-width="1.6" stroke-dasharray="1.5 1" />
+						</svg>
+					</BuilderActionButton>
+					<BuilderActionButton
+						tooltip="Field Settings"
+						shortcutKeys={[primaryModifierKey, alternateModifierKey, 'S']}
+						ariaLabel="Open field settings"
+						label="Settings"
+						tutorial="settings-button"
+						onclick={openSettings}
+					>
+						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+							<path
+								d="M9.6 3h4.8l.7 2.2 2 .8 2.1-1 2.4 4.1-1.7 1.5.2 2.2 1.5 1.7-2.4 4.1-2.1-1-2 .8-.7 2.2H9.6l-.7-2.2-2-.8-2.1 1-2.4-4.1 1.7-1.7.2-2.2-1.7-1.5L4.8 5l2.1 1 2-.8z"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.7"
+								stroke-linejoin="miter"
+							/>
+							<circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.7" />
+						</svg>
+					</BuilderActionButton>
 				</div>
 				<div class="ml-2 flex gap-1.5" aria-label="Field support controls">
-					<HoverTooltip text="Help" shortcutKeys={[primaryModifierKey, 'Shift', 'H']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-						<button
-							type="button"
-							aria-label="Open play builder help"
-							on:click={openHelp}
-							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-						>
-							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-								<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
-								<path d="M9.7 9a2.5 2.5 0 1 1 3.1 2.4c-.8.3-.8.9-.8 1.6M12 17h.01" fill="none" stroke="currentColor" stroke-width="2" />
-							</svg>
-							<span class="text-[8px] leading-none font-semibold">Help</span>
-						</button>
-					</HoverTooltip>
-					<HoverTooltip text="Interactive Tutorial" minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-						<button
-							type="button"
-							data-tutorial="tutorial-button"
-							aria-label="Start interactive play builder tutorial"
-							on:click={startTutorial}
-							class="tutorial-launch flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-							class:tutorial-launch-bouncing={tutorialButtonBouncing}
-						>
-							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-								<path d="M4 5h16v11H9l-4 3v-3H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="miter" />
-								<path d="m9 8 6 3-6 3z" fill="currentColor" />
-							</svg>
-							<span class="text-[8px] leading-none font-semibold">Tutorial</span>
-						</button>
-					</HoverTooltip>
-					<HoverTooltip text="Feedback" shortcutKeys={[primaryModifierKey, 'Shift', 'F']} minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0">
-						<button
-							type="button"
-							aria-label="Give feedback"
-							on:click={openFeedback}
-							class="flex h-9 w-10 cursor-pointer flex-col items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-						>
-							<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-								<path d="M4 5h16v12H9l-5 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
-								<path d="M8 9h8M8 13h5" stroke="currentColor" stroke-width="2" />
-							</svg>
-							<span class="text-[8px] leading-none font-semibold">Feedback</span>
-						</button>
-					</HoverTooltip>
+					<BuilderActionButton
+						tooltip="Help"
+						shortcutKeys={[primaryModifierKey, 'Shift', 'H']}
+						ariaLabel="Open play builder help"
+						label="Help"
+						onclick={openHelp}
+					>
+						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+							<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+							<path d="M9.7 9a2.5 2.5 0 1 1 3.1 2.4c-.8.3-.8.9-.8 1.6M12 17h.01" fill="none" stroke="currentColor" stroke-width="2" />
+						</svg>
+					</BuilderActionButton>
+					<BuilderActionButton
+						tooltip="Interactive Tutorial"
+						ariaLabel="Start interactive play builder tutorial"
+						label="Tutorial"
+						tutorial="tutorial-button"
+						buttonClass={tutorialButtonBouncing ? 'tutorial-launch tutorial-launch-bouncing' : 'tutorial-launch'}
+						onclick={startTutorial}
+					>
+						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+							<path d="M4 5h16v11H9l-4 3v-3H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="miter" />
+							<path d="m9 8 6 3-6 3z" fill="currentColor" />
+						</svg>
+					</BuilderActionButton>
+					<BuilderActionButton
+						tooltip="Feedback"
+						shortcutKeys={[primaryModifierKey, 'Shift', 'F']}
+						ariaLabel="Give feedback"
+						label="Feedback"
+						onclick={openFeedback}
+					>
+						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+							<path d="M4 5h16v12H9l-5 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
+							<path d="M8 9h8M8 13h5" stroke="currentColor" stroke-width="2" />
+						</svg>
+					</BuilderActionButton>
 				</div>
 			</div>
 			<div class="field-canvas relative my-auto w-full shrink-0">
@@ -6800,12 +6892,14 @@
 									/>
 								{/if}
 							{:else if tool === 'team-a' || tool === 'team-k' || tool === 'team-b' || tool === 'team-r'}
+								{@const previewPlayerKind = tool as PlayerKind}
+								{@const previewPlayerColor = playerPlacementColors[previewPlayerKind]}
 								<circle
 									cx={hoverPoint.x}
 									cy={hoverPoint.y}
 									r={playerRadius}
-									fill={tool === 'team-a' || tool === 'team-k' ? '#1c1917' : '#fff'}
-									stroke={tool === 'team-a' || tool === 'team-k' ? '#fff' : '#1c1917'}
+									fill={guideColor(previewPlayerColor)}
+									stroke={playerTextColor(previewPlayerColor)}
 									stroke-width={playerStrokeWidth}
 									opacity="0.55"
 									pointer-events="none"
@@ -6814,7 +6908,7 @@
 									x={hoverPoint.x}
 									y={hoverPoint.y + 3.4}
 									text-anchor="middle"
-									fill={tool === 'team-a' || tool === 'team-k' ? '#fff' : '#1c1917'}
+									fill={playerTextColor(previewPlayerColor)}
 									font-size="8.925"
 									font-weight="900"
 									opacity="0.65"
@@ -6989,6 +7083,7 @@
 
 						{#each paths as path}
 							{@const start = pathStart(path)}
+							{@const renderedPathPoints = pathPoints(path, start)}
 							<g data-layer-type="path" data-layer-id={path.id} data-tutorial-kind={path.kind}>
 								{#if path.kind === 'pass' || path.kind === 'kick'}
 									<path
@@ -7030,6 +7125,36 @@
 											marker-end={pathMarker(path.kind)}
 										/>
 									</g>
+								{:else if path.kind === 'run' && renderedPathPoints}
+									<path
+										data-field-element
+										data-field-type="path"
+										d={runPathData(start, path.end, renderedPathPoints)}
+										fill="none"
+										stroke="transparent"
+										stroke-width="44"
+										role="button"
+										tabindex="0"
+										aria-label={`${path.kind} line`}
+										class="focus:outline-none"
+										class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
+										class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('path', path.id)}
+										on:pointerenter={() => (hoveringElement = tool !== 'event')}
+										on:pointerleave={() => (hoveringElement = false)}
+										on:pointerdown|stopPropagation={(event) => beginOnPath(event, path)}
+										on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
+										on:keydown={(event) => handlePathKeydown(event, path)}
+									/>
+									<path
+										d={runPathData(start, path.end, renderedPathPoints)}
+										fill="none"
+										stroke={guideColor(path.color)}
+										stroke-width={pathStrokeWidth}
+										stroke-linecap={path.style === 'dotted' ? 'round' : 'square'}
+										stroke-dasharray={guideDash(path.style)}
+										marker-end={pathMarker(path.kind)}
+										pointer-events="none"
+									/>
 								{:else}
 									<line
 										data-field-element
@@ -7066,7 +7191,7 @@
 									/>
 								{/if}
 								{#if isArrowPath(path.kind)}
-									{@const arrowTip = arrowHitTip(path.kind, start, path.end)}
+									{@const arrowTip = arrowHitTip(path.kind, start, path.end, renderedPathPoints)}
 									<circle
 										data-field-element
 										data-field-type="path"
@@ -7113,7 +7238,19 @@
 							</g>
 						{/each}
 						{#if drawing}
-							{#if drawing.kind === 'pass' || drawing.kind === 'kick'}
+							{#if drawing.kind === 'run' && drawing.points}
+								<path
+									d={runPathData(drawing.start, drawing.end, drawing.points)}
+									fill="none"
+									stroke={defaultPathColor(drawing.kind)}
+									stroke-width={pathStrokeWidth}
+									stroke-linecap={defaultPathStyle(drawing.kind) === 'dotted' ? 'round' : 'square'}
+									stroke-dasharray={guideDash(defaultPathStyle(drawing.kind))}
+									marker-end={pathMarker(drawing.kind)}
+									opacity="0.65"
+									pointer-events="none"
+								/>
+							{:else if drawing.kind === 'pass' || drawing.kind === 'kick'}
 								<g opacity="0.65" pointer-events="none">
 									<path
 										d={airShadowPath(drawing.start, drawing.end)}
@@ -7156,7 +7293,7 @@
 								/>
 							{/if}
 							{#if showYardLineCursorEnabled && isArrowPath(drawing.kind)}
-								{@const drawingArrowTip = arrowHitTip(drawing.kind, drawing.start, drawing.end)}
+								{@const drawingArrowTip = arrowHitTip(drawing.kind, drawing.start, drawing.end, drawing.points)}
 								{#if isPointOnField(drawing.start)}
 									<text
 										data-yard-line-preview
@@ -7263,9 +7400,9 @@
 								{:else if marker.kind === 'event'}
 									<rect
 										x={marker.x - eventWidth(marker.label) / 2 - markerHitPadding}
-										y={marker.y - eventTagHeight / 2 - markerHitPadding}
+										y={marker.y - eventHeight(marker.label) / 2 - markerHitPadding}
 										width={eventWidth(marker.label) + markerHitPadding * 2}
-										height={eventTagHeight + markerHitPadding * 2}
+										height={eventHeight(marker.label) + markerHitPadding * 2}
 										fill="transparent"
 										pointer-events="all"
 									/>
@@ -7280,24 +7417,21 @@
 										pointer-events="all"
 									/>
 								{/if}
-								{#if marker.kind === 'team-a' || marker.kind === 'team-k'}
-									<circle cx={marker.x} cy={marker.y} r={playerRadius} fill="#1c1917" stroke="#fff" stroke-width={playerStrokeWidth} />
+								{#if isTeamMarker(marker)}
+									{@const markerColor = playerMarkerColor(marker)}
+									<circle
+										cx={marker.x}
+										cy={marker.y}
+										r={playerRadius}
+										fill={guideColor(markerColor)}
+										stroke={playerTextColor(markerColor)}
+										stroke-width={playerStrokeWidth}
+									/>
 									<text
 										x={marker.x}
 										y={marker.y + 3.4}
 										text-anchor="middle"
-										fill="#fff"
-										font-size={marker.label && marker.label.length >= 4 ? 7.65 : 8.925}
-										font-weight="900"
-										pointer-events="none">{marker.label}</text
-									>
-								{:else if marker.kind === 'team-b' || marker.kind === 'team-r'}
-									<circle cx={marker.x} cy={marker.y} r={playerRadius} fill="#fff" stroke="#1c1917" stroke-width={playerStrokeWidth} />
-									<text
-										x={marker.x}
-										y={marker.y + 3.4}
-										text-anchor="middle"
-										fill="#1c1917"
+										fill={playerTextColor(markerColor)}
 										font-size={marker.label && marker.label.length >= 4 ? 7.65 : 8.925}
 										font-weight="900"
 										pointer-events="none">{marker.label}</text
@@ -7339,19 +7473,24 @@
 										pointer-events="none"
 									/>
 								{:else if marker.kind === 'event'}
+									{@const eventLines = eventTagLines(marker.label)}
 									<rect
 										x={marker.x - eventWidth(marker.label) / 2}
-										y={marker.y - eventTagHeight / 2}
+										y={marker.y - eventHeight(marker.label) / 2}
 										width={eventWidth(marker.label)}
-										height={eventTagHeight}
+										height={eventHeight(marker.label)}
 										fill="#fff"
 										stroke="#1c1917"
 										stroke-width="2.25"
 										pointer-events="none"
 									/>
-									<text x={marker.x} y={marker.y + 3.5} text-anchor="middle" fill="#1c1917" font-size="8.5" font-weight="900" pointer-events="none"
-										>{marker.label}</text
-									>
+									<text x={marker.x} text-anchor="middle" fill="#1c1917" font-size="8.5" font-weight="900" pointer-events="none">
+										{#each eventLines as line, lineIndex}
+											<tspan x={marker.x} y={marker.y - ((eventLines.length - 1) * eventTagLineHeight) / 2 + 3.5 + lineIndex * eventTagLineHeight}
+												>{line}</tspan
+											>
+										{/each}
+									</text>
 								{:else}
 									<image
 										href="/images/penalty-flag.webp"
@@ -7400,12 +7539,14 @@
 								pointer-events="none">{yardLinePreviewText(draggedYardMarker.x)}</text
 							>
 						{:else if showYardLineCursorEnabled && draggedYardPath && isArrowPath(draggedYardPath.kind)}
-							{@const draggedArrowTip = arrowHitTip(draggedYardPath.kind, draggedYardPath.start, draggedYardPath.end)}
-							{#if isPointOnField(draggedYardPath.start)}
+							{@const draggedPathStart = pathStart(draggedYardPath)}
+							{@const draggedPathPoints = pathPoints(draggedYardPath, draggedPathStart)}
+							{@const draggedArrowTip = arrowHitTip(draggedYardPath.kind, draggedPathStart, draggedYardPath.end, draggedPathPoints)}
+							{#if draggedYardPathMode !== 'end' && isPointOnField(draggedPathStart)}
 								<text
 									data-yard-line-preview
-									x={draggedYardPath.start.x}
-									y={toolYardLinePreviewY(draggedYardPath.kind, draggedYardPath.start)}
+									x={draggedPathStart.x}
+									y={toolYardLinePreviewY(draggedYardPath.kind, draggedPathStart)}
 									text-anchor="middle"
 									fill="#fff"
 									stroke="#1c1917"
@@ -7414,10 +7555,10 @@
 									font-size="8"
 									font-weight="900"
 									opacity="0.58"
-									pointer-events="none">{yardLinePreviewText(draggedYardPath.start.x)}</text
+									pointer-events="none">{yardLinePreviewText(draggedPathStart.x)}</text
 								>
 							{/if}
-							{#if isPointOnField(draggedArrowTip)}
+							{#if draggedYardPathMode !== 'start' && isPointOnField(draggedArrowTip)}
 								<text
 									data-yard-line-preview
 									x={draggedArrowTip.x}
@@ -7893,7 +8034,9 @@
 						bind:this={editorElement}
 						data-tutorial="marker-editor"
 						class="absolute z-10 -translate-x-1/2 -translate-y-1/2 bg-white p-1 shadow-xl ring-2 ring-stone-900"
-						class:w-48={editingMarker.kind === 'deflag' || editingMarker.kind === 'bean-bag'}
+						class:w-52={editingMarker.kind === 'deflag'}
+						class:w-48={editingMarker.kind === 'bean-bag'}
+						class:w-36={isTeamMarker(editingMarker)}
 						style:left={`${editorLeft(editingMarker)}%`}
 						style:top={`${editorTop(editingMarker)}%`}
 						on:submit|preventDefault={commitMarkerEditor}
@@ -7923,9 +8066,8 @@
 								}
 							}}
 							class="mx-auto block h-8 border-0 bg-stone-100 px-2 text-center text-sm font-bold text-stone-900 outline-none focus:ring-2 focus:ring-stone-500"
-							class:w-16={isTeamMarker(editingMarker)}
 							class:w-40={!isTeamMarker(editingMarker) && editingMarker.kind !== 'deflag' && editingMarker.kind !== 'bean-bag'}
-							class:w-full={editingMarker.kind === 'deflag' || editingMarker.kind === 'bean-bag'}
+							class:w-full={isTeamMarker(editingMarker) || editingMarker.kind === 'deflag' || editingMarker.kind === 'bean-bag'}
 						/>
 						{#if editingMarker.kind === 'ball'}
 							<div class="mx-auto mt-1 flex w-40 gap-px" role="group" aria-label="Move football">
@@ -7945,40 +8087,33 @@
 							</div>
 						{/if}
 						{#if editingMarker.kind === 'deflag'}
-							<div class="mt-1 flex justify-center gap-1" role="group" aria-label="Flag belt color">
-								{#each deflagColors as option}
-									<HoverTooltip text={option.label} placement="above" minWidthPx={0} wrapperClass="flex h-6 w-6 shrink-0">
-										<button
-											type="button"
-											aria-label={`${option.label} flags`}
-											aria-pressed={(editingMarker.color ?? 'red') === option.id}
-											on:click={() => updateDeflagColor(option.id)}
-											class="h-6 w-6 cursor-pointer border border-stone-600 ring-offset-1 ring-offset-white hover:ring-1 hover:ring-stone-500"
-											class:ring-2={(editingMarker.color ?? 'red') === option.id}
-											class:ring-stone-950={(editingMarker.color ?? 'red') === option.id}
-											style:background={option.value}
-										></button>
-									</HoverTooltip>
-								{/each}
-							</div>
+							<ColorSwatchPalette
+								options={deflagColors}
+								selected={editingMarker.color ?? 'red'}
+								groupLabel="Flag belt color"
+								itemLabel={(option) => `${option.label} flags`}
+								onSelect={updateDeflagColor}
+							/>
 						{/if}
 						{#if editingMarker.kind === 'bean-bag'}
-							<div class="mt-1 flex justify-center gap-1" role="group" aria-label="Bean bag color">
-								{#each beanBagColors as option}
-									<HoverTooltip text={option.label} placement="above" minWidthPx={0} wrapperClass="flex h-6 w-6 shrink-0">
-										<button
-											type="button"
-											aria-label={`${option.label} bean bag`}
-											aria-pressed={(editingMarker.color ?? 'blue') === option.id}
-											on:click={() => updateBeanBagColor(option.id)}
-											class="h-6 w-6 cursor-pointer border border-stone-600 ring-offset-1 ring-offset-white hover:ring-1 hover:ring-stone-500"
-											class:ring-2={(editingMarker.color ?? 'blue') === option.id}
-											class:ring-stone-950={(editingMarker.color ?? 'blue') === option.id}
-											style:background={option.value}
-										></button>
-									</HoverTooltip>
-								{/each}
-							</div>
+							<ColorSwatchPalette
+								options={beanBagColors}
+								selected={editingMarker.color ?? 'blue'}
+								groupLabel="Bean bag color"
+								itemLabel={(option) => `${option.label} bean bag`}
+								onSelect={updateBeanBagColor}
+							/>
+						{/if}
+						{#if isTeamMarker(editingMarker)}
+							{@const selectedPlayerColor = editingMarker.color ?? defaultPlayerColor(editingMarker.kind)}
+							<ColorSwatchPalette
+								options={playerColors}
+								selected={selectedPlayerColor}
+								groupLabel="Player circle color"
+								itemLabel={(option) => `${option.label} player circle`}
+								columns={5}
+								onSelect={updatePlayerColor}
+							/>
 						{/if}
 					</form>
 				{/if}
@@ -8638,28 +8773,12 @@
 					<h3 class="mb-2 text-sm font-black tracking-wide uppercase">Field Details</h3>
 					<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
 						{#each fieldToggleOptions.filter((option) => option.fieldTypes.includes(fieldSettings.fieldType)) as option}
-							<button
-								type="button"
-								role="switch"
-								aria-checked={fieldSettings[option.key]}
-								on:click={() => toggleFieldSetting(option.key)}
-								class="flex h-full cursor-pointer items-start gap-3 border border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90"
-							>
-								<span
-									class="relative mt-0.5 h-5 w-9 shrink-0 border-2 border-stone-700 bg-stone-300 transition-colors"
-									class:!bg-green-600={fieldSettings[option.key]}
-								>
-									<span
-										class="absolute top-0.5 h-3 w-3 bg-white transition-[left]"
-										class:left-0.5={!fieldSettings[option.key]}
-										class:left-[18px]={fieldSettings[option.key]}
-									></span>
-								</span>
-								<span class="min-w-0">
-									<strong class="block text-xs font-black">{option.label}</strong>
-									<span class="mt-0.5 block text-[11px] leading-snug text-stone-600">{option.description}</span>
-								</span>
-							</button>
+							<BuilderToggleCard
+								label={option.label}
+								description={option.description}
+								checked={fieldSettings[option.key]}
+								onToggle={() => toggleFieldSetting(option.key)}
+							/>
 						{/each}
 					</div>
 				</section>
@@ -8694,138 +8813,45 @@
 					<h3 class="text-sm font-black tracking-wide uppercase">Play Builder Settings</h3>
 					<p class="mt-1 text-[11px] leading-snug text-stone-600">These preferences apply to every play builder opened in this browser.</p>
 					<div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-						<button
-							type="button"
-							role="switch"
-							aria-checked={autoSaveEnabled}
-							on:click={() => (autoSaveEnabled = !autoSaveEnabled)}
-							class="flex h-full cursor-pointer items-start gap-3 border border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90"
-						>
-							<span
-								class="relative mt-0.5 h-5 w-9 shrink-0 border-2 border-stone-700 bg-stone-300 transition-colors"
-								class:!bg-green-600={autoSaveEnabled}
-							>
-								<span
-									class="absolute top-0.5 h-3 w-3 bg-white transition-[left]"
-									class:left-0.5={!autoSaveEnabled}
-									class:left-[18px]={autoSaveEnabled}
-								></span>
-							</span>
-							<span class="min-w-0">
-								<strong class="block text-xs font-black">Auto-Save</strong>
-								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600"> Automatically save after you make changes.</span>
-							</span>
-						</button>
-						<button
-							type="button"
-							role="switch"
-							aria-checked={draftsEnabled}
-							on:click={() => {
+						<BuilderToggleCard
+							label="Auto-Save"
+							description="Automatically save after you make changes."
+							checked={autoSaveEnabled}
+							onToggle={() => (autoSaveEnabled = !autoSaveEnabled)}
+						/>
+						<BuilderToggleCard
+							label="Save Drafts"
+							description="Save and restore unfinished work."
+							checked={draftsEnabled}
+							onToggle={() => {
 								draftsEnabled = !draftsEnabled;
 								if (!draftsEnabled) clearLocalDraft();
 							}}
-							class="flex h-full cursor-pointer items-start gap-3 border border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90"
-						>
-							<span
-								class="relative mt-0.5 h-5 w-9 shrink-0 border-2 border-stone-700 bg-stone-300 transition-colors"
-								class:!bg-green-600={draftsEnabled}
-							>
-								<span class="absolute top-0.5 h-3 w-3 bg-white transition-[left]" class:left-0.5={!draftsEnabled} class:left-[18px]={draftsEnabled}
-								></span>
-							</span>
-							<span class="min-w-0">
-								<strong class="block text-xs font-black">Save Drafts</strong>
-								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600">Save and restore unfinished work.</span>
-							</span>
-						</button>
-						<button
-							type="button"
-							role="switch"
-							aria-checked={snappingEnabled}
-							on:click={() => (snappingEnabled = !snappingEnabled)}
-							class="flex h-full cursor-pointer items-start gap-3 border border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90"
-						>
-							<span
-								class="relative mt-0.5 h-5 w-9 shrink-0 border-2 border-stone-700 bg-stone-300 transition-colors"
-								class:!bg-green-600={snappingEnabled}
-							>
-								<span
-									class="absolute top-0.5 h-3 w-3 bg-white transition-[left]"
-									class:left-0.5={!snappingEnabled}
-									class:left-[18px]={snappingEnabled}
-								></span>
-							</span>
-							<span class="min-w-0">
-								<strong class="block text-xs font-black">Enable Snapping</strong>
-								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600">
-									Snap compatible elements automatically to marked yard lines.
-								</span>
-							</span>
-						</button>
-						<button
-							type="button"
-							role="switch"
-							aria-checked={highContrastEnabled}
-							on:click={() => (highContrastEnabled = !highContrastEnabled)}
-							class="flex h-full cursor-pointer items-start gap-3 border border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90"
-						>
-							<span
-								class="relative mt-0.5 h-5 w-9 shrink-0 border-2 border-stone-700 bg-stone-300 transition-colors"
-								class:!bg-green-600={highContrastEnabled}
-							>
-								<span
-									class="absolute top-0.5 h-3 w-3 bg-white transition-[left]"
-									class:left-0.5={!highContrastEnabled}
-									class:left-[18px]={highContrastEnabled}
-								></span>
-							</span>
-							<span class="min-w-0">
-								<strong class="block text-xs font-black">High Contrast Mode</strong>
-								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600">
-									Increase visual separation between the field, controls, text, and elements.
-								</span>
-							</span>
-						</button>
-						<button
-							type="button"
-							role="switch"
-							aria-checked={showYardLineCursorEnabled}
-							on:click={() => (showYardLineCursorEnabled = !showYardLineCursorEnabled)}
-							class="flex h-full cursor-pointer items-start gap-3 border border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90"
-						>
-							<span
-								class="relative mt-0.5 h-5 w-9 shrink-0 border-2 border-stone-700 bg-stone-300 transition-colors"
-								class:!bg-green-600={showYardLineCursorEnabled}
-							>
-								<span
-									class="absolute top-0.5 h-3 w-3 bg-white transition-[left]"
-									class:left-0.5={!showYardLineCursorEnabled}
-									class:left-[18px]={showYardLineCursorEnabled}
-								></span>
-							</span>
-							<span class="min-w-0">
-								<strong class="block text-xs font-black">Show Yard Line Under Cursor</strong>
-								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600"> Show the yard line beneath an element before you place it. </span>
-							</span>
-						</button>
-						<button
-							type="button"
-							role="switch"
-							aria-checked={adsEnabled}
-							on:click={() => (adsEnabled = !adsEnabled)}
-							class="flex h-full cursor-pointer items-start gap-3 border border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90"
-						>
-							<span
-								class="relative mt-0.5 h-5 w-9 shrink-0 border-2 border-stone-700 bg-stone-300 transition-colors"
-								class:!bg-green-600={adsEnabled}
-							>
-								<span class="absolute top-0.5 h-3 w-3 bg-white transition-[left]" class:left-0.5={!adsEnabled} class:left-[18px]={adsEnabled}></span>
-							</span>
-							<span class="min-w-0">
-								<strong class="block text-xs font-black">Show Ads</strong>
-								<span class="mt-0.5 block text-[11px] leading-snug text-stone-600"> Show the Play Builder ad panel beside the diagram. </span>
-							</span>
-						</button>
+						/>
+						<BuilderToggleCard
+							label="Enable Snapping"
+							description="Snap compatible elements automatically to marked yard lines."
+							checked={snappingEnabled}
+							onToggle={() => (snappingEnabled = !snappingEnabled)}
+						/>
+						<BuilderToggleCard
+							label="High Contrast Mode"
+							description="Increase visual separation between the field, controls, text, and elements."
+							checked={highContrastEnabled}
+							onToggle={() => (highContrastEnabled = !highContrastEnabled)}
+						/>
+						<BuilderToggleCard
+							label="Show Yard Line Under Cursor"
+							description="Show the yard line beneath an element before you place it."
+							checked={showYardLineCursorEnabled}
+							onToggle={() => (showYardLineCursorEnabled = !showYardLineCursorEnabled)}
+						/>
+						<BuilderToggleCard
+							label="Show Ads"
+							description="Show the Play Builder ad panel beside the diagram."
+							checked={adsEnabled}
+							onToggle={() => (adsEnabled = !adsEnabled)}
+						/>
 					</div>
 				</section>
 			</div>
@@ -9126,7 +9152,7 @@
 			transform: translateY(-5px);
 		}
 	}
-	.tutorial-launch-bouncing {
+	:global(.tutorial-launch-bouncing) {
 		animation: tutorial-dock-bounce 1.35s ease-in-out infinite;
 		transform-origin: bottom center;
 	}
@@ -9189,7 +9215,7 @@
 		color: #1c1917;
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.tutorial-launch-bouncing {
+		:global(.tutorial-launch-bouncing) {
 			animation: none;
 			outline: 3px solid #facc15;
 		}
