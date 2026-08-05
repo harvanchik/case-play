@@ -51,17 +51,7 @@
 	<DesktopPlayBuilderGate>
 		<div slot="mobile" class="relative z-10 mx-auto flex min-h-[calc(100vh-6rem)] w-full max-w-3xl flex-col justify-center py-6">
 			<div class="rotate-device-notice mb-3 flex items-center justify-center gap-2 text-center text-sm font-black text-stone-800">
-				<svg viewBox="0 0 32 32" class="h-7 w-7 shrink-0" aria-hidden="true">
-					<rect x="10" y="5" width="12" height="21" fill="none" stroke="currentColor" stroke-width="2" />
-					<path
-						d="M14 8h4M15 23h2M5 13a11 11 0 0 1 19-6M24 3v6h-6"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="square"
-						stroke-linejoin="miter"
-					/>
-				</svg>
+				<img src="/images/rotate-device.png" alt="" class="h-8 w-8 shrink-0 object-contain" />
 				<span>Rotate Your Device</span>
 			</div>
 			<div class="w-full overflow-hidden border-2 border-stone-900 bg-stone-800 shadow-lg">
