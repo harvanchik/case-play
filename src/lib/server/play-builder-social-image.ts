@@ -22,6 +22,7 @@ import {
 	playBuilderSmoothedPath
 } from '$lib/play-builder-rendering';
 import { PLAY_BUILDER_EVENT_TAG_LINE_HEIGHT, playBuilderEventTagLayout } from '$lib/play-builder-event-tag';
+import { PLAY_BUILDER_WATERMARK_BASELINE, PLAY_BUILDER_WATERMARK_TEXT, playBuilderWatermarkGeometry } from '$lib/play-builder-watermark';
 import beanBagBlackImage from './social-assets/bean-bag-black.png?inline';
 import beanBagBlueImage from './social-assets/bean-bag-blue.png?inline';
 import beanBagPinkImage from './social-assets/bean-bag-pink.png?inline';
@@ -358,7 +359,18 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 		const base = atMidfield ? String(yardLine) : half && wholeYards === 0 ? `${side}'s` : `${side}'s ${half ? wholeYards : yardLine}`;
 		return { base, half, baseWidth: base.length * 5.8 };
 	};
-	const fieldAngle = -(Math.atan2(fieldHeight, fieldWidth) * 180) / Math.PI;
+	const watermark = playBuilderWatermarkGeometry({
+		left: fieldLeft,
+		top: fieldTop,
+		width: fieldWidth,
+		height: fieldHeight,
+		safeArea: {
+			left: xForYards(leftGoalYards),
+			top: fieldTop,
+			width: xForYards(rightGoalYards) - xForYards(leftGoalYards),
+			height: fieldHeight
+		}
+	});
 	const arrowMarkers = (Object.keys(colors) as GuideColor[])
 		.map(
 			(color) =>
@@ -536,7 +548,7 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 		${hashes}${shortLines}${yardNumbers}${goalLetters}
 		${noRunZoneLabels}
 		${settings.showEndZoneText ? layout.endZoneCenters.map((yard, index) => `<text x="${xForYards(yard)}" y="${fieldTop + fieldHeight / 2}" transform="rotate(${index === 0 ? -90 : 90} ${xForYards(yard)} ${fieldTop + fieldHeight / 2})" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,.72)" font-size="26" font-weight="900" letter-spacing="4">END ZONE</text>`).join('') : ''}
-		<text x="${fieldLeft + fieldWidth / 2}" y="${fieldTop + fieldHeight / 2}" transform="rotate(${fieldAngle} ${fieldLeft + fieldWidth / 2} ${fieldTop + fieldHeight / 2})" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,.1)" font-size="52" font-weight="900" letter-spacing="7">CASEPLAY.ORG</text>
+		<text x="${watermark.centerX}" y="${watermark.centerY}" transform="rotate(${watermark.angle} ${watermark.centerX} ${watermark.centerY})" text-anchor="middle" dominant-baseline="${PLAY_BUILDER_WATERMARK_BASELINE}" fill="rgba(255,255,255,.1)" font-size="${watermark.fontSize}" font-weight="900" letter-spacing="${watermark.letterSpacing}">${PLAY_BUILDER_WATERMARK_TEXT}</text>
 		${pylons}${guideElements}${xMarks}${renderLayers()}${indicators}${freeDrawings}
 	</svg>`;
 };

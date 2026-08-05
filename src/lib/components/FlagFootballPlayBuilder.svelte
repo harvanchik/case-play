@@ -62,6 +62,7 @@
 		playBuilderEventTagLayout,
 		playBuilderEventTagLines
 	} from '$lib/play-builder-event-tag';
+	import { PLAY_BUILDER_WATERMARK_BASELINE, PLAY_BUILDER_WATERMARK_TEXT, playBuilderWatermarkGeometry } from '$lib/play-builder-watermark';
 	import {
 		FLAG_FOOTBALL_PLAY_BUILDER_DEFINITION,
 		type FlagFootballTool,
@@ -919,11 +920,22 @@
 	$: fieldTop = (484 - fieldHeight) / 2;
 	$: fieldBottom = fieldTop + fieldHeight;
 	const clampTeamBoxY = (y: number) => Math.max(0, Math.min(484 - 20, y));
-	$: fieldWatermarkAngle = -(Math.atan2(fieldHeight, fieldWidth) * 180) / Math.PI;
 	const xForYards = (yards: number) => fieldLeft + yards * (fieldWidth / fieldLayout.totalYards);
 	const yardsForX = (x: number) => (x - fieldLeft) / (fieldWidth / fieldLayout.totalYards);
 	const leftGoalYards = () => fieldLayout.goalLines[0];
 	const rightGoalYards = () => fieldLayout.goalLines.at(-1) ?? fieldLayout.totalYards;
+	$: fieldWatermark = playBuilderWatermarkGeometry({
+		left: fieldLeft,
+		top: fieldTop,
+		width: fieldWidth,
+		height: fieldHeight,
+		safeArea: {
+			left: xForYards(leftGoalYards()),
+			top: fieldTop,
+			width: xForYards(rightGoalYards()) - xForYards(leftGoalYards()),
+			height: fieldHeight
+		}
+	});
 	const leftGoalX = () => xForYards(leftGoalYards());
 	const rightGoalX = () => xForYards(rightGoalYards());
 	const clampLineToGainX = (x: number) => Math.max(leftGoalX(), Math.min(rightGoalX(), x));
@@ -6781,16 +6793,16 @@
 
 							<g data-field-watermark aria-hidden="true" pointer-events="none">
 								<text
-									x={fieldLeft + fieldWidth / 2}
-									y={fieldTop + fieldHeight / 2}
-									transform={`rotate(${fieldWatermarkAngle} ${fieldLeft + fieldWidth / 2} ${fieldTop + fieldHeight / 2})`}
+									x={fieldWatermark.centerX}
+									y={fieldWatermark.centerY}
+									transform={`rotate(${fieldWatermark.angle} ${fieldWatermark.centerX} ${fieldWatermark.centerY})`}
 									text-anchor="middle"
-									dominant-baseline="middle"
+									dominant-baseline={PLAY_BUILDER_WATERMARK_BASELINE}
 									fill="#ffffff"
 									fill-opacity="0.1"
-									font-size="52"
+									font-size={fieldWatermark.fontSize}
 									font-weight="900"
-									letter-spacing="7">CASEPLAY.ORG</text
+									letter-spacing={fieldWatermark.letterSpacing}>{PLAY_BUILDER_WATERMARK_TEXT}</text
 								>
 							</g>
 						{/key}
