@@ -3501,7 +3501,7 @@
 				tutorialDriver?.destroy();
 				return;
 			}
-			if (event.key === 'ArrowRight') {
+			if (!isEditableTarget && event.key === 'ArrowRight') {
 				event.preventDefault();
 				void skipTutorialStep();
 				return;
@@ -5987,6 +5987,7 @@
 										: 'Save play'
 							: 'Determining save access'}
 						label={saveActionLabel}
+						wrapperClass={saveActionLabel === 'Make Copy' ? 'flex h-9 w-10 shrink-0 max-lg:hidden' : 'flex h-9 w-10 shrink-0'}
 						busy={!ownershipResolved || actionInProgress === 'save'}
 						disabled={!ownershipResolved || !hasUnsavedChanges || tutorialActive || actionInProgress !== null}
 						labelClass="leading-none font-semibold whitespace-nowrap"
@@ -6080,7 +6081,7 @@
 							<HoverTooltip
 								text={editingPlayId === play.id ? '' : 'Double Click for Options'}
 								minWidthPx={0}
-								wrapperClass="flex h-9 min-w-20 shrink-0"
+								wrapperClass="flex h-9 min-w-20 shrink-0 max-lg:h-7 max-lg:min-w-14"
 							>
 								<button
 									data-play-id={play.id}
@@ -6089,7 +6090,7 @@
 									aria-pressed={index === activePlayIndex}
 									on:click={() => switchPlay(play.id)}
 									on:dblclick={(event) => openPlayMenu(event, play.id)}
-									class="flex h-9 min-w-20 shrink-0 cursor-pointer items-center justify-center border border-stone-500 bg-stone-100 px-3 text-[10px] font-black whitespace-nowrap text-stone-800 hover:bg-white aria-pressed:border-stone-950 aria-pressed:bg-stone-900 aria-pressed:text-white"
+									class="flex h-9 min-w-20 shrink-0 cursor-pointer items-center justify-center border border-stone-500 bg-stone-100 px-3 text-[10px] font-black whitespace-nowrap text-stone-800 hover:bg-white aria-pressed:border-stone-950 aria-pressed:bg-stone-900 aria-pressed:text-white max-lg:h-7 max-lg:min-w-14 max-lg:px-2 max-lg:text-[8px]"
 								>
 									{play.name}
 								</button>
@@ -6099,14 +6100,14 @@
 							text={playEntries.length >= PLAY_BUILDER_MAX_PLAYS ? 'Play Limit Reached' : 'Add Play'}
 							shortcutKeys={[alternateModifierKey, 'N']}
 							minWidthPx={0}
-							wrapperClass="flex h-9 w-9 shrink-0"
+							wrapperClass="flex h-9 w-9 shrink-0 max-lg:h-7 max-lg:w-7"
 						>
 							<button
 								type="button"
 								aria-label="Add another play"
 								disabled={playEntries.length >= PLAY_BUILDER_MAX_PLAYS}
 								on:click={addPlay}
-								class="flex h-9 w-9 cursor-pointer items-center justify-center border border-stone-500 bg-stone-100 text-xl font-black text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+								class="flex h-9 w-9 cursor-pointer items-center justify-center border border-stone-500 bg-stone-100 text-xl font-black text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 max-lg:h-7 max-lg:w-7 max-lg:text-base"
 							>
 								+
 							</button>
@@ -8263,7 +8264,7 @@
 		</div>
 	</div>
 	{#if viewOnly}
-		<div class="view-only-actions flex items-center justify-end gap-2 border-t border-stone-700 bg-stone-800 px-2 py-2">
+		<div class="view-only-actions flex items-center justify-end gap-2 border-t border-stone-700 bg-stone-800 px-2 py-2 max-lg:hidden">
 			<button
 				type="button"
 				class="cursor-pointer border-2 border-stone-100 bg-stone-100 px-3 py-2 text-xs font-black text-stone-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -8282,7 +8283,7 @@
 						aria-label={`View ${play.name}`}
 						aria-current={index === activePlayIndex ? 'page' : undefined}
 						on:click={() => switchPlay(play.id)}
-						class="flex h-9 min-w-20 shrink-0 cursor-pointer items-center justify-center border border-stone-500 bg-stone-100 px-3 text-[10px] font-black whitespace-nowrap text-stone-800 hover:bg-white aria-[current=page]:border-white aria-[current=page]:bg-stone-950 aria-[current=page]:text-white"
+						class="flex h-9 min-w-20 shrink-0 cursor-pointer items-center justify-center border border-stone-500 bg-stone-100 px-3 text-[10px] font-black whitespace-nowrap text-stone-800 hover:bg-white aria-[current=page]:border-white aria-[current=page]:bg-stone-950 aria-[current=page]:text-white max-lg:h-7 max-lg:min-w-14 max-lg:px-2 max-lg:text-[8px]"
 					>
 						{play.name}
 					</button>
