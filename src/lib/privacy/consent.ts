@@ -122,9 +122,12 @@ export const openConsentChoices = () => {
 	if (typeof window === 'undefined') return;
 	if (googleCmpHandlesRegion()) {
 		const consentWindow = window as ConsentWindow;
-		(consentWindow.googlefc ??= {}).callbackQueue ??= [];
-		consentWindow.googlefc.callbackQueue.push(() => consentWindow.googlefc?.showRevocationMessage?.());
-		return;
+		const showRevocationMessage = consentWindow.googlefc?.showRevocationMessage;
+		if (typeof showRevocationMessage === 'function') {
+			(consentWindow.googlefc ??= {}).callbackQueue ??= [];
+			consentWindow.googlefc.callbackQueue.push(showRevocationMessage);
+			return;
+		}
 	}
 	window.dispatchEvent(new Event(OPEN_CONSENT_EVENT));
 };
