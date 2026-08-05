@@ -76,9 +76,6 @@
 						>
 							Flag Football Play Builder
 						</h1>
-						<p class="font-neucha -mt-3 text-stone-600" style="font-size: clamp(0.75rem, 2cqw, 1.25rem);">
-							create, annotate, export, save, and share diagrams with the original Flag Football Play Builder tool.
-						</p>
 					</header>
 					<FlagFootballPlayBuilder
 						initialDocument={data.initialDocument}
