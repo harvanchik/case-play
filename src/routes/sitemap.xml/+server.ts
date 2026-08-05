@@ -8,7 +8,7 @@ const escapeXml = (value: string) =>
 
 export const GET: RequestHandler = async () => {
 	const [casePlays, playlists] = await Promise.all([listCasePlays(), listPlaylists()]);
-	const staticPaths = ['/', '/play-builder', '/about', '/contact'];
+	const staticPaths = ['/', '/diagram/flag-football', '/about', '/contact'];
 	if (playlists.length > 0) staticPaths.push('/playlists');
 	const staticUrls = staticPaths.map((path) => `<url><loc>${escapeXml(`${SITE_ORIGIN}${path}`)}</loc></url>`);
 	const casePlayUrls = casePlays.map((casePlay) => {

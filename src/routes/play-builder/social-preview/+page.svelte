@@ -1,9 +1,17 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
-	import type { PageData } from './$types';
 
-	export let data: PageData;
+	type FlagFootballSocialPreviewData = {
+		requestedId: string;
+		playBuilderId: string;
+		activePlayNumber: number;
+		playCount: number;
+		imageUrl: string;
+		message: string;
+	};
+
+	export let data: FlagFootballSocialPreviewData;
 
 	let playBuilderId = data.requestedId;
 	let selectedPlay = data.activePlayNumber;
@@ -20,7 +28,7 @@
 		const id = playBuilderId.trim();
 		if (id) params.set('id', id);
 		params.set('play', String(selectedPlay));
-		await goto(`/play-builder/social-preview?${params.toString()}`, { keepFocus: true, noScroll: true });
+		await goto(`/diagram/flag-football/social-preview?${params.toString()}`, { keepFocus: true, noScroll: true });
 	};
 </script>
 

@@ -12,10 +12,10 @@
 	<a href="/" class="nav-link underline-offset-4">Home</a>
 	<PublicNavDropdown
 		label="Play Builder"
-		href="/play-builder"
+		href="/diagram/flag-football"
 		align="left"
 		items={[
-			{ label: 'Flag Football', href: '/play-builder' },
+			{ label: 'Flag Football', href: '/diagram/flag-football' },
 			...['Basketball', 'Soccer', 'Volleyball', 'Floor Hockey', 'Softball'].map((sport) => ({ label: sport, disabled: true, suffix: 'Coming Soon' }))
 		]}
 	/>

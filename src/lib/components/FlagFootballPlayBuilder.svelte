@@ -1687,7 +1687,7 @@
 			sessionStorage.setItem('play-builder-action-message', JSON.stringify({ message: confirmation, expiresAt: Date.now() + 10_000 }));
 			sessionStorage.setItem(saveLabelFeedbackStorageKey, 'saved');
 			const playQuery = playEntries.length > 1 ? `?play=${activePlayIndex + 1}` : '';
-			await goto(`/play-builder/${id}${playQuery}`, { replaceState: true, keepFocus: true, noScroll: true });
+			await goto(`/diagram/flag-football/${id}${playQuery}`, { replaceState: true, keepFocus: true, noScroll: true });
 			return true;
 		} catch (error) {
 			showActionMessage(error instanceof Error ? error.message : 'Unable to save play.');
@@ -1703,7 +1703,7 @@
 		try {
 			const id = await createSavedPlay(currentSerializedDocument());
 			showActionMessage('Copy created');
-			await goto(`/play-builder/${id}`, { replaceState: true, keepFocus: true, noScroll: true });
+			await goto(`/diagram/flag-football/${id}`, { replaceState: true, keepFocus: true, noScroll: true });
 		} catch (error) {
 			showActionMessage(error instanceof Error ? error.message : 'Unable to make a copy.');
 		} finally {
@@ -4369,13 +4369,13 @@
 	const openBlankBoard = async () => {
 		showNewPrompt = false;
 		clearLocalDraft();
-		const isAlreadyNewBoard = window.location.pathname.replace(/\/$/, '') === '/play-builder' && savedPlayId === null;
+		const isAlreadyNewBoard = window.location.pathname.replace(/\/$/, '') === '/diagram/flag-football' && savedPlayId === null;
 		if (isAlreadyNewBoard) {
 			resetToBlankBoard();
 			return;
 		}
 		savedSceneKey = currentSceneKey;
-		await goto('/play-builder');
+		await goto('/diagram/flag-football');
 	};
 	const createTutorialNewPlay = async () => {
 		tutorialDriver?.destroy();

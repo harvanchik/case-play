@@ -205,7 +205,7 @@
 				<p class="mt-1 text-sm text-stone-600">Your saved diagrams from the Flag Football Play Builder.</p>
 			</div>
 			<a
-				href="/play-builder"
+				href="/diagram/flag-football"
 				class="inline-flex h-10 items-center gap-2 border-2 border-stone-900 bg-stone-900 px-4 text-sm font-black text-white shadow-[3px_3px_0_rgba(28,25,23,0.22)] transition-colors hover:bg-stone-700 focus-visible:outline-4 focus-visible:outline-[#6faf7d] active:translate-0.5 active:shadow-none"
 			>
 				<Icon icon="material-symbols:add-circle-outline" class="h-5 w-5" aria-hidden="true" />
@@ -223,7 +223,7 @@
 						on:pointerdown={(event) => handleCardPointerDown(event, play.id)}
 					>
 						<a
-							href={isTemporaryPlay(play.id) ? undefined : `/play-builder/${play.id}`}
+							href={isTemporaryPlay(play.id) ? undefined : `/diagram/flag-football/${play.id}`}
 							aria-disabled={isTemporaryPlay(play.id)}
 							class={`block min-w-0 focus-visible:outline-4 focus-visible:outline-[#6faf7d] ${isTemporaryPlay(play.id) ? 'pointer-events-none' : ''}`}
 						>
@@ -277,7 +277,7 @@
 								</p>
 							{:else}
 								<a
-									href={isTemporaryPlay(play.id) ? undefined : `/play-builder/${play.id}`}
+									href={isTemporaryPlay(play.id) ? undefined : `/diagram/flag-football/${play.id}`}
 									aria-disabled={isTemporaryPlay(play.id)}
 									class={`group block rounded-sm focus-visible:outline-4 focus-visible:outline-[#6faf7d] ${isTemporaryPlay(play.id) ? 'pointer-events-none' : ''}`}
 								>
@@ -346,7 +346,8 @@
 			>
 				<h2 class="text-xl font-black text-stone-900">No saved plays yet</h2>
 				<p class="mt-2 text-sm text-stone-600">Save a diagram in the Play Builder and it will appear here.</p>
-				<a href="/play-builder" class="mt-5 inline-block bg-stone-900 px-4 py-2 text-sm font-black text-white hover:bg-stone-700">Open Play Builder</a
+				<a href="/diagram/flag-football" class="mt-5 inline-block bg-stone-900 px-4 py-2 text-sm font-black text-white hover:bg-stone-700"
+					>Open Play Builder</a
 				>
 			</section>
 		{/if}

@@ -1,20 +1,5 @@
-import { Resvg } from '@resvg/resvg-js';
-import {
-	defaultSocialPlayBuilderDocument,
-	playBuilderSocialRenderOptions,
-	renderPlayBuilderSocialSvg
-} from '$lib/server/play-builder-social-image';
-import type { RequestHandler } from './$types';
+import { redirect, type RequestHandler } from '@sveltejs/kit';
 
-export const GET: RequestHandler = () => {
-	const image = new Resvg(renderPlayBuilderSocialSvg(defaultSocialPlayBuilderDocument()), playBuilderSocialRenderOptions())
-		.render()
-		.asPng();
-	const body = image.buffer.slice(image.byteOffset, image.byteOffset + image.byteLength) as ArrayBuffer;
-	return new Response(body, {
-		headers: {
-			'content-type': 'image/png',
-			'cache-control': 'public, max-age=300, s-maxage=31536000, immutable'
-		}
-	});
+export const GET: RequestHandler = ({ url }) => {
+	throw redirect(308, `/diagram/flag-football/social.png${url.search}`);
 };

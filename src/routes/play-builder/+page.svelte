@@ -4,20 +4,23 @@
 	import PlayBuilderAttribution from '$lib/components/PlayBuilderAttribution.svelte';
 	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
 	import DesktopPlayBuilderGate from '$lib/components/DesktopPlayBuilderGate.svelte';
-	import type { PageData } from './$types';
+	type FlagFootballDiagramPageData = {
+		accountUser?: unknown;
+		accountCsrfToken?: string | null;
+	};
 
-	export let data: PageData;
+	export let data: FlagFootballDiagramPageData;
 
 	const pageTitle = 'Flag Football Play Builder | caseplay.org';
 	const pageDescription =
 		'Create flag football play diagrams online for clinics, officiating education, rules discussions, and case-play training. Draw routes, place players and officials, customize fields, save plays, and share or export your diagrams.';
-	const socialImage = 'https://caseplay.org/play-builder/social.png?v=3';
+	const socialImage = 'https://caseplay.org/diagram/flag-football/social.png?v=3';
 	let adsEnabled = false;
 	const structuredData = {
 		'@context': 'https://schema.org',
 		'@type': 'WebApplication',
 		name: 'Flag Football Play Builder',
-		url: 'https://caseplay.org/play-builder',
+		url: 'https://caseplay.org/diagram/flag-football',
 		description: pageDescription,
 		applicationCategory: 'SportsApplication',
 		applicationSubCategory: 'Flag football diagramming and officiating education',

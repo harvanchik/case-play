@@ -75,7 +75,7 @@ export const load: LayoutServerLoad = ({ request, url, locals, cookies }) => {
 		url.pathname === '/cookie-policy' ||
 		url.pathname.startsWith('/api/') ||
 		url.pathname === '/upload' ||
-		(url.pathname.startsWith('/play-builder/') && url.pathname !== '/play-builder');
+		(url.pathname.startsWith('/diagram/flag-football/') && url.pathname !== '/diagram/flag-football');
 
 	return {
 		canonicalUrl,

@@ -4,11 +4,23 @@
 	import PlayBuilderAttribution from '$lib/components/PlayBuilderAttribution.svelte';
 	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
 	import DesktopPlayBuilderGate from '$lib/components/DesktopPlayBuilderGate.svelte';
-	import type { PageData } from './$types';
+	import type { SerializedPlayBuilderDocument } from '$lib/play-builder-scene';
 
-	export let data: PageData;
+	type SavedFlagFootballDiagramPageData = {
+		playId: string;
+		initialDocument: SerializedPlayBuilderDocument;
+		activePlayName: string;
+		activePlayNumber: number;
+		playCount: number;
+		updatedAt: string;
+		accountOwnedByCurrentUser: boolean;
+		accountSessionActive: boolean;
+		accountCsrfToken?: string | null;
+	};
 
-	$: socialImage = `https://caseplay.org/play-builder/${data.playId}/social.png?play=${data.activePlayNumber}&v=5-${encodeURIComponent(data.updatedAt)}`;
+	export let data: SavedFlagFootballDiagramPageData;
+
+	$: socialImage = `https://caseplay.org/diagram/flag-football/${data.playId}/social.png?play=${data.activePlayNumber}&v=5-${encodeURIComponent(data.updatedAt)}`;
 	const pageTitle = 'Flag Football Play Builder | caseplay.org';
 	$: pageDescription = `View “${data.activePlayName},” a shared flag football diagram${data.playCount > 1 ? ` with ${data.playCount} plays` : ''} created in the CasePlay.org Flag Football Play Builder.`;
 	let adsEnabled = false;

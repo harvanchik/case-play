@@ -30,7 +30,7 @@
 				My Plays
 			</a>
 			<a
-				href="/play-builder"
+				href="/diagram/flag-football"
 				class="inline-flex h-11 items-center justify-center gap-2 border-2 border-stone-900 bg-stone-900 px-5 text-sm font-black text-white shadow-[3px_3px_0_rgba(28,25,23,0.2)] transition-colors hover:bg-stone-700 focus-visible:outline-4 focus-visible:outline-[#22c55e] active:translate-0.5 active:shadow-none"
 			>
 				<Icon icon="material-symbols:add-circle-outline" class="h-5 w-5" aria-hidden="true" />

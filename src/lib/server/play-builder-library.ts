@@ -34,6 +34,6 @@ export const summarizePlayBuilderLibraryDiagram = (diagram: PlayBuilderLibraryDi
 		id: diagram.id,
 		title,
 		updatedAt: diagram.updatedAt,
-		previewUrl: `/play-builder/${diagram.id}/social.png?play=1&format=diagram&v=${encodeURIComponent(diagram.updatedAt)}`
+		previewUrl: `/diagram/flag-football/${diagram.id}/social.png?play=1&format=diagram&v=${encodeURIComponent(diagram.updatedAt)}`
 	};
 };

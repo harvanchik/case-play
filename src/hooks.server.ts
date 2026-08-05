@@ -49,7 +49,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.url.pathname === '/cookie-policy' ||
 		event.url.pathname.startsWith('/api/') ||
 		event.url.pathname === '/upload' ||
-		(event.url.pathname.startsWith('/play-builder/') && event.url.pathname !== '/play-builder');
+		(event.url.pathname.startsWith('/diagram/flag-football/') && event.url.pathname !== '/diagram/flag-football');
 
 	if (isFilteredCaseLibrary || isUtilityOrSharedRoute) {
 		response.headers.set('X-Robots-Tag', 'noindex, follow');

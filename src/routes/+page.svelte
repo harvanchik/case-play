@@ -205,7 +205,7 @@
 						aria-hidden="true">NEW</span
 					>
 					<a
-						href="/play-builder"
+						href="/diagram/flag-football"
 						class="flex cursor-pointer items-center justify-center border border-stone-300 bg-stone-50 px-4 text-stone-900 transition-colors duration-200 hover:bg-stone-100 hover:text-black focus:ring-2 focus:ring-stone-500"
 						title="Open Play Builder"
 						aria-label="Open Play Builder — New"
