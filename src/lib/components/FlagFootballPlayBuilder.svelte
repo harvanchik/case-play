@@ -145,7 +145,6 @@
 	export let savedPlayId: string | null = null;
 	export let exportPrompt: string | null = null;
 	export let exportPromptSource: HTMLElement | null = null;
-	export let viewOnly = false;
 	export let adsEnabled = false;
 	export let accountOwnedByCurrentUser = false;
 	export let accountSessionActive = false;
@@ -271,6 +270,8 @@
 	let actionMessage = '';
 	let actionMessageTimer: ReturnType<typeof setTimeout> | null = null;
 	let canEditSavedPlay = savedPlayId === null || accountOwnedByCurrentUser;
+	// Saved links remain editable in the browser holding their private edit token.
+	$: viewOnly = !canEditSavedPlay;
 	let ownershipResolved = savedPlayId === null || accountSessionActive;
 	let saveFeedbackState: 'idle' | 'saved' = 'idle';
 	let saveActionLabel = '';
@@ -1618,7 +1619,11 @@
 		}
 	};
 	const storeEditToken = (playId: string, editToken: string) => {
-		sessionStorage.setItem(`play-builder-edit:${playId}`, editToken);
+		try {
+			sessionStorage.setItem(`play-builder-edit:${playId}`, editToken);
+		} catch {
+			// Durable ownership can still be stored when session storage is unavailable.
+		}
 		try {
 			localStorage.setItem(editTokensStorageKey, JSON.stringify({ ...storedEditTokens(), [playId]: editToken }));
 		} catch {
@@ -1628,10 +1633,14 @@
 	const editTokenForPlay = (playId: string) => {
 		const durableToken = storedEditTokens()[playId];
 		if (durableToken) {
-			sessionStorage.setItem(`play-builder-edit:${playId}`, durableToken);
 			return durableToken;
 		}
-		const sessionToken = sessionStorage.getItem(`play-builder-edit:${playId}`);
+		let sessionToken: string | null = null;
+		try {
+			sessionToken = sessionStorage.getItem(`play-builder-edit:${playId}`);
+		} catch {
+			// An unavailable storage API does not grant editing access.
+		}
 		if (sessionToken) storeEditToken(playId, sessionToken);
 		return sessionToken;
 	};
@@ -5459,7 +5468,7 @@
 		toolPreferencesHydrated = true;
 		restoreBuilderPreferences();
 		builderPreferencesHydrated = true;
-		if (!viewOnly) {
+		if (canEditSavedPlay) {
 			try {
 				const rawDraft = localStorage.getItem(localDraftKey());
 				if (!draftsEnabled) {

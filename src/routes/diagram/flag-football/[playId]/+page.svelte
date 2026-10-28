@@ -5,4 +5,6 @@
 	export let data: PageData;
 </script>
 
-<SavedFlagFootballDiagramPage {data} />
+{#key data.playId}
+	<SavedFlagFootballDiagramPage {data} />
+{/key}

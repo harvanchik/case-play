@@ -58,7 +58,6 @@
 				<FlagFootballPlayBuilder
 					initialDocument={data.initialDocument}
 					savedPlayId={data.playId}
-					viewOnly={!data.accountOwnedByCurrentUser}
 					accountOwnedByCurrentUser={data.accountOwnedByCurrentUser}
 					accountSessionActive={data.accountSessionActive}
 					accountCsrfToken={data.accountCsrfToken ?? null}
@@ -85,7 +84,6 @@
 						initialDocument={data.initialDocument}
 						savedPlayId={data.playId}
 						bind:adsEnabled
-						viewOnly={!data.accountOwnedByCurrentUser}
 						accountOwnedByCurrentUser={data.accountOwnedByCurrentUser}
 						accountSessionActive={data.accountSessionActive}
 						accountCsrfToken={data.accountCsrfToken ?? null}
