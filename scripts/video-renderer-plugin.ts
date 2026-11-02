@@ -9,6 +9,9 @@ export async function buildVideoRendererSource() {
 		platform: 'node',
 		format: 'esm',
 		external: ['@resvg/resvg-js'],
+		// Config loading runs before SvelteKit has generated its tsconfig on a clean checkout.
+		alias: { $lib: resolve('src/lib') },
+		tsconfigRaw: { compilerOptions: {} },
 		plugins: [
 			{
 				name: 'inline-social-assets',

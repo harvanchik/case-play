@@ -6,7 +6,7 @@
 		"dev": "vite dev",
 		"dev:open": "vite dev --open",
 		"dev:host": "vite dev --host",
-		"build": "vite build",
+		"build": "svelte-kit sync && vite build",
 		"check": "svelte-check --tsconfig ./tsconfig.json",
 		"test": "tsx --test tests/*.test.ts",
 		"test:e2e": "playwright test",
