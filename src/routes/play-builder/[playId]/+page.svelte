@@ -83,7 +83,6 @@
 					<FlagFootballPlayBuilder
 						initialDocument={data.initialDocument}
 						savedPlayId={data.playId}
-						bind:adsEnabled
 						accountOwnedByCurrentUser={data.accountOwnedByCurrentUser}
 						accountSessionActive={data.accountSessionActive}
 						accountCsrfToken={data.accountCsrfToken ?? null}

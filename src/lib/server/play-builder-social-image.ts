@@ -1,3 +1,4 @@
+import { evaluateAnimation } from '../play-builder-animation';
 import {
 	defaultPlayBuilderFieldSettings,
 	formatPlayBuilderGameClock,
@@ -333,7 +334,7 @@ const downMarkerDisplay = (guide: FieldGuide, los: FieldGuide | undefined, yards
 	return { base, half, baseWidth: base.length * 5.8 - (half ? 4 : 0) };
 };
 
-const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings, standalone = false) => {
+const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings, standalone = false, clockVisible = true) => {
 	const layout = fieldLayouts[settings.fieldType];
 	const palette = fieldPalettes[settings.fieldColor];
 	const fixtureScale =
@@ -387,12 +388,18 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 						const scoreboard =
 							index === 0
 								? [
-										{ x: x - 62, value: settings.gameQuarter.toUpperCase(), fontSize: 12, letterSpacing: 1.5 },
-										{ x: x + width + 4, value: formatPlayBuilderGameClock(settings.gameClockSeconds), fontSize: 11, letterSpacing: 0.5 }
+										{ x: x - 62, value: settings.gameQuarter.toUpperCase(), fontSize: 12, letterSpacing: 1.5, visible: true },
+										{
+											x: x + width + 4,
+											value: formatPlayBuilderGameClock(settings.gameClockSeconds),
+											fontSize: 11,
+											letterSpacing: 0.5,
+											visible: clockVisible
+										}
 									]
 										.map(
 											(item) =>
-												`<g><rect x="${item.x}" y="${y}" width="58" height="20" fill="#111827" stroke="#d2b48c" stroke-width="2"/><text x="${item.x + 29}" y="${y + 14}" text-anchor="middle" fill="#fef3c7" font-size="${item.fontSize}" font-weight="900" letter-spacing="${item.letterSpacing}">${item.value}</text></g>`
+												`<g><rect x="${item.x}" y="${y}" width="58" height="20" fill="#111827" stroke="#d2b48c" stroke-width="2"/><text x="${item.x + 29}" y="${y + 14}" text-anchor="middle" fill="#fef3c7" font-size="${item.fontSize}" font-weight="900" opacity="${item.visible ? 1 : 0}" letter-spacing="${item.letterSpacing}">${item.value}</text></g>`
 										)
 										.join('')
 								: '';
@@ -556,7 +563,7 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 export const renderPlayBuilderSocialSvg = (document: PlayBuilderDocument) => {
 	const activePlayIndex = document.plays[document.activePlayIndex] ? document.activePlayIndex : 0;
 	const active = document.plays[activePlayIndex];
-	const field = renderField(active.scene, active.settings);
+	const field = renderField(evaluateAnimation(active, 0), active.settings);
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="Inter, sans-serif">
 		<defs><pattern id="graph" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#e7e5e4" stroke-width="1" opacity=".58"/></pattern></defs>
 		<rect width="1200" height="630" fill="#fafaf9"/><rect width="1200" height="630" fill="url(#graph)"/>
@@ -572,10 +579,10 @@ export const renderPlayBuilderSocialSvg = (document: PlayBuilderDocument) => {
  * The field renderer is intentionally shared with the social image so both
  * previews stay visually identical and continue to reflect the same play.
  */
-export const renderPlayBuilderDiagramSvg = (document: PlayBuilderDocument) => {
+export const renderPlayBuilderDiagramSvg = (document: PlayBuilderDocument, options: { clockVisible?: boolean } = {}) => {
 	const activePlayIndex = document.plays[document.activePlayIndex] ? document.activePlayIndex : 0;
 	const active = document.plays[activePlayIndex];
-	const field = renderField(active.scene, active.settings, true);
+	const field = renderField(evaluateAnimation(active, 0), active.settings, true, options.clockVisible ?? true);
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="484" viewBox="0 0 1000 484" font-family="Inter, sans-serif">
 		${field}
 	</svg>`;

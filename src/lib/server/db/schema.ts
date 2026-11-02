@@ -131,6 +131,33 @@ export const playBuilderDiagrams = sqliteTable(
 );
 
 /** First-party CasePlay accounts are deliberately separate from the legacy admin auth tables. */
+export const playBuilderExports = sqliteTable(
+	'play_builder_exports',
+	{
+		id: text('id').primaryKey(),
+		accountId: text('account_id')
+			.notNull()
+			.references(() => accounts.id, { onDelete: 'cascade' }),
+		snapshotJson: text('snapshot_json').notNull(),
+		snapshotHash: text('snapshot_hash').notNull(),
+		status: text('status', { enum: ['queued', 'rendering', 'completed', 'failed', 'expired'] }).notNull(),
+		progress: integer('progress').notNull().default(0),
+		outputPath: text('output_path'),
+		sandboxName: text('sandbox_name'),
+		error: text('error'),
+		createdAt: text('created_at').notNull(),
+		updatedAt: text('updated_at').notNull(),
+		expiresAt: text('expires_at')
+	},
+	(table) => [
+		uniqueIndex('play_builder_exports_one_active')
+			.on(table.accountId)
+			.where(sql`${table.status} IN ('queued', 'rendering')`),
+		index('play_builder_exports_account_created').on(table.accountId, table.createdAt),
+		index('play_builder_exports_snapshot').on(table.accountId, table.snapshotHash, table.status)
+	]
+);
+
 export const accounts = sqliteTable(
 	'caseplay_accounts',
 	{

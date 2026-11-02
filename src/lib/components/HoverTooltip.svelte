@@ -8,6 +8,8 @@
 
 	let {
 		text,
+		reopenOnPointerMove = false,
+		pointerPosition,
 		shortcutKeys = [],
 		cursorOffsetXPx = 24,
 		cursorOffsetYPx = 18,
@@ -20,6 +22,8 @@
 		children
 	}: {
 		text: string;
+		reopenOnPointerMove?: boolean;
+		pointerPosition?: { x: number; y: number };
 		shortcutKeys?: string[];
 		cursorOffsetXPx?: number;
 		cursorOffsetYPx?: number;
@@ -48,15 +52,17 @@
 	const positionPanel = async () => {
 		await tick();
 		if (!panel) return;
+		const anchorX = pointerPosition?.x ?? cursorX;
+		const anchorY = pointerPosition?.y ?? cursorY;
 		const position =
 			placement === 'above'
 				? {
-						left: Math.max(paddingPx, Math.min(cursorX - panel.offsetWidth / 2, window.innerWidth - panel.offsetWidth - paddingPx)),
-						top: Math.max(paddingPx, Math.min(cursorY - panel.offsetHeight - cursorOffsetYPx, window.innerHeight - panel.offsetHeight - paddingPx))
+						left: Math.max(paddingPx, Math.min(anchorX - panel.offsetWidth / 2, window.innerWidth - panel.offsetWidth - paddingPx)),
+						top: Math.max(paddingPx, Math.min(anchorY - panel.offsetHeight - cursorOffsetYPx, window.innerHeight - panel.offsetHeight - paddingPx))
 					}
 				: cursorFloatingPosition({
-						cursorX,
-						cursorY,
+						cursorX: anchorX,
+						cursorY: anchorY,
 						panelWidth: panel.offsetWidth,
 						panelHeight: panel.offsetHeight,
 						offsetX: cursorOffsetXPx,
@@ -67,6 +73,13 @@
 		top = position.top;
 	};
 
+	// Delegated tooltips can change text without entering a new wrapper.
+	$effect(() => {
+		text;
+		pointerPosition;
+		if (isOpen) void positionPanel();
+	});
+
 	const openAtPointer = (event: PointerEvent) => {
 		window.dispatchEvent(new CustomEvent('case-play-tooltip-open', { detail: tooltipId }));
 		cursorX = event.clientX;
@@ -75,7 +88,10 @@
 		positionPanel();
 	};
 	const followPointer = (event: PointerEvent) => {
-		if (!isOpen) return;
+		if (!isOpen) {
+			if (reopenOnPointerMove && text) openAtPointer(event);
+			return;
+		}
 		cursorX = event.clientX;
 		cursorY = event.clientY;
 		positionPanel();
@@ -107,6 +123,7 @@
 	class={wrapperClass}
 	role="group"
 	onpointerenter={openAtPointer}
+	onpointerover={reopenOnPointerMove ? openAtPointer : undefined}
 	onpointermove={followPointer}
 	onpointerleave={() => (isOpen = false)}
 	onfocusin={openAtFocus}

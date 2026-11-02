@@ -1,3 +1,5 @@
+import { validateAnimation, type PlayAnimation } from './play-builder-animation';
+
 export type PlayerKind = 'team-a' | 'team-k' | 'team-b' | 'team-r';
 export type OfficialKind = 'official-r' | 'official-l' | 'official-b' | 'official-f';
 export type MarkerKind = PlayerKind | OfficialKind | 'ball' | 'flag' | 'bean-bag' | 'deflag' | 'event';
@@ -33,7 +35,7 @@ export type PlayBuilderFieldSettings = {
 	fieldColor: PlayBuilderFieldColor;
 };
 export type Point = { x: number; y: number };
-export type FieldMarker = Point & { id: number; kind: MarkerKind; label?: string; sequence?: number; color?: GuideColor };
+export type FieldMarker = Point & { setupDefault?: boolean; name?: string; id: number; kind: MarkerKind; label?: string; sequence?: number; color?: GuideColor };
 export type FieldPath = {
 	id: number;
 	kind: PathKind;
@@ -45,7 +47,7 @@ export type FieldPath = {
 	/** Optional sampled points for a free-drawn Run arrow. Straight paths omit this. */
 	points?: Point[];
 };
-export type FieldGuide = { id: number; kind: GuideKind; x: number; color: GuideColor; style: GuideStyle; down?: DownMarkerValue };
+export type FieldGuide = { setupDefault?: boolean; name?: string; id: number; kind: GuideKind; x: number; color: GuideColor; style: GuideStyle; down?: DownMarkerValue };
 export type FreeStroke = { id: number; color: GuideColor; points: Point[]; width?: number };
 export type LayerType = 'guide' | 'path' | 'marker';
 export type LayerRef = { type: LayerType; id: number };
@@ -100,10 +102,10 @@ const fieldSettingKeys = [
 ] as const;
 
 type LegacyMarkerTuple = [number, number, number, number, string | null, number | null];
-type MarkerTuple = [number, number, number, number, string | null, number | null, number | null];
+type MarkerTuple = [number, number, number, number, string | null, number | null, number | null, string?, boolean?];
 type PathTuple = [number, number, number, number, number, number, number, number, number | null, number[]?];
 type LegacyGuideTuple = [number, number, number, number, number];
-type GuideTuple = [number, number, number, number, number, number | null];
+type GuideTuple = [number, number, number, number, number, number | null, string?, boolean?];
 type LegacyStrokeTuple = [number, number, number[]];
 type StrokeTuple = [number, number, number, number[]];
 type FieldSettingsTuple = [number, number, number, string?, string?, number?, number?];
@@ -119,7 +121,7 @@ export type SerializedPlayBuilderScene = {
 
 export type PlayBuilderDocument = {
 	activePlayIndex: number;
-	plays: { name: string; scene: PlayBuilderScene; settings: PlayBuilderFieldSettings }[];
+	plays: { name: string; scene: PlayBuilderScene; settings: PlayBuilderFieldSettings; animation?: PlayAnimation }[];
 };
 
 export const PLAY_BUILDER_PLAY_NAME_MAX_LENGTH = 64;
@@ -191,7 +193,8 @@ export type SerializedPlayBuilderDocument =
 	| SerializedPlayBuilderDocumentV3
 	| SerializedPlayBuilderDocumentV4
 	| SerializedPlayBuilderDocumentV5
-	| SerializedPlayBuilderDocumentV6;
+	| SerializedPlayBuilderDocumentV6
+	| { v: 7; a: number; p: [string, SerializedPlayBuilderScene, FieldSettingsTuple, PlayAnimation | null][] };
 
 const quantize = (value: number) => Math.round(value * 10);
 const dequantize = (value: number) => value / 10;
@@ -199,15 +202,19 @@ const indexOf = <T extends string>(items: readonly T[], value: T) => Math.max(0,
 
 export const encodePlayBuilderScene = (scene: PlayBuilderScene): SerializedPlayBuilderScene => ({
 	v: 1,
-	m: scene.markers.map((marker) => [
-		marker.id,
-		indexOf(markerKinds, marker.kind),
-		quantize(marker.x),
-		quantize(marker.y),
-		marker.label ?? null,
-		marker.sequence ?? null,
-		marker.color === undefined ? null : indexOf(colors, marker.color)
-	]),
+	m: scene.markers.map(
+		(marker) =>
+			[
+				marker.id,
+				indexOf(markerKinds, marker.kind),
+				quantize(marker.x),
+				quantize(marker.y),
+				marker.label ?? null,
+				marker.sequence ?? null,
+				marker.color === undefined ? null : indexOf(colors, marker.color),
+				...(marker.setupDefault !== undefined ? [marker.name ?? '', marker.setupDefault] : marker.name ? [marker.name] : [])
+			] as MarkerTuple
+	),
 	p: scene.paths.map((path) => {
 		const tuple: PathTuple = [
 			path.id,
@@ -235,14 +242,18 @@ export const encodePlayBuilderScene = (scene: PlayBuilderScene): SerializedPlayB
 		}
 		return tuple;
 	}),
-	g: scene.guides.map((guide) => [
-		guide.id,
-		indexOf(guideKinds, guide.kind),
-		quantize(guide.x),
-		indexOf(colors, guide.color),
-		indexOf(styles, guide.style),
-		guide.kind === 'line-to-gain' ? indexOf(downMarkerValues, guide.down ?? '1st') : null
-	]),
+	g: scene.guides.map(
+		(guide) =>
+			[
+				guide.id,
+				indexOf(guideKinds, guide.kind),
+				quantize(guide.x),
+				indexOf(colors, guide.color),
+				indexOf(styles, guide.style),
+				guide.kind === 'line-to-gain' ? indexOf(downMarkerValues, guide.down ?? '1st') : null,
+				...(guide.setupDefault !== undefined ? [guide.name ?? '', guide.setupDefault] : guide.name ? [guide.name] : [])
+			] as GuideTuple
+	),
 	f: scene.freeStrokes.map((stroke) => {
 		const points: number[] = [];
 		let previousX = 0;
@@ -275,7 +286,7 @@ export const decodePlayBuilderScene = (value: unknown): PlayBuilderScene => {
 	const markers = scene.m.map((item) => {
 		if (
 			!Array.isArray(item) ||
-			(item.length !== 6 && item.length !== 7) ||
+			(item.length !== 6 && item.length !== 7 && item.length !== 8 && item.length !== 9) ||
 			!validInteger(item[0]) ||
 			!validIndex(item[1], markerKinds.length) ||
 			!validCoordinate(item[2]) ||
@@ -289,7 +300,11 @@ export const decodePlayBuilderScene = (value: unknown): PlayBuilderScene => {
 		const maximumLabelLength = kind === 'event' ? 40 : 24;
 		if (label !== null && (typeof label !== 'string' || label.length > maximumLabelLength)) throw new Error('Invalid marker label.');
 		if (sequence !== null && !validInteger(sequence)) throw new Error('Invalid marker sequence.');
-		const colorIndex = item.length === 7 ? item[6] : null;
+		const colorIndex = item.length >= 7 ? (item[6] ?? null) : null;
+		const name = item.length >= 8 ? item[7] : undefined;
+  const setupDefault = item.length === 9 ? item[8] : undefined;
+  if (setupDefault !== undefined && typeof setupDefault !== 'boolean') throw new Error('Invalid setup marker.');
+		if (name !== undefined && (typeof name !== 'string' || name.length > 64)) throw new Error('Invalid object name.');
 		if (colorIndex !== null && !validIndex(colorIndex, colors.length)) throw new Error('Invalid marker color.');
 		return {
 			id: item[0],
@@ -298,7 +313,9 @@ export const decodePlayBuilderScene = (value: unknown): PlayBuilderScene => {
 			y: dequantize(item[3]),
 			...(label === null ? {} : { label }),
 			...(sequence === null ? {} : { sequence }),
-			...(colorIndex === null ? {} : { color: colors[colorIndex] })
+			...(colorIndex === null ? {} : { color: colors[colorIndex] }),
+			...(name ? { name } : {}),
+   ...(setupDefault === undefined ? {} : { setupDefault })
 		};
 	});
 	const paths = scene.p.map((item) => {
@@ -344,24 +361,30 @@ export const decodePlayBuilderScene = (value: unknown): PlayBuilderScene => {
 	let guides = scene.g.map((item) => {
 		if (
 			!Array.isArray(item) ||
-			(item.length !== 5 && item.length !== 6) ||
+			(item.length !== 5 && item.length !== 6 && item.length !== 7 && item.length !== 8) ||
 			!validInteger(item[0]) ||
 			!validIndex(item[1], guideKinds.length) ||
 			!validCoordinate(item[2]) ||
 			!validIndex(item[3], colors.length) ||
 			!validIndex(item[4], styles.length) ||
-			(item.length === 6 && item[5] !== null && !validIndex(item[5], downMarkerValues.length))
+			(item.length >= 6 && item[5] !== null && !validIndex(item[5], downMarkerValues.length))
 		) {
 			throw new Error('Invalid guide data.');
 		}
 		const kind = guideKinds[item[1]];
+		const name = item.length >= 7 ? item[6] : undefined;
+  const setupDefault = item.length === 8 ? item[7] : undefined;
+  if (setupDefault !== undefined && typeof setupDefault !== 'boolean') throw new Error('Invalid setup guide.');
+		if (name !== undefined && (typeof name !== 'string' || name.length > 64)) throw new Error('Invalid object name.');
 		return {
 			id: item[0],
 			kind,
 			x: dequantize(item[2]),
 			color: colors[item[3]],
 			style: styles[item[4]],
-			down: kind === 'line-to-gain' && item.length === 6 && item[5] !== null ? downMarkerValues[item[5]] : kind === 'line-to-gain' ? '1st' : undefined
+			...(name ? { name } : {}),
+   ...(setupDefault === undefined ? {} : { setupDefault }),
+			down: kind === 'line-to-gain' && item.length >= 6 && item[5] != null ? downMarkerValues[item[5]] : kind === 'line-to-gain' ? '1st' : undefined
 		};
 	});
 	const latestLineToGainId = guides.filter((guide) => guide.kind === 'line-to-gain').at(-1)?.id;
@@ -476,9 +499,9 @@ const decodeFieldSettings = (
 };
 
 export const encodePlayBuilderDocument = (document: PlayBuilderDocument): SerializedPlayBuilderDocument => ({
-	v: 6,
+	v: 7,
 	a: document.activePlayIndex,
-	p: document.plays.map((play) => [play.name, encodePlayBuilderScene(play.scene), encodeFieldSettings(play.settings)])
+	p: document.plays.map((play) => [play.name, encodePlayBuilderScene(play.scene), encodeFieldSettings(play.settings), play.animation ?? null])
 });
 
 export const decodePlayBuilderDocument = (value: unknown): PlayBuilderDocument => {
@@ -488,7 +511,7 @@ export const decodePlayBuilderDocument = (value: unknown): PlayBuilderDocument =
 	if (!value || typeof value !== 'object') throw new Error('Invalid play builder document.');
 	const document = value as Partial<SerializedPlayBuilderDocument>;
 	if (
-		(document.v !== 2 && document.v !== 3 && document.v !== 4 && document.v !== 5 && document.v !== 6) ||
+		(document.v !== 2 && document.v !== 3 && document.v !== 4 && document.v !== 5 && document.v !== 6 && document.v !== 7) ||
 		!Number.isInteger(document.a) ||
 		!Array.isArray(document.p) ||
 		document.p.length < 1 ||
@@ -498,14 +521,16 @@ export const decodePlayBuilderDocument = (value: unknown): PlayBuilderDocument =
 	}
 	if (Number(document.a) < 0 || Number(document.a) >= document.p.length) throw new Error('Invalid active play.');
 	const plays = document.p.map((item) => {
-		const expectedLength = document.v === 2 ? 2 : 3;
+		const expectedLength = document.v === 2 ? 2 : document.v === 7 ? 4 : 3;
 		if (!Array.isArray(item) || item.length !== expectedLength || typeof item[0] !== 'string') throw new Error('Invalid play data.');
 		const name = item[0].trim();
 		if (name.length < 1 || name.length > PLAY_BUILDER_PLAY_NAME_MAX_LENGTH)
 			throw new Error(`Play names must be between 1 and ${PLAY_BUILDER_PLAY_NAME_MAX_LENGTH} characters.`);
+		const scene = decodePlayBuilderScene(item[1]);
 		return {
 			name,
-			scene: decodePlayBuilderScene(item[1]),
+			scene,
+			animation: document.v === 7 && item[3] !== null ? validateAnimation(item[3], scene) : undefined,
 			settings:
 				document.v === 2
 					? defaultPlayBuilderFieldSettings()

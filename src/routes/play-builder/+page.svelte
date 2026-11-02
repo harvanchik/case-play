@@ -89,7 +89,6 @@
 						</p> -->
 					</header>
 					<FlagFootballPlayBuilder
-						bind:adsEnabled
 						accountSessionActive={Boolean(data?.accountUser)}
 						accountCsrfToken={data?.accountCsrfToken ?? null}
 					/>

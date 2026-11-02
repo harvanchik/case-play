@@ -70,6 +70,28 @@
 	} from '$lib/flag-football-play-builder-definition';
 	import HoverTooltip from './HoverTooltip.svelte';
 	import BuilderActionButton from './play-builder/BuilderActionButton.svelte';
+	import AnimationPanel from './play-builder/AnimationPanel.svelte';
+	import MarkerArtwork from './play-builder/MarkerArtwork.svelte';
+	import AnimationOverlay from './play-builder/AnimationOverlay.svelte';
+ import AnimationIcon from './play-builder/AnimationIcon.svelte';
+ import { startAnimationTutorial as launchAnimationTutorial } from '$lib/play-builder-animation-tutorial';
+ import { createKeyboardScrubber } from '$lib/play-builder-keyboard-scrub';
+	import {
+		animationDuration,
+        appendAnimationStep,
+		applyAnimationStep,
+		captureAnimationEdits,
+ evaluateAnimationClock,
+		cloneAnimation,
+		createAnimation,
+		defaultMotion,
+		evaluateAnimation,
+		sameTarget as sameAnimationTarget,
+		stepTime,
+		type AnimationTarget,
+		type Motion,
+		type PlayAnimation
+	} from '$lib/play-builder-animation';
 	import BuilderToggleCard from './play-builder/BuilderToggleCard.svelte';
 	import ColorSwatchPalette from './play-builder/ColorSwatchPalette.svelte';
 	import FieldSideToggle from './play-builder/FieldSideToggle.svelte';
@@ -145,7 +167,6 @@
 	export let savedPlayId: string | null = null;
 	export let exportPrompt: string | null = null;
 	export let exportPromptSource: HTMLElement | null = null;
-	export let adsEnabled = false;
 	export let accountOwnedByCurrentUser = false;
 	export let accountSessionActive = false;
 	export let accountCsrfToken: string | null = null;
@@ -227,8 +248,13 @@
 	const blankScene = (): Scene => ({ markers: [], paths: [], guides: [], freeStrokes: [], layerOrder: [] });
 	const loadedDocument = initialDocument
 		? decodePlayBuilderDocument(initialDocument)
-		: { activePlayIndex: 0, plays: [{ name: 'Play 1', scene: blankScene(), settings: defaultPlayBuilderFieldSettings() }] };
-	type PlayEntry = { id: number; name: string; scene: Scene; settings: PlayBuilderFieldSettings };
+		: {
+				activePlayIndex: 0,
+				plays: [
+					{ name: 'Play 1', scene: blankScene(), settings: defaultPlayBuilderFieldSettings(), animation: undefined as PlayAnimation | undefined }
+				]
+			};
+	type PlayEntry = { id: number; name: string; scene: Scene; settings: PlayBuilderFieldSettings; animation?: PlayAnimation };
 	type BuilderState = {
 		plays: PlayEntry[];
 		activePlayId: number;
@@ -236,11 +262,13 @@
 		nextPlayNumber: number;
 		laserDrawings: LaserDrawing[];
 		selectedTargets: SelectedTarget[];
+		animationStep: number;
 	};
 	let playEntries: PlayEntry[] = loadedDocument.plays.map((play, index) => ({
 		id: index + 1,
 		name: play.name,
 		scene: play.scene,
+		animation: play.animation ? cloneAnimation(play.animation) : undefined,
 		settings: { ...play.settings }
 	}));
 	let activePlayIndex = loadedDocument.activePlayIndex;
@@ -253,8 +281,27 @@
 				return match ? Number(match[1]) : 0;
 			})
 		) + 1;
-	const loadedScene = playEntries[activePlayIndex].scene;
-	const loadedIds = [...loadedScene.markers, ...loadedScene.paths, ...loadedScene.guides, ...loadedScene.freeStrokes].map((item) => item.id);
+	let animation = playEntries[activePlayIndex].animation;
+	let animationBaseScene = structuredClone(playEntries[activePlayIndex].scene);
+	let animationOpen = false;
+	let animationStep = 0;
+	let animationPlaying = false;
+	let animationPreview = false;
+	let animationTime = 0;
+	let animationRate = 1;
+ let animationShuttleRate = 0;
+	let animationLoop = false;
+	let animationGhosts = true;
+	let animationDrawingRoute = false;
+	let animationFrame: number | null = null;
+	let animationLastFrame = 0;
+	let animationDockLeft = 12;
+	let animationDockWidth = 720;
+	let animationContent: { scene: Scene; animation?: PlayAnimation };
+	const loadedScene = animation ? applyAnimationStep(animationBaseScene, animation.steps[0]) : animationBaseScene;
+	const loadedIds = [...animationBaseScene.markers, ...animationBaseScene.paths, ...animationBaseScene.guides, ...animationBaseScene.freeStrokes].map(
+		(item) => item.id
+	);
 	let svg: SVGSVGElement;
 	let tool: ActiveTool = 'team-a';
 	let markers: FieldMarker[] = loadedScene.markers;
@@ -273,16 +320,18 @@
 	// Saved links remain editable in the browser holding their private edit token.
 	$: viewOnly = !canEditSavedPlay;
 	let ownershipResolved = savedPlayId === null || accountSessionActive;
-	let saveFeedbackState: 'idle' | 'saved' = 'idle';
+	let saveFeedbackState: 'idle' | 'saved' | 'failed' = 'idle';
 	let saveActionLabel = '';
 	$: saveActionLabel = !ownershipResolved
 		? ''
 		: actionInProgress === 'save'
 			? 'Saving'
-			: saveFeedbackState === 'saved'
+			: saveFeedbackState === 'failed'
+                ? 'Failed!'
+            : saveFeedbackState === 'saved'
 				? 'Saved'
 				: savedPlayId && !canEditSavedPlay
-					? 'Make Copy'
+					? 'Duplicate'
 					: 'Save';
 	let showShare = false;
 	let shareUrl = '';
@@ -303,8 +352,14 @@
 	let diagramModalMaxHeight = 0;
 	let tutorialDriver: Driver | null = null;
 	let tutorialActive = false;
+ let animationTutorialActive = false;
+ let animationTutorialKeys: 'none' | 'playback' | 'steps' = 'none';
 	let tutorialStepIndex = 0;
 	let tutorialButtonBouncing = false;
+ let animationLaunchBouncing = false;
+ let animationTutorialAttention = false;
+ const animationOpenedKey = 'caseplay-animation-opened-v1';
+ const animationTutorialSeenKey = 'caseplay-animation-tutorial-seen-v1';
 	let activeTutorialSteps: TutorialStep[] = [];
 	let tutorialSkipping = false;
 	let tutorialAutoPlacementIndex = 0;
@@ -325,6 +380,8 @@
 	let exportSettingsHydrated = false;
 	let toolPreferencesHydrated = false;
 	let builderPreferencesHydrated = false;
+ let extendedGrassEnabled = false;
+ let extendedGrassBounds = { width: 1000, height: 700, x: 0, y: 0 };
 	let autoSaveEnabled = false;
 	let draftsEnabled = true;
 	let snappingEnabled = true;
@@ -335,6 +392,8 @@
 	let exportSettingsTop = 8;
 	let exportSettingsRight = 8;
 	let showNewPrompt = false;
+ let showSetupConfirm = false;
+ let setupCancelButton: HTMLButtonElement;
 	let newPromptCloseButton: HTMLButtonElement;
 	let restoreDraftButton: HTMLButtonElement;
 	let editingPlayId: number | null = null;
@@ -548,7 +607,7 @@
 					snapping: snappingEnabled,
 					highContrast: highContrastEnabled,
 					showYardLineCursor: showYardLineCursorEnabled,
-					ads: adsEnabled
+					extendedGrass: extendedGrassEnabled
 				})
 			);
 		} catch {
@@ -563,12 +622,20 @@
 					y: (pathStart(editingPath).y + editingPath.end.y) / 2
 				}
 			: null;
+ $: animatedClock = evaluateAnimationClock(fieldSettings.gameClockSeconds, animation && (animationOpen || animationPreview || viewOnly) ? animationTime : 0);
+	$: if (animation && !animationPreview) syncCarriedBalls(animation, animationStep, markers);
+	$: animationContent = animation
+		? animationPreview
+			? { scene: animationBaseScene, animation }
+			: captureAnimationEdits(animationBaseScene, { markers, paths, guides, freeStrokes, layerOrder }, animation, animationStep)
+		: { scene: { markers, paths, guides, freeStrokes, layerOrder }, animation: undefined };
 	$: currentSceneKey = JSON.stringify(
 		encodePlayBuilderDocument({
 			activePlayIndex,
 			plays: playEntries.map((play, index) => ({
 				name: play.name,
-				scene: index === activePlayIndex ? { markers, paths, guides, freeStrokes, layerOrder } : play.scene,
+				scene: index === activePlayIndex ? animationContent.scene : play.scene,
+				animation: index === activePlayIndex ? animationContent.animation : play.animation,
 				settings: index === activePlayIndex ? fieldSettings : play.settings
 			}))
 		})
@@ -912,6 +979,7 @@
 	];
 	$: fieldLayout = fieldLayouts[fieldSettings.fieldType];
 	$: fieldPalette = fieldColorOptions.find((option) => option.id === fieldSettings.fieldColor) ?? fieldColorOptions[0];
+ $: extendedGrassColor = `rgb(${[1, 3, 5].map(index => Math.round(parseInt(fieldPalette.endZone.slice(index, index + 2), 16) * .8)).join(', ')})`;
 	$: currentFieldDefaults = { ...DEFAULT_PLAY_BUILDER_FIELD_SETTINGS, fieldType: fieldSettings.fieldType };
 	$: fieldSettingsAreDefault = JSON.stringify(fieldSettings) === JSON.stringify(currentFieldDefaults);
 	$: fieldWidth = Math.min(fieldMaxWidth, fieldMaxHeight * (fieldLayout.totalYards / fieldLayout.widthYards));
@@ -1015,6 +1083,7 @@
 		x: Math.max(fieldLeft, Math.min(fieldRight, x)),
 		y: Math.max(fieldTop, Math.min(fieldBottom, y))
 	});
+ const clampOfficialPoint = ({x,y}:Point):Point => ({x:Math.max(0,Math.min(1000,x)),y:Math.max(0,Math.min(484,y))});
 	const sidelineMarkerBounds = () => {
 		if (!fieldLayout.teamBox) return { top: fieldTop, bottom: fieldBottom };
 		const setback = fieldLayout.teamBoxSetbackYards * (fieldWidth / fieldLayout.totalYards);
@@ -1201,6 +1270,160 @@
 		freeStrokes: freeStrokes.map((stroke) => ({ ...stroke, points: stroke.points.map((point) => ({ ...point })) })),
 		layerOrder: layerOrder.map((layer) => ({ ...layer }))
 	});
+	const currentAnimationContent = () =>
+		animation
+			? animationPreview
+				? { scene: cloneScene(animationBaseScene), animation: cloneAnimation(animation) }
+				: captureAnimationEdits(animationBaseScene, sceneSnapshot(), animation, animationStep)
+			: { scene: sceneSnapshot(), animation: undefined };
+	const syncCarriedBalls = (value: PlayAnimation, index: number, currentMarkers: FieldMarker[]) => {
+		let changed = false;
+		const next = currentMarkers.map((marker) => {
+			const pose = value.steps[index]?.poses.find((item) => item.type === 'marker' && item.id === marker.id);
+			const carrier = pose?.carrierId === undefined ? undefined : currentMarkers.find((item) => item.id === pose.carrierId);
+			if (!carrier || !pose) return marker;
+			const x = carrier.x + (pose.offset?.x ?? 12),
+				y = carrier.y + (pose.offset?.y ?? 8);
+			if (marker.x === x && marker.y === y) return marker;
+			changed = true;
+			return { ...marker, x, y };
+		});
+		if (changed) markers = next;
+	};
+	const pauseAnimation = () => {
+        animationShuttleRate = 0;
+		animationPlaying = false;
+		if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+		animationFrame = null;
+	};
+	const commitAnimation = () => {
+		const content = currentAnimationContent();
+		animationBaseScene = content.scene;
+		animation = content.animation;
+	};
+	const selectAnimationStep = (index: number) => {
+		if (!animation?.steps[index]) return;
+		const selection = selectedTargets.map((target) => ({ ...target }));
+		pauseAnimation();
+		commitAnimation();
+		animationStep = index;
+		animationPreview = false;
+		animationDrawingRoute = false;
+		animationTime = stepTime(animation!, index);
+		applyScene(applyAnimationStep(animationBaseScene, animation!.steps[index]));
+		selectedTargets = selection.filter(targetExists);
+		refreshSelectionUi();
+	};
+	const changeAnimation = (next: PlayAnimation, index = animationStep) => {
+		if (viewOnly) return;
+		saveHistory();
+		const content = currentAnimationContent();
+		animationBaseScene = content.scene;
+		animation = cloneAnimation(next);
+		animationPreview = true; // select must not capture the previous step into the replacement.
+		selectAnimationStep(Math.min(index, next.steps.length - 1));
+	};
+ // Keep floating controls outside the page's isolated stacking and clipping contexts.
+ const animationPortal = (node: HTMLElement) => {
+  document.body.appendChild(node);
+  return { destroy: () => node.remove() };
+ };
+	const openAnimation = () => {
+		if (viewOnly) return;
+		if (!animation) {
+			saveHistory();
+			animationBaseScene = sceneSnapshot();
+			animation = createAnimation(animationBaseScene);
+		}
+		animationOpen = true;
+        animationLaunchBouncing = false;
+        try { localStorage.setItem(animationOpenedKey, '1'); } catch {}
+		tool = 'select';
+        toolbarEditorTool = null;
+        hoverPoint = null;
+        clearPlacementSnap();
+        selectedTargets = [];
+        refreshSelectionUi();
+	};
+	const closeAnimation = () => {
+		selectAnimationStep(0);
+		animationOpen = false;
+	};
+	const showAnimationTime = (time: number) => {
+		if (!animation) return;
+		animationTime = Math.max(0, Math.min(animationDuration(animation), time));
+		animationPreview = true;
+		animationDrawingRoute = false;
+  if(tool!=='laser' && tool!=='free-draw') {tool='select'; toolbarEditorTool=null; hoverPoint=null;clearPlacementSnap();}
+  if(selectedTargets.length) {selectedTargets=[]; refreshSelectionUi();}
+			applyScene(evaluateAnimation({ scene: animationBaseScene, animation }, animationTime));
+	};
+	const seekAnimation = (time: number) => {
+		pauseAnimation();
+		commitAnimation();
+  const snappedStep = animation?.steps.findIndex((_, index) => Math.abs(stepTime(animation!, index) - time) < 0.00001) ?? -1;
+  if (snappedStep >= 0) selectAnimationStep(snappedStep);
+  else showAnimationTime(time);
+	};
+	const animateFrame = (now: number) => {
+		if ((!animationPlaying && !animationShuttleRate) || !animation) return;
+		const duration = animationDuration(animation);
+		const next = animationTime + ((now - animationLastFrame) / 1000) * (animationShuttleRate || animationRate);
+		animationLastFrame = now;
+		showAnimationTime(!animationShuttleRate && animationLoop && next >= duration ? next % duration : next);
+		if (!animationShuttleRate && next >= duration && !animationLoop) {
+			selectAnimationStep(animation.steps.length - 1);
+			return;
+		}
+		animationFrame = requestAnimationFrame(animateFrame);
+	};
+ const shuttleAnimation = (direction: number) => {
+  if (!animation) return;
+  if (direction && animationShuttleRate === direction * 2) return;
+  if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+  animationFrame = null;
+  if (direction) commitAnimation();
+  animationShuttleRate = direction * 2;
+  animationLastFrame = performance.now();
+  if (animationPlaying || animationShuttleRate) animationFrame = requestAnimationFrame(animateFrame);
+  else {
+   const index = animation.steps.findIndex((_, i) => Math.abs(stepTime(animation!, i) - animationTime) < .00001);
+   if (index >= 0) selectAnimationStep(index);
+  }
+ };
+	const toggleAnimationPlayback = () => {
+		if (animationPlaying) {
+			pauseAnimation();
+			return;
+		}
+		if (!animation || !animationDuration(animation)) return;
+		commitAnimation();
+		if (animationTime >= animationDuration(animation)) animationTime = 0;
+		animationPlaying = true;
+		animationLastFrame = performance.now();
+		animationFrame = requestAnimationFrame(animateFrame);
+	};
+	const updateAnimationMotion = (motion: Motion) => {
+		if (!animation) return;
+		const next = currentAnimationContent().animation!;
+		const transition = next.transitions[Math.max(0, animationStep - 1)];
+		if (!transition) return;
+		transition.motions = [...transition.motions.filter((item) => !sameAnimationTarget(item, motion)), motion];
+		const drawing = animationDrawingRoute;
+		changeAnimation(next);
+		animationDrawingRoute = drawing;
+	};
+ const renameAnimationObject = (target: AnimationTarget, value: string) => {
+  if (viewOnly || !animation || animationPreview) return;
+  saveHistory();
+  const name = value.trim().slice(0,64) || undefined;
+  if (target.type === 'marker') markers = markers.map(marker => marker.id === target.id ? {...marker,name} : marker);
+  else guides = guides.map(guide => guide.id === target.id ? {...guide,name} : guide);
+ };
+ const selectAnimationObject = (target: AnimationTarget) => {
+  if(viewOnly || animationPreview) return;
+  selectedTargets=[target];tool='select';toolbarEditorTool=null;refreshSelectionUi();
+ };
 	const clearEditorState = () => {
 		editingMarkerId = null;
 		editingGuideId = null;
@@ -1274,7 +1497,10 @@
 	const builderSnapshot = (): BuilderState => ({
 		plays: playEntries.map((play, index) => ({
 			...play,
-			scene: cloneScene(index === activePlayIndex ? sceneSnapshot() : play.scene),
+			scene: cloneScene(index === activePlayIndex ? animationContent.scene : play.scene),
+			animation: (index === activePlayIndex ? animationContent.animation : play.animation)
+				? cloneAnimation((index === activePlayIndex ? animationContent.animation : play.animation)!)
+				: undefined,
 			settings: { ...(index === activePlayIndex ? fieldSettings : play.settings) }
 		})),
 		activePlayId: playEntries[activePlayIndex]?.id ?? playEntries[0].id,
@@ -1288,7 +1514,8 @@
 				appearedAt: null,
 				points: drawing.points.map((point) => ({ ...point }))
 			})),
-		selectedTargets: selectedTargets.map((target) => ({ ...target }))
+		selectedTargets: selectedTargets.map((target) => ({ ...target })),
+		animationStep
 	});
 	const pushBuilderState = (stack: BuilderState[], state: BuilderState) => [...stack.slice(-29), state];
 	const saveHistory = () => {
@@ -1296,14 +1523,20 @@
 		future = [];
 	};
 	const syncActivePlayUrl = (index = activePlayIndex) => {
-		if (!savedPlayId || typeof window === 'undefined') return;
+		if (animationTutorialActive || !savedPlayId || typeof window === 'undefined') return;
 		const url = new URL(window.location.href);
 		if (playEntries.length > 1) url.searchParams.set('play', String(index + 1));
 		else url.searchParams.delete('play');
 		replaceState(`${url.pathname}${url.search}${url.hash}`, {});
 	};
 	const applyBuilderState = (state: BuilderState) => {
-		playEntries = state.plays.map((play) => ({ ...play, scene: cloneScene(play.scene), settings: { ...play.settings } }));
+		pauseAnimation();
+		playEntries = state.plays.map((play) => ({
+			...play,
+			scene: cloneScene(play.scene),
+			animation: play.animation ? cloneAnimation(play.animation) : undefined,
+			settings: { ...play.settings }
+		}));
 		nextPlayEntryId = state.nextPlayEntryId;
 		nextPlayNumber = state.nextPlayNumber;
 		const now = performance.now();
@@ -1345,7 +1578,13 @@
 		syncActivePlayUrl(index);
 		fieldSettings = { ...playEntries[index].settings };
 		nextId = maxSceneId(playEntries[index].scene) + 1;
-		applyScene(playEntries[index].scene);
+		animation = playEntries[index].animation;
+		if (!animation) animationOpen = false;
+		animationBaseScene = cloneScene(playEntries[index].scene);
+		animationStep = Math.min(state.animationStep ?? 0, (animation?.steps.length ?? 1) - 1);
+		animationPreview = false;
+		animationTime = animation ? stepTime(animation, animationStep) : 0;
+		applyScene(animation ? applyAnimationStep(animationBaseScene, animation.steps[animationStep]) : animationBaseScene);
 		selectedTargets = (state.selectedTargets ?? []).filter(targetExists);
 		refreshSelectionUi();
 		void tick().then(() => {
@@ -1355,18 +1594,25 @@
 		});
 	};
 	const storeActivePlayState = () => {
-		playEntries = playEntries.map((play, index) =>
-			index === activePlayIndex ? { ...play, scene: sceneSnapshot(), settings: { ...fieldSettings } } : play
-		);
+		const content = currentAnimationContent();
+		playEntries = playEntries.map((play, index) => (index === activePlayIndex ? { ...play, ...content, settings: { ...fieldSettings } } : play));
 	};
 	const loadPlayAtIndex = (index: number, updateUrl = true) => {
 		const play = playEntries[index];
 		if (!play) return;
+		pauseAnimation();
+		animation = play.animation ? cloneAnimation(play.animation) : undefined;
+		if (!animation) animationOpen = false;
+		animationBaseScene = cloneScene(play.scene);
+		animationStep = 0;
+		animationTime = 0;
+		animationPreview = false;
+		animationDrawingRoute = false;
 		activePlayIndex = index;
 		if (updateUrl) syncActivePlayUrl(index);
 		fieldSettings = { ...play.settings };
 		nextId = maxSceneId(play.scene) + 1;
-		applyScene(play.scene);
+		applyScene(animation ? applyAnimationStep(animationBaseScene, animation.steps[0]) : play.scene);
 		void tick().then(() => {
 			playStripElement?.querySelector<HTMLElement>(`[data-play-id="${play.id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 		});
@@ -1412,6 +1658,19 @@
 		playEntries = [...playEntries, play];
 		loadPlayAtIndex(playEntries.length - 1);
 	};
+ const createPlayFromStep = (index: number) => {
+  if (viewOnly || !animation?.steps[index] || playEntries.length >= PLAY_BUILDER_MAX_PLAYS) return;
+  commitAnimation();
+  const source = currentAnimationContent();
+  const step = source.animation!.steps[index];
+  const scene = cloneScene(applyAnimationStep(source.scene, step));
+  saveHistory();
+  storeActivePlayState();
+  const playNumber = nextDefaultPlayNumber();
+  nextPlayNumber = playNumber + 1;
+  playEntries = [...playEntries, { id: nextPlayEntryId++, name: uniquePlayName(`Play ${playNumber}`), scene, settings: { ...fieldSettings } }];
+  loadPlayAtIndex(playEntries.length - 1);
+ };
 	const openPlayMenu = async (event: MouseEvent, playId: number) => {
 		event.preventDefault();
 		event.stopPropagation();
@@ -1455,6 +1714,7 @@
 			id: nextPlayEntryId++,
 			name: uniquePlayName(`${source.name} Copy`),
 			scene: cloneScene(source.scene),
+			animation: source.animation ? cloneAnimation(source.animation) : undefined,
 			settings: { ...source.settings }
 		};
 		playEntries = [...playEntries.slice(0, sourceIndex + 1), duplicate, ...playEntries.slice(sourceIndex + 1)];
@@ -1499,10 +1759,14 @@
 		activeFreeStroke = null;
 		layerOrder = [];
 	};
+ const persistPreviewDrawings = () => {
+  if(animation && animationPreview) animationBaseScene={...animationBaseScene,freeStrokes:freeStrokes.map(stroke=>({...stroke,points:stroke.points.map(point=>({...point}))}))};
+ };
 	const discardFreeDrawings = () => {
 		clearEditorState();
 		clearDeleteState();
 		freeStrokes = [];
+ persistPreviewDrawings();
 		activeFreeStroke = null;
 		erasingFreeStrokes = false;
 		eraseHistorySaved = false;
@@ -1526,7 +1790,8 @@
 			activePlayIndex,
 			plays: playEntries.map((play, index) => ({
 				name: play.name,
-				scene: index === activePlayIndex ? sceneSnapshot() : play.scene,
+				scene: index === activePlayIndex ? currentAnimationContent().scene : play.scene,
+				animation: index === activePlayIndex ? currentAnimationContent().animation : play.animation,
 				settings: index === activePlayIndex ? fieldSettings : play.settings
 			}))
 		});
@@ -1543,7 +1808,7 @@
 		}
 	};
 	const scheduleLocalDraft = (_sceneKey: string, unsaved: boolean) => {
-		if (!draftHydrated || viewOnly || !draftsEnabled || accountSessionActive) return;
+		if (!draftHydrated || viewOnly || !draftsEnabled || accountSessionActive || animationTutorialActive) return;
 		if (draftSaveTimer) clearTimeout(draftSaveTimer);
 		draftSaveTimer = null;
 		if (!unsaved) {
@@ -1566,6 +1831,7 @@
 			id: index + 1,
 			name: play.name,
 			scene: cloneScene(play.scene),
+			animation: play.animation ? cloneAnimation(play.animation) : undefined,
 			settings: { ...play.settings }
 		}));
 		activePlayIndex = decoded.activePlayIndex;
@@ -1575,7 +1841,7 @@
 		future = [];
 		fieldSettings = { ...playEntries[activePlayIndex].settings };
 		nextId = maxSceneId(playEntries[activePlayIndex].scene) + 1;
-		applyScene(playEntries[activePlayIndex].scene);
+		loadPlayAtIndex(activePlayIndex, false);
 	};
 	const restorePendingDraft = () => {
 		if (!pendingDraft) return;
@@ -1659,11 +1925,14 @@
 		saveFeedbackState = 'saved';
 	};
 	const savePlay = async (): Promise<boolean> => {
-		if (actionInProgress || !ownershipResolved || !hasUnsavedChanges) return false;
+		if (actionInProgress || !ownershipResolved || !hasUnsavedChanges || animationTutorialActive) return false;
 		const documentToSave = currentSerializedDocument();
 		const savedDocumentKey = JSON.stringify(documentToSave);
 		actionInProgress = 'save';
+        saveFeedbackState = 'idle';
 		lastSaveAttemptAt = Date.now();
+        const startedAt = lastSaveAttemptAt;
+        const minimumSavingTime = () => new Promise<void>(resolve => setTimeout(resolve, Math.max(0, 1000 - (Date.now() - startedAt))));
 		showPendingActionMessage(canEditSavedPlay ? 'Saving…' : 'Making copy…');
 		try {
 			const editToken = savedPlayId && !accountOwnedByCurrentUser ? editTokenForPlay(savedPlayId) : null;
@@ -1674,6 +1943,7 @@
 					body: JSON.stringify({ document: documentToSave, ...(editToken ? { editToken } : {}) })
 				});
 				if (response.ok) {
+                    await minimumSavingTime();
 					canEditSavedPlay = true;
 					savedSceneKey = savedDocumentKey;
 					clearLocalDraft();
@@ -1687,6 +1957,7 @@
 				}
 			}
 			const id = await createSavedPlay(documentToSave);
+            await minimumSavingTime();
 			canEditSavedPlay = true;
 			savedSceneKey = savedDocumentKey;
 			clearLocalDraft();
@@ -1699,6 +1970,8 @@
 			await goto(`/diagram/flag-football/${id}${playQuery}`, { replaceState: true, keepFocus: true, noScroll: true });
 			return true;
 		} catch (error) {
+            await minimumSavingTime();
+            saveFeedbackState = 'failed';
 			showActionMessage(error instanceof Error ? error.message : 'Unable to save play.');
 			return false;
 		} finally {
@@ -1916,6 +2189,8 @@
 	};
 	const exportImage = async (format: 'png' | 'jpg' | 'webp' | 'pdf') => {
 		if (actionInProgress) return;
+		pauseAnimation();
+		const animationRestore = { step: animationStep, time: animationTime, preview: animationPreview, scene: sceneSnapshot() };
 		actionInProgress = format;
 		showPendingActionMessage(`Preparing ${format.toUpperCase()}…`);
 		let restorePlayId: number | null = null;
@@ -1931,6 +2206,10 @@
 				const canvases: HTMLCanvasElement[] = [];
 				for (let index = 0; index < playEntries.length; index += 1) {
 					loadPlayAtIndex(index, false);
+					if (playEntries[index].id === restorePlayId && animation) {
+						animationPreview = true;
+						applyScene(animationRestore.scene);
+					}
 					await tick();
 					await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 					canvases.push(
@@ -1950,6 +2229,12 @@
 				const restoreIndex = playEntries.findIndex((play) => play.id === restorePlayId);
 				if (restoreIndex >= 0) {
 					loadPlayAtIndex(restoreIndex, false);
+					if (animation) {
+						animationStep = animationRestore.step;
+						animationTime = animationRestore.time;
+						animationPreview = animationRestore.preview;
+						applyScene(animationRestore.scene);
+					}
 					await tick();
 				}
 			}
@@ -2084,9 +2369,9 @@
 	const isOfficialMarker = (marker: FieldMarker): marker is FieldMarker & { kind: OfficialKind } => isOfficialKind(marker.kind);
 	const isSidelineMarkerKind = (kind: MarkerKind | ActiveTool) => playerKinds.includes(kind as PlayerKind) || isOfficialKind(kind);
 	const pointForActiveTool = (point: Point) =>
-		tool === 'laser' ? point : isSidelineMarkerKind(tool) ? clampSidelineMarkerPoint(point) : clampPoint(point);
+		tool === 'laser' ? point : isOfficialKind(tool) ? clampOfficialPoint(point) : isSidelineMarkerKind(tool) ? clampSidelineMarkerPoint(point) : clampPoint(point);
 	const isPointInActiveToolArea = (point: Point) =>
-		tool === 'laser'
+		(tool === 'laser' || isOfficialKind(tool))
 			? point.x >= 0 && point.x <= 1000 && point.y >= 0 && point.y <= 484
 			: isSidelineMarkerKind(tool)
 				? isPointInSidelineMarkerArea(point)
@@ -2148,7 +2433,7 @@
 			const playerKind = kind as PlayerKind;
 			const sequence = nextPlayerSequence(playerKind);
 			return {
-				id: nextId++,
+				id: nextId++, setupDefault: false,
 				kind,
 				sequence,
 				color: playerPlacementColors[playerKind],
@@ -2156,10 +2441,10 @@
 				...point
 			};
 		}
-		if (kind === 'event') return { id: nextId++, kind, label: 'EVENT', ...point };
-		if (kind === 'deflag') return { id: nextId++, kind, color: deflagPlacementColor, ...point };
-		if (kind === 'bean-bag') return { id: nextId++, kind, color: beanBagPlacementColor, ...point };
-		return { id: nextId++, kind, ...point };
+		if (kind === 'event') return { id: nextId++, setupDefault: false, kind, label: 'EVENT', ...point };
+		if (kind === 'deflag') return { id: nextId++, setupDefault: false, kind, color: deflagPlacementColor, ...point };
+		if (kind === 'bean-bag') return { id: nextId++, setupDefault: false, kind, color: beanBagPlacementColor, ...point };
+		return { id: nextId++, setupDefault: false, kind, ...point };
 	};
 	const editorLeft = (marker: FieldMarker) => Math.max(10, Math.min(90, marker.x / 10));
 	const editorTop = (marker: FieldMarker) => Math.max(12, Math.min(88, (marker.y / 484) * 100));
@@ -2327,40 +2612,41 @@
 		return null;
 	};
 	const updateFieldControlTooltip = (event: PointerEvent) => {
+  if (viewOnly) { fieldControlTooltip = ''; return; }
 		const target = event.target instanceof Element ? event.target.closest('[data-hover-tooltip]') : null;
 		fieldControlTooltip = target?.getAttribute('data-hover-tooltip') ?? '';
 	};
 	const syncLayerDom = async () => {
 		await tick();
 		if (!svg) return;
+ const sceneLayers = svg.querySelector<SVGGElement>('[data-scene-layers]');
+ if (!sceneLayers) return;
 		for (const layer of layerOrder.filter((item) => item.type === 'guide')) {
 			const element = svg.querySelector<SVGGElement>(`[data-layer-type="${layer.type}"][data-layer-id="${layer.id}"]`);
-			if (element) svg.appendChild(element);
+			if (element) sceneLayers.appendChild(element);
 		}
-		const fieldXLayer = svg.querySelector<SVGGElement>('[data-field-x-layer]');
-		if (fieldXLayer) svg.appendChild(fieldXLayer);
 		const footballMarkerIds = new Set(markers.filter((marker) => marker.kind === 'ball').map((marker) => marker.id));
 		const attachedMarkerIds = new Set(paths.flatMap((path) => (path.startMarkerId === undefined ? [] : [path.startMarkerId])));
 		for (const layer of layerOrder.filter(
 			(item) => item.type !== 'guide' && !(item.type === 'marker' && (footballMarkerIds.has(item.id) || attachedMarkerIds.has(item.id)))
 		)) {
 			const element = svg.querySelector<SVGGElement>(`[data-layer-type="${layer.type}"][data-layer-id="${layer.id}"]`);
-			if (element) svg.appendChild(element);
+			if (element) sceneLayers.appendChild(element);
 		}
 		for (const layer of layerOrder.filter((item) => item.type === 'marker' && attachedMarkerIds.has(item.id) && !footballMarkerIds.has(item.id))) {
 			const element = svg.querySelector<SVGGElement>(`[data-layer-type="marker"][data-layer-id="${layer.id}"]`);
-			if (element) svg.appendChild(element);
+			if (element) sceneLayers.appendChild(element);
 		}
 		for (const layer of layerOrder.filter((item) => item.type === 'marker' && footballMarkerIds.has(item.id))) {
 			const element = svg.querySelector<SVGGElement>(`[data-layer-type="marker"][data-layer-id="${layer.id}"]`);
-			if (element) svg.appendChild(element);
+			if (element) sceneLayers.appendChild(element);
 		}
 		const downMarkerLayer = svg.querySelector<SVGGElement>('[data-down-marker-layer]');
-		if (downMarkerLayer) svg.appendChild(downMarkerLayer);
+		if (downMarkerLayer) sceneLayers.appendChild(downMarkerLayer);
 		const drawingLayer = svg.querySelector<SVGGElement>('[data-free-drawing-layer]');
-		if (drawingLayer) svg.appendChild(drawingLayer);
+		if (drawingLayer) sceneLayers.appendChild(drawingLayer);
 		const laserLayer = svg.querySelector<SVGGElement>('[data-laser-pointer-layer]');
-		if (laserLayer) svg.appendChild(laserLayer);
+		if (laserLayer) sceneLayers.appendChild(laserLayer);
 	};
 	const raiseLayer = (type: LayerType, id: number) => {
 		layerOrder = [...layerOrder.filter((layer) => layer.type !== type || layer.id !== id), { type, id }];
@@ -2458,7 +2744,10 @@
 		return `${data} L ${last.x} ${last.y}`;
 	};
 	const pathStart = (path: FieldPath): Point => {
-		const marker = path.startMarkerId === undefined ? undefined : markers.find((item) => item.id === path.startMarkerId);
+		const marker =
+			path.startMarkerId === undefined
+				? undefined
+				: (animation ? animationBaseScene.markers : markers).find((item) => item.id === path.startMarkerId);
 		return marker ? { x: marker.x, y: marker.y } : path.start;
 	};
 	const pathPoints = (path: FieldPath, start = pathStart(path)): Point[] | undefined => {
@@ -2696,6 +2985,7 @@
 		const pastedMarkers = elementClipboard.markers.map((marker) => ({
 			...marker,
 			id: idMap.get(targetKey({ type: 'marker', id: marker.id }))!,
+ setupDefault: false,
 			x: marker.x + dx,
 			y: marker.y + dy
 		}));
@@ -2710,6 +3000,7 @@
 		const pastedGuides = elementClipboard.guides.map((guide) => ({
 			...guide,
 			id: idMap.get(targetKey({ type: 'guide', id: guide.id }))!,
+ setupDefault: false,
 			kind: 'custom' as const,
 			x: guide.x + dx,
 			down: undefined
@@ -2758,6 +3049,26 @@
 			moved: false
 		};
 	};
+ $: revertOriginScene = animation && animationStep > 0 ? applyAnimationStep(animationBaseScene, animation.steps[animationStep - 1]) : null;
+ $: revertSelection = animationOpen && !animationPreview && selectedTargets.length === 1 ? selectedTargets[0] : null;
+ $: revertOrigin = revertSelection?.type === 'marker' ? revertOriginScene?.markers.find(item => item.id === revertSelection!.id)
+  : revertSelection?.type === 'guide' ? revertOriginScene?.guides.find(item => item.id === revertSelection!.id) : undefined;
+ $: revertCurrent = revertSelection?.type === 'marker' ? markers.find(item => item.id === revertSelection!.id)
+  : revertSelection?.type === 'guide' ? guides.find(item => item.id === revertSelection!.id) : undefined;
+ $: canRevertPosition = !!(revertOrigin && revertCurrent && (revertOrigin.x !== revertCurrent.x || ('y' in revertOrigin && 'y' in revertCurrent && revertOrigin.y !== revertCurrent.y)));
+ const revertElementPosition = () => {
+  if (viewOnly || !animation || !revertSelection || revertSelection.type === 'path' || !revertOrigin || !canRevertPosition) return;
+  const target: AnimationTarget = { type: revertSelection.type, id: revertSelection.id };
+  const next = currentAnimationContent().animation!;
+  const pose = next.steps[animationStep].poses.find(item => sameAnimationTarget(item, target));
+  if (!pose) return;
+  pose.x = revertOrigin.x;
+  if ('y' in revertOrigin) pose.y = revertOrigin.y;
+  delete pose.carrierId;
+  delete pose.offset;
+  next.transitions[animationStep - 1].motions = next.transitions[animationStep - 1].motions.filter(item => !sameAnimationTarget(item, target));
+  changeAnimation(next);
+ };
 	const deleteHoveredElement = () => {
 		if (viewOnly) {
 			clearDeleteState();
@@ -2771,6 +3082,8 @@
 		completeTutorialAction('delete-element');
 	};
 	const removeElementTarget = (target: SelectedTarget) => {
+		if (animation && target.type === 'marker' && animation.steps[animationStep]?.poses.some((pose) => pose.carrierId === target.id))
+			showActionMessage('Ball detached');
 		if (target.type === 'marker') markers = markers.filter((item) => item.id !== target.id);
 		if (target.type === 'path') paths = paths.filter((item) => item.id !== target.id);
 		if (target.type === 'guide') guides = guides.filter((item) => item.id !== target.id);
@@ -2957,7 +3270,7 @@
 		scoreboardHistorySaved = false;
 	};
 	const cycleGameQuarter = (event: Event) => {
-		if (viewOnly || tool === 'laser' || tool === 'free-draw') return;
+		if (viewOnly || animationPreview || tool === 'laser' || tool === 'free-draw') return;
 		event.preventDefault();
 		event.stopPropagation();
 		if (editingScoreboard === 'clock') commitScoreboardEditor();
@@ -3148,7 +3461,7 @@
 		guideYardageInput?.select();
 	};
 	const startEditingGameClock = async (event: Event) => {
-		if (viewOnly || tool === 'laser' || tool === 'free-draw') return;
+		if (viewOnly || animationPreview || tool === 'laser' || tool === 'free-draw') return;
 		event.preventDefault();
 		event.stopPropagation();
 		clearDeleteState();
@@ -3167,7 +3480,7 @@
 		gameClockEditInput?.select();
 	};
 	const startEditingTeamBox = async (event: Event, teamBoxY: number, teamBoxIndex: number) => {
-		if (viewOnly || tool === 'laser' || tool === 'free-draw') return;
+		if (viewOnly || animationPreview || tool === 'laser' || tool === 'free-draw') return;
 		event.preventDefault();
 		clearDeleteState();
 		editingMarkerId = null;
@@ -3297,7 +3610,7 @@
 		value === 'line-to-gain';
 	const openToolbarPresetEditor = async (event: MouseEvent, selectedTool: Tool) => {
 		if (!isToolbarPresetTool(selectedTool)) return;
-		if (selectedTool === 'laser' && performance.now() < suppressLaserPresetOpenUntil) return;
+		if (event.type !== 'contextmenu' && selectedTool === 'laser' && performance.now() < suppressLaserPresetOpenUntil) return;
 		event.preventDefault();
 		event.stopPropagation();
 		// The toolbar tooltip is portaled to the page body, so close it explicitly before
@@ -3440,6 +3753,7 @@
 		if (existing) guides = guides.map((guide) => (guide.id === existing.id ? { ...guide, x: nextX } : guide));
 		else {
 			const guide: FieldGuide = {
+   setupDefault: false,
 				id: nextId++,
 				kind: toolbarEditorTool,
 				x: nextX,
@@ -3474,15 +3788,114 @@
 		else clearEditorState();
 		restoreSelectedElementControls();
 	};
+ const viewerSpeeds = [0.25, 0.5, 1, 1.25, 1.5, 1.75, 2];
+ const cycleViewerSpeed = () => animationRate = viewerSpeeds[(viewerSpeeds.indexOf(animationRate) + 1) % viewerSpeeds.length];
+ const viewerScrubber = createKeyboardScrubber(() => animationTime, () => animationDuration(animation), seekAnimation, { playing: () => animationPlaying, change: shuttleAnimation });
+ const handleViewerPlaybackKey = (event: KeyboardEvent) => {
+  viewerScrubber.modifier(event.shiftKey);
+  if (!['ArrowLeft', 'ArrowRight', 'Shift'].includes(event.key)) viewerScrubber.stop();
+  if (!viewOnly || event.isComposing) return false;
+  if (event.key === 'Escape' && (showShare || showExportSettings)) {
+   event.preventDefault(); showShare = false; showExportSettings = false; return true;
+  }
+  if (showShare || showExportSettings || showHelp || showFeedback || (event.target as Element)?.closest('input,textarea,select,[contenteditable="true"]')) return false;
+  const command = event.ctrlKey || event.metaKey;
+  let viewerAction: (() => unknown) | undefined;
+  if (command && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'l') viewerAction = openShare;
+  else if (command && !event.altKey && event.shiftKey && event.key.toLowerCase() === 'o') viewerAction = openExportSettings;
+  else if (!command && !event.altKey && event.shiftKey && event.key.toLowerCase() === 'n') viewerAction = openBlankBoard;
+  if (viewerAction) { event.preventDefault(); event.stopImmediatePropagation(); if (!event.repeat) void viewerAction(); return true; }
+  if (!animation || command) return false;
+  if (!event.altKey && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+   event.preventDefault(); event.stopImmediatePropagation();
+   viewerScrubber.keydown(event);
+   return true;
+  }
+  const previous = () => {
+   for (let i = animation!.steps.length - 1; i >= 0; i--) if (stepTime(animation!, i) < animationTime - .000001) return selectAnimationStep(i);
+  };
+  const next = () => { const index = animation!.steps.findIndex((_, i) => stepTime(animation!, i) > animationTime + .000001); if (index >= 0) selectAnimationStep(index); };
+  let action: (() => void) | undefined;
+  if (!event.altKey && !event.shiftKey) {
+   const key = event.key.toLowerCase();
+   if (key === ' ' || key === 'k') action = toggleAnimationPlayback;
+   else if (key === 'j') action = previous;
+   else if (key === 'l') action = next;
+   else if (key === 'home') action = () => selectAnimationStep(0);
+   else if (key === 'end') action = () => selectAnimationStep(animation!.steps.length - 1);
+   else if (key === 'arrowleft' || key === 'arrowright') action = () => seekAnimation(Math.max(0, Math.min(animationDuration(animation), Math.round((animationTime + (key === 'arrowleft' ? -.05 : .05)) * 100) / 100)));
+   else { const number = /^Numpad[1-9]$/.test(event.code) ? Number(event.code.slice(-1)) : /^[1-9]$/.test(event.key) ? Number(event.key) : 0; if (number && animation.steps[number - 1]) action = () => selectAnimationStep(number - 1); }
+  } else if (event.altKey && !event.shiftKey && ['ArrowUp', 'ArrowDown'].includes(event.key)) action = () => animationRate = viewerSpeeds[Math.max(0, Math.min(viewerSpeeds.length - 1, viewerSpeeds.indexOf(animationRate) + (event.key === 'ArrowUp' ? 1 : -1)))];
+  else if (event.altKey && event.shiftKey && event.key === 'ArrowLeft') action = previous;
+  else if (event.altKey && event.shiftKey && event.key === 'ArrowRight') action = next;
+  if (!action) return false;
+  event.preventDefault(); event.stopImmediatePropagation();
+  if (!event.repeat || ['ArrowLeft', 'ArrowRight'].includes(event.key)) action();
+  return true;
+ };
 	const handleGlobalKeydown = (event: KeyboardEvent) => {
+  if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'c' && (window.getSelection()?.toString() || (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) && event.target.selectionStart !== event.target.selectionEnd)) { event.stopImmediatePropagation(); return; }
+  if (animationTutorialActive && animationTutorialKeys !== 'playback' && !(event.target as Element)?.closest('input,textarea,select,[contenteditable="true"],[data-timing-rail]')) {
+   const navigation = ['ArrowLeft','ArrowRight','Home','End','Space','KeyJ','KeyK','KeyL'].includes(event.code) || event.altKey && ['ArrowUp','ArrowDown'].includes(event.key);
+   if (navigation) { event.preventDefault(); event.stopImmediatePropagation(); return; }
+  }
+  if(animationTutorialActive && event.key==='Escape' && !document.querySelector('[data-animation-path-picker]') && !animationDrawingRoute) { event.preventDefault(); tutorialDriver?.destroy(); return; }
+  if (handleViewerPlaybackKey(event)) return;
+  if (animationOpen && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 's') {
+   event.preventDefault();
+   event.stopImmediatePropagation();
+   if (viewOnly || event.repeat || actionInProgress || tutorialActive || showSetupConfirm || showDraftRestore || showNewPrompt || showShare || showExportSettings || showSettings || showHelp || showFeedback) return;
+   const focused = document.activeElement;
+   if (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) focused.blur();
+   if (hasActiveInlineEditor()) commitActiveEditor();
+   void savePlay();
+   return;
+  }
+  if (showSetupConfirm) {
+   if (event.key === 'Escape') { event.preventDefault(); dismissSetupConfirm(); }
+   return;
+  }
+  if(event.altKey && !event.shiftKey && !event.ctrlKey && !event.metaKey && event.code==='KeyA') {
+   const target=event.target as HTMLElement | null;
+   const editing=target?.closest('input,textarea,select,[contenteditable="true"]');
+   const busy=tutorialActive || actionInProgress!==null || showSetupConfirm || showDraftRestore || showNewPrompt || showShare || showExportSettings || showSettings || showHelp || showFeedback || editingPlayId!==null || hasActiveInlineEditor();
+   if(!event.repeat && !event.isComposing && !editing && !busy && !viewOnly) {event.preventDefault();if(animationOpen) closeAnimation();else openAnimation();}
+   return;
+  }
+  if((animationOpen || viewOnly && animation) && event.altKey && !event.shiftKey && !event.ctrlKey && !event.metaKey && ['KeyT','ArrowUp','ArrowDown'].includes(event.code)) return;
+  // Animation commands use their own modifier family; never feed them to drawing tools.
+  if(event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey) {
+   const target=event.target as HTMLElement | null;
+   const editing=target?.closest('input,textarea,select,[contenteditable="true"]');
+   const busy=tutorialActive || actionInProgress!==null || showSetupConfirm || showDraftRestore || showNewPrompt || showShare || showExportSettings || showSettings || showHelp || showFeedback || editingPlayId!==null || hasActiveInlineEditor();
+   if(busy && !editing) {event.preventDefault(); return;}
+
+   return;
+  }
+
+  if (animationOpen && !event.ctrlKey && !event.metaKey && !event.altKey && ['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+  if((animationOpen || viewOnly && animation) && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && (event.code==='Space'||event.key==='ArrowLeft'||event.key==='ArrowRight'||event.key==='Home'||event.key==='End'||/^[jkl]$/i.test(event.key)||/^[1-9]$/.test(event.key)||/^Numpad[1-9]$/.test(event.code))) return;
+
+  if (animationOpen && !viewOnly && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'v') {
+   const target = event.target as Element | null;
+   if (target?.closest('input,textarea,select,[contenteditable="true"]') || tutorialActive || showSetupConfirm || showDraftRestore || showNewPrompt || showShare || showExportSettings || showSettings || showHelp || showFeedback) return;
+   event.preventDefault();
+   if (hasActiveInlineEditor()) commitActiveEditor();
+   animationDrawingRoute = false;
+   selectTool('select');
+   return;
+  }
+
+		if (animationPreview && !((event.ctrlKey || event.metaKey) && ['s', 'z', 'y'].includes(event.key.toLowerCase())) && !( !event.ctrlKey && !event.metaKey && !event.altKey && (event.key.toLowerCase()==='d' || event.shiftKey && event.key.toLowerCase()==='l' || tool==='laser' && event.key.toLowerCase()==='c'))) return;
 		if (viewOnly) return;
 		const target = event.target as HTMLElement | null;
+		if (target?.closest('[data-animation-ui], [data-animation-overlay]') && !event.ctrlKey && !event.metaKey) return;
 		const isEditableTarget = target?.matches('input, textarea, select, [contenteditable="true"]') ?? false;
 		const isShareShortcut = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'l';
 		if (isShareShortcut) {
 			event.preventDefault();
 			const interfaceIsBusy =
-				showDraftRestore ||
+				showSetupConfirm || showDraftRestore ||
 				tutorialActive ||
 				showNewPrompt ||
 				showShare ||
@@ -3504,7 +3917,7 @@
 			if (event.key === 'Escape') event.preventDefault();
 			return;
 		}
-		if (tutorialActive) {
+		if (tutorialActive && !animationTutorialActive) {
 			if (event.key === 'Escape') {
 				event.preventDefault();
 				tutorialDriver?.destroy();
@@ -3776,10 +4189,14 @@
 	const handleWindowPointerDown = (event: PointerEvent) => {
 		if (viewOnly) return;
 		const target = event.target as Node;
+		if (target instanceof Element && target.closest('[data-animation-ui]')) {
+			commitActiveEditor();
+			return;
+		}
 		if (editingPlayId !== null && !playMenuElement?.contains(target)) renamePlay();
 		const clickedFieldElement = target instanceof Element && Boolean(target.closest('[data-field-element]'));
 		const clickedBuilderCanvas = target instanceof Element && Boolean(target.closest('svg[role="application"]'));
-		if (selectedTargets.length > 0 && !deleteButtonElement?.contains(target) && !clickedFieldElement && !clickedBuilderCanvas) clearDeleteState();
+		if (selectedTargets.length > 0 && !deleteButtonElement?.contains(target) && !(target instanceof Element && target.closest('[data-element-actions]')) && !clickedFieldElement && !clickedBuilderCanvas) clearDeleteState();
 		if (
 			toolbarEditorTool !== null &&
 			!toolbarEditorElement?.contains(target) &&
@@ -4235,7 +4652,100 @@
 		tutorialActive = true;
 		tutorialDriver.drive();
 	};
+ const startAnimationEditorTutorial = async () => {
+  if (viewOnly || actionInProgress || animationTutorialActive) return;
+  animationTutorialAttention = false;
+  try { localStorage.setItem(animationTutorialSeenKey, '1'); } catch {}
+  tutorialDriver?.destroy();
+  commitActiveEditor();
+  commitAnimation();
+  const backup = builderSnapshot();
+  const previousHistory = history, previousFuture = future;
+  const previousFeedback = saveFeedbackState;
+  const previousTool = tool;
+  const previousRate = animationRate, previousLoop = animationLoop, previousGhosts = animationGhosts;
+  const previousOpen = animationOpen;
+  const previousTime = animationTime, previousPreview = animationPreview;
+  const originalUrl = window.location.href;
+  tutorialActive = true;
+  animationTutorialActive = true;
+  document.body.classList.add('animation-tutorial-active');
+  if (draftSaveTimer) clearTimeout(draftSaveTimer);
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  pauseAnimation();
+  storeActivePlayState();
+  playEntries = [...playEntries, {id:nextPlayEntryId++,name:'Tutorial',scene:blankScene(),settings:defaultPlayBuilderFieldSettings()}];
+  loadPlayAtIndex(playEntries.length-1, false);
+  await tick();
+  applyDefaultSetup();
+  openAnimation();
+  animationRate = 1; animationLoop = false; animationGhosts = true;
+  history = []; future = [];
+  await tick();
+  const added = () => !!animation && animation.steps.length > 1;
+  const moved = () => added() && !!animationContent.animation?.steps[1].poses.some(pose => {
+   const before=animationContent.animation!.steps[0].poses.find(p=>sameAnimationTarget(p,pose));
+   return before?.visible && pose.visible && (before.x!==pose.x || before.y!==pose.y);
+  });
+  const add = () => { if (!added() && animation) { const next=appendAnimationStep(animation); changeAnimation(next,1); } };
+  const move = () => {
+   add();
+   if (moved() || !animation) return;
+   const next=currentAnimationContent().animation!;
+   const pose=next.steps[1].poses.find(p=>p.type==='marker' && next.steps[0].poses.find(b=>sameAnimationTarget(b,p))?.visible)!;
+   pose.x += 100; pose.y = Math.max(70, pose.y-35);
+   changeAnimation(next,1);
+  };
+  const editStep = () => { add(); selectAnimationStep(animation!.steps.length-1); };
+  const prepareFinalRoute = async () => {
+   move(); editStep();
+   const next=currentAnimationContent().animation!;
+   const index=next.steps.length-1;
+   if(!next.steps[index].poses.some(p=>{const before=next.steps[index-1].poses.find(b=>sameAnimationTarget(b,p));return p.visible&&before?.visible&&(p.x!==before.x||p.y!==before.y);})) {
+    const pose=next.steps[index].poses.find(p=>p.type==='marker' && p.visible)!;
+    pose.x=Math.min(950,pose.x+100);pose.y=Math.max(70,pose.y-35);
+    changeAnimation(next,index);
+   }
+   await tick();
+  };
+  let nextMovementBaseline=0;
+  const closePath = () => { animationDrawingRoute=false; document.querySelector<HTMLElement>('.step-duration')?.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true})); };
+  launchAnimationTutorial({added,moved,add,move,editStep,
+   ghosts:()=>{move();selectAnimationStep(1);},
+   beginNextMovement:()=>{editStep();nextMovementBaseline=animation!.steps.length;},
+   nextMovementReady:()=>!!animation&&animation.steps.length>nextMovementBaseline,
+   nextMovement:()=>{if(animation&&animation.steps.length<=nextMovementBaseline)changeAnimation(appendAnimationStep(currentAnimationContent().animation!),animation.steps.length);},
+   lesson:(mode)=>{animationTutorialKeys=mode; if(mode!=='playback') pauseAnimation();},
+   boundaries:()=>{add();if(animation!.steps.length<3) changeAnimation(appendAnimationStep(currentAnimationContent().animation!),2);seekAnimation(Math.max(0,stepTime(animation!,1)-.25));},
+   endStep:()=>{add();selectAnimationStep(animation!.steps.length-1);},
+   pathOpen:()=>!!document.querySelector('[data-animation-path-picker]'),
+   prepareRoute:prepareFinalRoute,
+   openPath:async()=>{
+    await prepareFinalRoute();
+    const route=document.querySelector<SVGPathElement>('[data-animation-route] path[pointer-events="stroke"]');
+    const box=svg.getBoundingClientRect();
+    route?.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,clientX:box.left+box.width*.55,clientY:box.top+box.height*.4}));
+    await tick();
+   },closePath,
+   register:tour=>tutorialDriver=tour,
+   finish:()=>{
+    pauseAnimation(); clearEditorState(); editingPlayId=null; showSetupConfirm=false;
+    document.body.classList.remove('animation-tutorial-active');
+    animationOpen=false;
+    applyBuilderState(backup);
+    history=previousHistory; future=previousFuture;
+    animationRate=previousRate; animationLoop=previousLoop; animationGhosts=previousGhosts;
+    tool=previousTool; animationOpen=previousOpen;
+    if(previousPreview) showAnimationTime(previousTime);
+    saveFeedbackState=previousFeedback;
+    replaceState(originalUrl,{});
+    tutorialDriver=null;
+    void tick().then(()=>{animationTutorialActive=false;tutorialActive=false;scheduleLocalDraft(currentSceneKey,hasUnsavedChanges);});
+   }
+  });
+ };
 	const selectTool = (nextTool: ActiveTool) => {
+		if (animationPreview && !['laser','free-draw','select'].includes(nextTool)) return;
 		if (suppressNextClick) return;
 		if (tool === 'laser' && nextTool !== 'laser') releaseLaserDrawings();
 		if (hasActiveInlineEditor()) commitActiveEditor();
@@ -4264,8 +4774,23 @@
 		suppressLaserPresetOpenUntil = now + 500;
 	};
 	const updateDiagramModalPosition = () => {
+		if (builderRoot) {
+			const bounds = svg?.getBoundingClientRect() ?? builderRoot.getBoundingClientRect();
+			animationDockLeft = Math.max(8, bounds.left);
+			animationDockWidth = Math.min(720, window.innerWidth - 16);
+			animationDockLeft = Math.min(animationDockLeft, window.innerWidth - animationDockWidth - 8);
+		}
 		if (typeof window === 'undefined' || !builderRoot) return;
 		const bounds = builderRoot.getBoundingClientRect();
+  if (svg) {
+   const field = svg.getBoundingClientRect();
+   const scale = field.width / 1000;
+   if (scale > 0) extendedGrassBounds = {
+    width: builderRoot.clientWidth / scale, height: builderRoot.clientHeight / scale,
+    x: (field.left - bounds.left - builderRoot.clientLeft) / scale,
+    y: (field.top - bounds.top - builderRoot.clientTop) / scale
+   };
+  }
 		const visibleLeft = Math.max(0, bounds.left);
 		const visibleRight = Math.min(window.innerWidth, bounds.right);
 		const visibleTop = Math.max(0, bounds.top);
@@ -4319,6 +4844,7 @@
 		exportSettingsCloseButton?.focus();
 	};
 	const updateFieldSetting = <Key extends keyof PlayBuilderFieldSettings>(key: Key, value: PlayBuilderFieldSettings[Key]) => {
+  if (key === 'fieldType' && animation && animation.steps.length > 1 && value !== fieldSettings.fieldType) return;
 		if (fieldSettings[key] === value) {
 			if (key === 'fieldColor') completeTutorialAction('settings-field-color');
 			return;
@@ -4358,6 +4884,14 @@
 		clearPlacementSnap();
 	};
 	const resetToBlankBoard = () => {
+		pauseAnimation();
+		animation = undefined;
+		animationOpen = false;
+		animationPreview = false;
+		animationStep = 0;
+		animationTime = 0;
+		animationDrawingRoute = false;
+		animationBaseScene = blankScene();
 		fieldSettings = defaultPlayBuilderFieldSettings();
 		playEntries = [{ id: 1, name: 'Play 1', scene: blankScene(), settings: { ...fieldSettings } }];
 		activePlayIndex = 0;
@@ -4411,9 +4945,48 @@
 		const saved = await savePlay();
 		if (saved) showNewPrompt = false;
 	};
-	const setupDefaultScenario = () => {
-		if (dismissEditorForAction() || suppressNextClick) return;
-		saveHistory();
+	const dismissSetupConfirm = () => {
+  showSetupConfirm = false;
+  void tick().then(() => document.querySelector<HTMLButtonElement>('[aria-label="Clear animation"]')?.focus());
+ };
+ const requestAnimationReset = async () => {
+  if (viewOnly || !animation) return;
+  pauseAnimation();
+  showSetupConfirm = true;
+  await tick();
+  updateDiagramModalPosition();
+  setupCancelButton?.focus();
+ };
+ const confirmAnimationReset = () => {
+  if (!animation || viewOnly) return;
+  saveHistory();
+  commitAnimation();
+  const start = applyAnimationStep(animationBaseScene, animation!.steps[0]);
+  animationBaseScene = start;
+  animation = createAnimation(start);
+  animationPreview = true;
+  selectAnimationStep(0);
+  showSetupConfirm = false;
+ };
+ const setupDefaultScenario = () => {
+  if (dismissEditorForAction() || suppressNextClick || viewOnly || animation && animationPreview) return;
+  applyDefaultSetup();
+ };
+ const applyDefaultSetup = () => {
+  if (viewOnly) return;
+  saveHistory();
+  pauseAnimation();
+  const original = currentAnimationContent();
+  const originalAnimation = original.animation;
+  const setupIndex = animationStep;
+  const registry = original.scene;
+  const tagged = registry.markers.some(marker => marker.setupDefault) || registry.guides.some(guide => guide.setupDefault);
+  const wasPresentAtStart = (type: 'marker' | 'guide', id: number) => !originalAnimation || !!originalAnimation.steps[0].poses.find(pose => pose.type === type && pose.id === id)?.visible;
+  const originalMarker = (kind: MarkerKind) => registry.markers.find(marker => marker.kind === kind && (marker.setupDefault || !tagged && marker.setupDefault === undefined && wasPresentAtStart('marker', marker.id) && (kind !== 'team-a' || marker.sequence === 1)));
+  const originalGuide = (kind: GuideKind) => registry.guides.find(guide => guide.kind === kind && (guide.setupDefault || !tagged && guide.setupDefault === undefined && wasPresentAtStart('guide', guide.id)));
+  const markerId = (kind: MarkerKind) => originalMarker(kind)?.id ?? nextId++;
+  const guideId = (kind: GuideKind) => originalGuide(kind)?.id ?? nextId++;
+  animationDrawingRoute = false;
 		clearEditorState();
 		clearDeleteState();
 		clearPlacementSnap();
@@ -4429,18 +5002,18 @@
 		const centerY = fieldTop + fieldHeight / 2;
 		const quarterbackX = xForYards(setup.lineOfScrimmage - setup.quarterbackDepth);
 		const lineOfScrimmage: FieldGuide = {
-			id: nextId++,
+			id: guideId('line-of-scrimmage'),
 			kind: 'line-of-scrimmage',
 			x: lineOfScrimmageX,
 			color: 'white',
 			style: 'dashed'
 		};
-		const lineToGain: FieldGuide = { id: nextId++, kind: 'line-to-gain', x: lineToGainX, color: 'yellow', style: 'solid', down: '1st' };
-		const football: FieldMarker = { id: nextId++, kind: 'ball', x: lineOfScrimmageX, y: centerY };
-		const quarterback: FieldMarker = { id: nextId++, kind: 'team-a', sequence: 1, label: 'A-1', x: quarterbackX, y: centerY };
+		const lineToGain: FieldGuide = { id: guideId('line-to-gain'), kind: 'line-to-gain', x: lineToGainX, color: 'yellow', style: 'solid', down: '1st' };
+		const football: FieldMarker = { id: markerId('ball'), kind: 'ball', x: lineOfScrimmageX, y: centerY };
+		const quarterback: FieldMarker = { id: markerId('team-a'), kind: 'team-a', sequence: 1, label: 'A-1', x: quarterbackX, y: centerY };
 		const standardRefereeX = xForYards(setup.lineOfScrimmage - setup.quarterbackDepth - 7);
 		const standardRefereeY = fieldTop + fieldHeight * Math.min(0.82, 0.5 + 7 / fieldLayout.widthYards);
-		const lineJudgeY = fieldTop - officialSize * 0.18;
+		const lineJudgeY = fieldTop - officialSize / 2 - 3;
 		const fieldJudgeY = fieldBottom + officialSize * 0.12;
 		const officialPositions: Record<PlayBuilderFieldType, { kind: OfficialKind; x: number; y: number }[]> = {
 			traditional: [
@@ -4465,10 +5038,16 @@
 				{ kind: 'official-l', x: lineOfScrimmageX, y: lineJudgeY }
 			]
 		};
-		const officials = officialPositions[fieldSettings.fieldType].map((position) => ({ id: nextId++, ...position }));
-		markers = [football, quarterback, ...officials];
+		const officials = officialPositions[fieldSettings.fieldType].map((position) => ({ id: markerId(position.kind), ...position }));
+		markers = [football, quarterback, ...officials].map(marker => {
+   const old = originalAnimation ? originalMarker(marker.kind) : undefined;
+   return { ...marker, ...old, id: marker.id, x: marker.x, y: marker.y, setupDefault: true };
+  });
 		paths = [];
-		guides = [lineOfScrimmage, lineToGain];
+		guides = [lineOfScrimmage, lineToGain].map(guide => {
+   const old = originalAnimation ? originalGuide(guide.kind) : undefined;
+   return { ...guide, ...old, id: guide.id, x: guide.x, setupDefault: true };
+  });
 		freeStrokes = [];
 		activeFreeStroke = null;
 		layerOrder = [
@@ -4478,6 +5057,18 @@
 			{ type: 'marker', id: quarterback.id },
 			...officials.map((official): LayerRef => ({ type: 'marker', id: official.id }))
 		];
+  if (originalAnimation) {
+   const reset = captureAnimationEdits(registry, sceneSnapshot(), originalAnimation, setupIndex);
+   for (let index = 0; index < reset.animation.steps.length; index++) {
+    if (index === setupIndex) continue;
+    reset.animation.steps[index].poses = reset.animation.steps[index].poses.map(pose => originalAnimation.steps[index].poses.find(old => sameAnimationTarget(old, pose)) ?? pose);
+   }
+   if (setupIndex > 0) reset.animation.transitions[setupIndex - 1].motions = [];
+   animationBaseScene = reset.scene;
+   animation = reset.animation;
+   animationPreview = true;
+   selectAnimationStep(setupIndex);
+  }
 		if (tool === 'laser') releaseLaserDrawings();
 		tool = 'team-a';
 		syncLayerDom();
@@ -4567,6 +5158,7 @@
 			eraseHistorySaved = true;
 		}
 		freeStrokes = freeStrokes.filter((stroke) => !hitIds.has(stroke.id));
+ persistPreviewDrawings();
 	};
 	const eraseFreeStrokesAlong = (start: Point, end: Point) => {
 		const distance = Math.hypot(end.x - start.x, end.y - start.y);
@@ -4738,6 +5330,7 @@
 		saveHistory();
 		const replacedGuide = guides.find((item) => item.kind === kind);
 		const guide: FieldGuide = {
+   setupDefault: false,
 			id: nextId++,
 			kind,
 			x: kind === 'line-to-gain' ? wholeYardLineToGainX(x) : wholeYardLineOfScrimmageX(x),
@@ -4778,6 +5371,7 @@
 	};
 
 	const beginOnField = async (event: PointerEvent) => {
+		if (animationPreview && tool !== 'laser' && tool !== 'free-draw') return;
 		if (viewOnly) return;
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
@@ -4838,7 +5432,13 @@
 			svg.setPointerCapture(event.pointerId);
 		}
 	};
+ let pendingShiftDeselection: SelectedTarget | null = null;
+ const selectDragTarget = (target: SelectedTarget, shift: boolean, point?: Point) => {
+  pendingShiftDeselection = shift && selectedTargets.some(item => item.type === target.type && item.id === target.id) ? target : null;
+  return pendingShiftDeselection ? true : selectTarget(target, shift, point);
+ };
 	const beginOnMarker = async (event: PointerEvent, marker: FieldMarker) => {
+		if (animationPreview && tool !== 'laser' && tool !== 'free-draw') return;
 		if (viewOnly) return;
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
@@ -4877,7 +5477,7 @@
 			svg.setPointerCapture(event.pointerId);
 			return;
 		}
-		const selected = selectTarget({ type: 'marker', id: marker.id }, event.shiftKey);
+		const selected = selectDragTarget({ type: 'marker', id: marker.id }, event.shiftKey);
 		if (!selected) return;
 		if (selectedTargets.length > 1) {
 			beginGroupDrag(event);
@@ -4886,13 +5486,14 @@
 		dragTarget = {
 			type: 'marker',
 			id: marker.id,
-			pointerStart: isSidelineMarkerKind(marker.kind) ? clampSidelineMarkerPoint(canvasPointFromEvent(event)) : pointFromEvent(event),
+			pointerStart: isOfficialKind(marker.kind) ? canvasPointFromEvent(event) : isSidelineMarkerKind(marker.kind) ? clampSidelineMarkerPoint(canvasPointFromEvent(event)) : pointFromEvent(event),
 			elementStart: { x: marker.x, y: marker.y },
 			moved: false,
 			snapToMarkers: paths.some((path) => path.startMarkerId === marker.id)
 		};
 	};
 	const beginOnPath = async (event: PointerEvent, path: FieldPath, mode: 'whole' | 'start' | 'end' = 'whole') => {
+		if (animationPreview && tool !== 'laser' && tool !== 'free-draw') return;
 		if (viewOnly) return;
 		if (event.button !== 0 || dismissEditorForAction() || suppressNextClick) return;
 		event.preventDefault();
@@ -4913,7 +5514,7 @@
 		if (mode === 'start' && path.startMarkerId !== undefined) {
 			const attachedMarker = markers.find((marker) => marker.id === path.startMarkerId);
 			if (attachedMarker) {
-				const selected = selectTarget({ type: 'marker', id: attachedMarker.id }, event.shiftKey);
+				const selected = selectDragTarget({ type: 'marker', id: attachedMarker.id }, event.shiftKey);
 				if (!selected) return;
 				if (selectedTargets.length > 1) {
 					beginGroupDrag(event);
@@ -4922,7 +5523,7 @@
 				dragTarget = {
 					type: 'marker',
 					id: attachedMarker.id,
-					pointerStart: isSidelineMarkerKind(attachedMarker.kind) ? clampSidelineMarkerPoint(canvasPointFromEvent(event)) : pointFromEvent(event),
+					pointerStart: isOfficialKind(attachedMarker.kind) ? canvasPointFromEvent(event) : isSidelineMarkerKind(attachedMarker.kind) ? clampSidelineMarkerPoint(canvasPointFromEvent(event)) : pointFromEvent(event),
 					elementStart: { x: attachedMarker.x, y: attachedMarker.y },
 					moved: false,
 					snapToMarkers: true
@@ -4930,7 +5531,7 @@
 				return;
 			}
 		}
-		const selected = selectTarget({ type: 'path', id: path.id }, event.shiftKey);
+		const selected = selectDragTarget({ type: 'path', id: path.id }, event.shiftKey);
 		if (!selected) return;
 		if (mode === 'whole' && selectedTargets.length > 1) {
 			beginGroupDrag(event);
@@ -4949,6 +5550,7 @@
 		};
 	};
 	const beginOnGuide = async (event: PointerEvent, guide: FieldGuide, fromDownMarker = false) => {
+		if (animationPreview && tool !== 'laser' && tool !== 'free-draw') return;
 		if (viewOnly) return;
 		if (event.button !== 0 || suppressNextClick) return;
 		if (tool === 'laser') {
@@ -4980,7 +5582,7 @@
 		}
 		const pointerStart = pointFromEvent(event);
 		if (!fromDownMarker) {
-			const selected = selectTarget({ type: 'guide', id: guide.id }, event.shiftKey, pointerStart);
+			const selected = selectDragTarget({ type: 'guide', id: guide.id }, event.shiftKey, pointerStart);
 			if (!selected) return;
 			if (selectedTargets.length > 1) {
 				beginGroupDrag(event);
@@ -5092,9 +5694,30 @@
 			}
 		}
 		if (!dragTarget) return;
-		const dragPoint = dragTarget.type === 'group' ? canvasPoint : point;
-		const rawDx = dragPoint.x - dragTarget.pointerStart.x;
-		const rawDy = dragPoint.y - dragTarget.pointerStart.y;
+		const markerDragId = dragTarget.type === 'marker' ? dragTarget.id : null;
+		const draggingOfficial = markerDragId !== null && markers.some(marker => marker.id === markerDragId && isOfficialMarker(marker));
+		const dragPoint = dragTarget.type === 'group' || draggingOfficial ? canvasPoint : point;
+		let rawDx = dragPoint.x - dragTarget.pointerStart.x;
+		let rawDy = dragPoint.y - dragTarget.pointerStart.y;
+  if (event.shiftKey) {
+   clearPlacementSnap();
+   const increment = Math.PI / 4;
+   let originOffset = { x: 0, y: 0 };
+   if (animation && animationOpen && animationStep > 0 && dragTarget.type === 'marker') {
+    const markerId = dragTarget.id;
+    const motion = animation.transitions[animationStep - 1]?.motions.find(item => item.type === 'marker' && item.id === markerId);
+    if (motion?.path !== 'custom') {
+     const origin = applyAnimationStep(animationBaseScene, animation.steps[animationStep - 1]).markers.find(item => item.id === markerId);
+     if (origin) originOffset = { x: origin.x - dragTarget.elementStart.x, y: origin.y - dragTarget.elementStart.y };
+    }
+   }
+   const dx = rawDx - originOffset.x, dy = rawDy - originOffset.y;
+   const angle = Math.round(Math.atan2(dy, dx) / increment) * increment;
+   const cosine = Math.cos(angle), sine = Math.sin(angle);
+   const distance = dx * cosine + dy * sine;
+   rawDx = originOffset.x + (Math.abs(cosine) < 1e-8 ? 0 : distance * cosine);
+   rawDy = originOffset.y + (Math.abs(sine) < 1e-8 ? 0 : distance * sine);
+  }
 		if (!dragTarget.moved && Math.hypot(rawDx, rawDy) < 4) return;
 		if (!dragTarget.moved) {
 			saveHistory();
@@ -5141,13 +5764,13 @@
 			const draggedMarker = markers.find((marker) => marker.id === target.id);
 			const unclampedCandidate = { x: target.elementStart.x + rawDx, y: target.elementStart.y + rawDy };
 			const candidate =
-				draggedMarker && isSidelineMarkerKind(draggedMarker.kind) ? clampSidelineMarkerPoint(unclampedCandidate) : clampPoint(unclampedCandidate);
-			const snappedMarker = shouldSnapElements(event) && dragTarget.snapToMarkers ? nearestMarkerToPoint(candidate, dragTarget.id) : null;
+				draggedMarker && isOfficialMarker(draggedMarker) ? clampOfficialPoint(unclampedCandidate) : draggedMarker && isSidelineMarkerKind(draggedMarker.kind) ? clampSidelineMarkerPoint(unclampedCandidate) : clampPoint(unclampedCandidate);
+			const snappedMarker = !event.shiftKey && shouldSnapElements(event) && dragTarget.snapToMarkers ? nearestMarkerToPoint(candidate, dragTarget.id) : null;
 			const next = snappedMarker ? { x: snappedMarker.x, y: snappedMarker.y } : candidate;
 			markers = markers.map((marker) => (marker.id === target.id ? { ...marker, ...next } : marker));
 			paths = paths.map((path) => (path.startMarkerId === target.id ? withPathStart(path, { ...next }) : path));
 			if (!snappedMarker && placementPointerMoved) {
-				if (shouldSnapElements(event)) scheduleDragSnap(target, next.x, true);
+				if (!event.shiftKey && shouldSnapElements(event)) scheduleDragSnap(target, next.x, true);
 				else clearPlacementSnap();
 			}
 		}
@@ -5163,7 +5786,7 @@
 						: rawX;
 			guides = guides.map((guide) => (guide.id === target.id ? { ...guide, x } : guide));
 			if (placementPointerMoved) {
-				if (shouldSnapElements(event)) scheduleDragSnap(target, x, true);
+				if (!event.shiftKey && shouldSnapElements(event)) scheduleDragSnap(target, x, true);
 				else clearPlacementSnap();
 			}
 		}
@@ -5259,6 +5882,7 @@
 						: activeFreeStroke.points;
 			saveHistory();
 			freeStrokes = [...freeStrokes, { ...activeFreeStroke, points }];
+ persistPreviewDrawings();
 			activeFreeStroke = null;
 			activeFreeDrawShape = freeDrawShape;
 			syncLayerDom();
@@ -5267,6 +5891,12 @@
 			return;
 		}
 		if (event.pointerType === 'pen' && event.button === 2) return;
+		if (pendingShiftDeselection && dragTarget && !dragTarget.moved) {
+   const target = pendingShiftDeselection;
+   selectedTargets = selectedTargets.filter(item => item.type !== target.type || item.id !== target.id);
+   refreshSelectionUi();
+  }
+  pendingShiftDeselection = null;
 		const draggedDownMarker = dragTarget?.type === 'guide' && dragTarget.fromDownMarker && dragTarget.moved;
 		let droppedTargets: SelectedTarget[] = [];
 		if (dragTarget?.moved) {
@@ -5386,7 +6016,7 @@
 			if (typeof stored.snapping === 'boolean') snappingEnabled = stored.snapping;
 			if (typeof stored.highContrast === 'boolean') highContrastEnabled = stored.highContrast;
 			if (typeof stored.showYardLineCursor === 'boolean') showYardLineCursorEnabled = stored.showYardLineCursor;
-			if (typeof stored.ads === 'boolean') adsEnabled = stored.ads;
+			if (typeof stored.extendedGrass === 'boolean') extendedGrassEnabled = stored.extendedGrass;
 		} catch {
 			// Ignore malformed settings left by an older browser session.
 		}
@@ -5495,6 +6125,8 @@
 		}
 		draftHydrated = !showDraftRestore;
 		tutorialButtonBouncing = localStorage.getItem(tutorialSeenKey) !== '1';
+        animationLaunchBouncing = localStorage.getItem(animationOpenedKey) !== '1';
+        animationTutorialAttention = localStorage.getItem(animationTutorialSeenKey) !== '1';
 		const browserNavigator = navigator as Navigator & { userAgentData?: { platform?: string } };
 		const usesAppleShortcuts = /Mac|iPhone|iPad|iPod/i.test(browserNavigator.userAgentData?.platform ?? navigator.platform ?? navigator.userAgent);
 		primaryModifierKey = usesAppleShortcuts ? '⌘' : 'Ctrl';
@@ -5525,6 +6157,8 @@
 		if (showDraftRestore) void tick().then(() => restoreDraftButton?.focus());
 		syncLayerDom();
 		return () => {
+   viewerScrubber.stop();
+			pauseAnimation();
 			tutorialDriver?.destroy();
 			clearPlacementSnap();
 			clearActionMessageTimer();
@@ -5542,17 +6176,25 @@
 	});
 </script>
 
-<svelte:window on:keydown|capture={handleGlobalKeydown} on:beforeunload={handleBeforeUnload} />
+<svelte:window on:keyup={(event) => viewerScrubber.keyup(event)} on:blur={() => viewerScrubber.stop()} on:keydown|capture={handleGlobalKeydown} on:beforeunload={handleBeforeUnload} />
 
 <section
 	bind:this={builderRoot}
 	on:pointerdown={markTutorialSeen}
-	class="relative border-2 border-stone-900 bg-stone-800 shadow-lg select-none"
+	class="relative isolate border-2 border-stone-900 bg-stone-800 shadow-lg select-none"
 	class:view-only={viewOnly}
+	class:animation-preview={animationPreview}
 	class:high-contrast-mode={highContrastEnabled}
 	aria-label={viewOnly ? 'Shared flag football play diagram' : 'Flag football play builder'}
 >
-	<div data-tutorial="draw-workspace" class="flex gap-2 p-2" aria-hidden={viewOnly}>
+{#if extendedGrassEnabled}
+ <svg data-extended-grass aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10 h-full w-full" viewBox={`0 0 ${extendedGrassBounds.width} ${extendedGrassBounds.height}`} preserveAspectRatio="none">
+  <defs><pattern id="builder-extended-grass-stripe" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform={`translate(${extendedGrassBounds.x} ${extendedGrassBounds.y}) rotate(18)`}><rect width="16" height="32" fill="rgba(255,255,255,0.025)" /></pattern></defs>
+  <rect width="100%" height="100%" fill={extendedGrassColor} />
+  <rect width="100%" height="100%" fill="url(#builder-extended-grass-stripe)" />
+ </svg>
+{/if}
+	<div data-tutorial="draw-workspace" class="flex gap-2 p-2">
 		<div class="tool-column relative z-[60] my-auto w-10 shrink-0 sm:w-12">
 			<div class="flex w-full flex-col gap-px bg-stone-500 p-px" role="toolbar" aria-label="Drawing tools">
 				{#each toolRows as row}
@@ -5580,12 +6222,16 @@
 									data-tutorial-tool={item.id}
 									aria-label={item.label}
 									aria-pressed={tool === item.id}
-									on:pointerdown={() => {
+ disabled={animationPreview && item.id!=='laser' && item.id!=='free-draw'}
+ class:animation-tool-disabled={animationPreview && item.id!=='laser' && item.id!=='free-draw'}
+									on:pointerdown={(event) => {
+                                        if (event.button !== 0) return;
 										registerLaserToolbarClick(item.id);
 										activateToolbarTool(item.id);
 									}}
 									on:click={(event) => event.detail === 0 && activateToolbarTool(item.id)}
 									on:dblclick|stopPropagation={(event) => openToolbarPresetEditor(event, item.id)}
+									on:contextmenu|preventDefault|stopPropagation={(event) => openToolbarPresetEditor(event, item.id)}
 									class="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-0 bg-stone-100 text-xs font-bold text-stone-600 transition-colors hover:bg-white hover:text-stone-900 sm:text-sm"
 									class:flex-row={item.id === 'laser'}
 									class:border-r={(row.length === 2 && itemIndex === 0) || (officialRow && itemIndex % 2 === 0)}
@@ -5921,7 +6567,7 @@
 						shortcutKeys={[primaryModifierKey, 'Z']}
 						ariaLabel="Undo"
 						label="Undo"
-						disabled={tutorialActive || history.length === 0}
+						disabled={tutorialActive && !animationTutorialActive || history.length === 0}
 						disabledOpacity="35"
 						onclick={() => runGuardedAction(undo)}
 					>
@@ -5941,7 +6587,7 @@
 						shortcutKeys={[primaryModifierKey, 'Shift', 'Z']}
 						ariaLabel="Redo"
 						label="Redo"
-						disabled={tutorialActive || future.length === 0}
+						disabled={tutorialActive && !animationTutorialActive || future.length === 0}
 						disabledOpacity="35"
 						onclick={() => runGuardedAction(redo)}
 					>
@@ -5970,6 +6616,8 @@
 				</div>
 
 				<div data-tutorial="file-actions" class="ml-2 flex gap-1.5">
+
+
 					<BuilderActionButton
 						tooltip="New Play"
 						shortcutKeys={['Shift', 'N']}
@@ -5977,36 +6625,41 @@
 						label="New"
 						tutorial="new-button"
 						disabled={(tutorialActive && activeTutorialSteps[tutorialStepIndex]?.data?.waitFor !== 'tutorial-new-play') || actionInProgress !== null}
-						onclick={requestNewBoard}
+						onclick={viewOnly ? openBlankBoard : requestNewBoard}
 					>
 						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
 							<path d="M5 3h10l4 4v14H5zM15 3v5h4M12 11v7M8.5 14.5h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
 						</svg>
 					</BuilderActionButton>
-					<BuilderActionButton
+					{#if viewOnly}<BuilderActionButton tooltip="Duplicate" ariaLabel="Duplicate this play builder" label="Duplicate" labelStyle="font-size: 7.25px;" disabled={actionInProgress !== null} onclick={makeCopyFromSharedPlay}>
+ <AnimationIcon name="copy" />
+ </BuilderActionButton>{:else}<BuilderActionButton
 						tooltip={saveActionLabel}
 						shortcutKeys={[primaryModifierKey, 'S']}
 						ariaLabel={ownershipResolved
 							? actionInProgress === 'save'
 								? 'Saving play'
-								: saveFeedbackState === 'saved'
+								: saveFeedbackState === 'failed'
+                                    ? 'Save failed'
+                                : saveFeedbackState === 'saved'
 									? 'Play saved'
-									: saveActionLabel === 'Make Copy'
-										? 'Make a copy of this play builder'
+									: saveActionLabel === 'Duplicate'
+										? 'Duplicate this play builder'
 										: 'Save play'
 							: 'Determining save access'}
 						label={saveActionLabel}
-						wrapperClass={saveActionLabel === 'Make Copy' ? 'flex h-9 w-10 shrink-0 max-lg:hidden' : 'flex h-9 w-10 shrink-0'}
+                        buttonClass={saveFeedbackState === 'failed' && actionInProgress !== 'save' ? '!bg-red-800 !text-white hover:!bg-red-900' : ''}
+						wrapperClass={saveActionLabel === 'Duplicate' ? 'flex h-9 w-10 shrink-0 max-lg:hidden' : 'flex h-9 w-10 shrink-0'}
 						busy={!ownershipResolved || actionInProgress === 'save'}
 						disabled={!ownershipResolved || !hasUnsavedChanges || tutorialActive || actionInProgress !== null}
 						labelClass="leading-none font-semibold whitespace-nowrap"
-						labelStyle={`font-size: ${saveActionLabel === 'Make Copy' ? '7.25px' : '8px'};${saveActionLabel === 'Make Copy' ? ' margin-top: 0.04em;' : ''}`}
+						labelStyle={`font-size: ${saveActionLabel === 'Duplicate' ? '7.25px' : '8px'};${saveActionLabel === 'Duplicate' ? ' margin-top: 0.04em;' : ''}`}
 						onclick={savePlay}
 					>
 						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
 							<path d="M4 3h13l3 3v15H4zM8 3v6h8V3M8 20v-7h8v7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter" />
 						</svg>
-					</BuilderActionButton>
+					</BuilderActionButton>{/if}
 					{#if savedPlayId}
 						<BuilderActionButton
 							tooltip="Share"
@@ -6060,6 +6713,9 @@
 						<path d="M8 16h8M8 12h8" stroke="currentColor" stroke-width="2" />
 					</svg>
 				</BuilderActionButton>
+<BuilderActionButton tooltip="Coming Soon" ariaLabel="Download MP4 — Coming Soon" label="MP4" disabled={true} disabledOpacity="35" onclick={() => {}}>
+ <svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+ </BuilderActionButton>
 				<BuilderActionButton
 					tooltip="Export Settings"
 					shortcutKeys={[primaryModifierKey, 'Shift', 'O']}
@@ -6088,24 +6744,25 @@
 					<div class="flex w-max items-stretch gap-1">
 						{#each playEntries as play, index (play.id)}
 							<HoverTooltip
-								text={editingPlayId === play.id ? '' : 'Double Click for Options'}
+								text={viewOnly || editingPlayId === play.id ? '' : 'Double Click for Options'}
 								minWidthPx={0}
 								wrapperClass="flex h-9 min-w-20 shrink-0 max-lg:h-7 max-lg:min-w-14"
 							>
 								<button
 									data-play-id={play.id}
 									type="button"
-									aria-label={`Open ${play.name}`}
+									aria-label={`${viewOnly ? "View" : "Open"} ${play.name}`}
 									aria-pressed={index === activePlayIndex}
 									on:click={() => switchPlay(play.id)}
-									on:dblclick={(event) => openPlayMenu(event, play.id)}
-									class="flex h-9 min-w-20 shrink-0 cursor-pointer items-center justify-center border border-stone-500 bg-stone-100 px-3 text-[10px] font-black whitespace-nowrap text-stone-800 hover:bg-white aria-pressed:border-stone-950 aria-pressed:bg-stone-900 aria-pressed:text-white max-lg:h-7 max-lg:min-w-14 max-lg:px-2 max-lg:text-[8px]"
+									on:dblclick={(event) => { if (!viewOnly) openPlayMenu(event, play.id); }}
+									on:contextmenu|preventDefault|stopPropagation={(event) => { if (!viewOnly) openPlayMenu(event, play.id); }}
+									class="flex h-9 min-w-20 shrink-0 cursor-pointer items-center justify-center border-2 border-stone-950 bg-white px-3 text-xs font-normal whitespace-nowrap text-stone-950 hover:bg-stone-100 aria-pressed:bg-stone-200 aria-pressed:font-black aria-pressed:hover:bg-stone-300 max-lg:h-7 max-lg:min-w-14 max-lg:px-2 max-lg:text-[10px]"
 								>
 									{play.name}
 								</button>
 							</HoverTooltip>
 						{/each}
-						<HoverTooltip
+						{#if !viewOnly}<HoverTooltip
 							text={playEntries.length >= PLAY_BUILDER_MAX_PLAYS ? 'Play Limit Reached' : 'Add Play'}
 							shortcutKeys={[alternateModifierKey, 'N']}
 							minWidthPx={0}
@@ -6116,11 +6773,11 @@
 								aria-label="Add another play"
 								disabled={playEntries.length >= PLAY_BUILDER_MAX_PLAYS}
 								on:click={addPlay}
-								class="flex h-9 w-9 cursor-pointer items-center justify-center border border-stone-500 bg-stone-100 text-xl font-black text-stone-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 max-lg:h-7 max-lg:w-7 max-lg:text-base"
+								class="flex h-9 w-9 cursor-pointer items-center justify-center border-2 border-stone-950 bg-white font-black text-stone-950 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40 max-lg:h-7 max-lg:w-7"
 							>
-								+
+<svg viewBox="0 0 24 24" class="h-3 w-3 max-lg:h-2.5 max-lg:w-2.5" aria-hidden="true"><path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="2.5" /></svg>
 							</button>
-						</HoverTooltip>
+						</HoverTooltip>{/if}
 					</div>
 				</div>
 				{#if editingPlayId !== null}
@@ -6142,7 +6799,7 @@
 										renamePlay();
 									}
 								}}
-								class="h-8 min-w-0 flex-1 border border-stone-500 bg-white px-2 text-xs font-semibold outline-none focus:border-stone-950"
+								class="h-8 min-w-0 flex-1 border-2 border-stone-500 bg-white px-2 text-xs font-semibold outline-none focus:border-stone-950"
 							/>
 							<HoverTooltip text="Duplicate Play" placement="above" minWidthPx={0} wrapperClass="flex h-8 w-8 shrink-0">
 								<button
@@ -6150,7 +6807,7 @@
 									aria-label="Duplicate play"
 									disabled={playEntries.length >= PLAY_BUILDER_MAX_PLAYS}
 									on:click={duplicatePlay}
-									class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center border border-stone-500 bg-white text-stone-800 hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40"
+									class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center border-2 border-stone-500 bg-white text-stone-800 hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40"
 								>
 									<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
 										<rect x="9" y="9" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" />
@@ -6182,7 +6839,7 @@
 					</div>
 				{/if}
 			</div>
-			<div
+			{#if !viewOnly}<div
 				class="bottom-action-toolbar absolute right-2 z-20 flex items-end gap-1.5"
 				style="bottom: calc(50% - 23.8cqw);"
 				aria-label="Field controls"
@@ -6195,7 +6852,25 @@
 						{actionMessage}
 					</span>
 				{/if}
-				<div class="flex gap-1.5" aria-label="Field setup controls">
+				<div class="relative flex gap-1.5" class:tutorial-launch-bouncing={animationLaunchBouncing} aria-label="Animation controls">
+<BuilderActionButton
+						tooltip="Open Animation Editor"
+ shortcutKeys={['Alt', 'A']}
+ ariaKeyshortcuts="Alt+A"
+						ariaLabel="Animate play"
+ buttonClass="relative"
+						label="Animate"
+						disabled={tutorialActive || actionInProgress !== null}
+						pressed={animationOpen}
+						onclick={() => (animationOpen ? closeAnimation() : openAnimation())}
+					>
+ {#if animationLaunchBouncing}<span data-animation-new class="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-600 px-1 text-[8px] leading-3 font-black text-white">NEW</span>{/if}
+						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true"
+							><path d="M8 4 21 12 8 20zM3 5v14" fill="none" stroke="currentColor" stroke-width="2" /></svg
+						>
+					</BuilderActionButton>
+</div>
+<div class="ml-2 flex gap-1.5" aria-label="Field setup controls">
 					<BuilderActionButton
 						tooltip="Flip Field Direction"
 						shortcutKeys={['Shift', 'F']}
@@ -6215,13 +6890,15 @@
 							/>
 						</svg>
 					</BuilderActionButton>
+
+
 					<BuilderActionButton
 						tooltip="Default Setup"
 						shortcutKeys={[primaryModifierKey, 'Shift', 'S']}
 						ariaLabel="Set up default play"
 						label="Setup"
 						tutorial="setup-button"
-						onclick={setupDefaultScenario}
+						disabled={Boolean(animation && animationPreview)} onclick={setupDefaultScenario}
 					>
 						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
 							<path d="M4 5h16v14H4zM8 5v14M13 5v14M18 5v14" fill="none" stroke="currentColor" stroke-width="1.6" />
@@ -6289,8 +6966,17 @@
 					</BuilderActionButton>
 				</div>
 			</div>
-			<div class="field-canvas relative my-auto w-full shrink-0">
-				<HoverTooltip text={fieldControlTooltip} minWidthPx={0} wrapperClass="contents">
+			{:else}
+ <div class="bottom-action-toolbar absolute right-2 z-20 flex items-end gap-1.5" style="bottom: calc(50% - 23.8cqw);" aria-label="Shared playback controls">
+  <BuilderActionButton tooltip="Go to Start" shortcutKeys={['HOME']} ariaLabel="Go to animation start" label="Start" disabled={!ownershipResolved || !animation || animationTime <= 0} onclick={() => selectAnimationStep(0)}><AnimationIcon name="start" /></BuilderActionButton>
+  <BuilderActionButton tooltip={animationPlaying ? 'Pause' : animationDuration(animation) > 0 && animationTime >= animationDuration(animation) ? 'Restart' : 'Play'} shortcutKeys={['K / Space']} ariaLabel={animationPlaying ? 'Pause animation' : animationDuration(animation) > 0 && animationTime >= animationDuration(animation) ? 'Restart animation' : 'Play animation'} label={animationPlaying ? 'Pause' : animationDuration(animation) > 0 && animationTime >= animationDuration(animation) ? 'Restart' : 'Play'} disabled={!ownershipResolved || !animationDuration(animation)} onclick={toggleAnimationPlayback}><AnimationIcon name={animationPlaying ? 'pause' : animationDuration(animation) > 0 && animationTime >= animationDuration(animation) ? 'reset' : 'play'} /></BuilderActionButton>
+  <BuilderActionButton tooltip="Playback Speed" shortcutKeys={['Alt', '↑ / ↓']} ariaLabel="Cycle playback speed" label="Speed" disabled={!ownershipResolved || !animationDuration(animation)} onclick={cycleViewerSpeed}><span class="text-xs font-black leading-4">{animationRate.toFixed(animationRate % .5 === 0 ? 1 : 2)}×</span></BuilderActionButton>
+  <BuilderActionButton tooltip="Loop Playback" ariaLabel="Loop playback" label="Loop" pressed={animationLoop} disabled={!ownershipResolved || !animationDuration(animation)} onclick={() => animationLoop = !animationLoop}><span class:text-blue-500={animationLoop}><AnimationIcon name="repeat" /></span></BuilderActionButton>
+ </div>
+ {/if}
+ <div class="field-canvas relative my-auto w-full shrink-0">
+				<HoverTooltip text={viewOnly ? "" : fieldControlTooltip} minWidthPx={0} wrapperClass="contents">
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions (Capture listeners block editing in shared view; individual field controls handle keyboard interaction.) -->
 					<svg
 						bind:this={svg}
 						data-tutorial="field"
@@ -6319,14 +7005,19 @@
 						role="application"
 						aria-label="Blank horizontal NIRSA flag football field drawing area"
 						aria-disabled={viewOnly}
-						on:pointerdown|capture={beginStylusEraser}
+						on:pointerdown|capture={(event) => { if (viewOnly) { event.preventDefault(); event.stopImmediatePropagation(); } else beginStylusEraser(event); }}
+      on:click|capture={(event) => { if (viewOnly) { event.preventDefault(); event.stopImmediatePropagation(); } }}
+      on:keydown|capture={(event) => { if (viewOnly) { event.preventDefault(); event.stopImmediatePropagation(); } }}
+      on:dblclick|capture={(event) => { if (viewOnly) { event.preventDefault(); event.stopImmediatePropagation(); } }}
 						on:pointerdown={beginOnField}
 						on:pointermove={(event) => {
+       if (viewOnly) return;
 							updateFieldControlTooltip(event);
 							continuePointer(event);
 						}}
 						on:contextmenu|preventDefault
 						on:pointerenter={(event) => {
+       if (viewOnly) { hoverPoint = null; pointerOnField = false; return; }
 							hoveringElement = false;
 							const canvasPoint = canvasPointFromEvent(event);
 							pointerInsideSelectedGroup = isPointInSelectedGroup(canvasPoint);
@@ -6434,10 +7125,10 @@
 											<rect
 												data-field-element
 												data-field-type="team-box-text"
-												data-hover-tooltip="Double Click to Edit"
-												role="button"
-												tabindex="0"
-												aria-label={`${teamBoxLabel}, double-click to rename team box`}
+												data-hover-tooltip={viewOnly ? undefined : "Double Click to Edit"}
+												role="button" aria-disabled={viewOnly}
+												tabindex={viewOnly ? undefined : 0}
+												aria-label={viewOnly ? teamBoxLabel : `${teamBoxLabel}, double-click to rename team box`}
 												x={(xForYards(teamBox[0]) + xForYards(teamBox[1]) - teamBoxTextHitWidth) / 2}
 												y={teamBoxY + 2}
 												width={teamBoxTextHitWidth}
@@ -6446,6 +7137,7 @@
 												pointer-events="all"
 												on:pointerdown|stopPropagation
 												on:dblclick|stopPropagation={(event) => startEditingTeamBox(event, teamBoxY, teamBoxIndex)}
+												on:contextmenu|preventDefault|stopPropagation={(event) => startEditingTeamBox(event, teamBoxY, teamBoxIndex)}
 												on:keydown={(event) => {
 													if (event.key === 'Enter') void startEditingTeamBox(event, teamBoxY, teamBoxIndex);
 												}}
@@ -6475,7 +7167,7 @@
 								{@const scoreboardGap = 10}
 								{@const quarterBoxX = xForYards(scoreboardTeamBox[0]) - scoreboardGap - scoreboardWidth}
 								{@const clockBoxX = xForYards(scoreboardTeamBox[1]) + scoreboardGap}
-								{#each [{ kind: 'quarter' as const, x: quarterBoxX, value: fieldSettings.gameQuarter.toUpperCase(), label: `Quarter ${fieldSettings.gameQuarter}, click for next quarter` }, { kind: 'clock' as const, x: clockBoxX, value: formatPlayBuilderGameClock(fieldSettings.gameClockSeconds), label: `Game clock ${formatPlayBuilderGameClock(fieldSettings.gameClockSeconds)}, click to edit` }] as scoreboardItem}
+								{#each [{ kind: 'quarter' as const, x: quarterBoxX, value: fieldSettings.gameQuarter.toUpperCase(), label: `Quarter ${fieldSettings.gameQuarter}, click for next quarter` }, { kind: 'clock' as const, x: clockBoxX, value: formatPlayBuilderGameClock(animatedClock.seconds), label: `Game clock ${formatPlayBuilderGameClock(animatedClock.seconds)}, click to edit` }] as scoreboardItem}
 									<g data-export-scoreboard>
 										<rect
 											x={scoreboardItem.x}
@@ -6536,17 +7228,19 @@
 												font-size="12"
 												font-weight="900"
 												letter-spacing="0.75"
-												pointer-events="none">{scoreboardItem.value}</text
+												data-game-clock={scoreboardItem.kind==='clock' ? true : undefined}
+ opacity={scoreboardItem.kind==='clock' && animationPlaying && !animatedClock.visible ? 0 : 1}
+ pointer-events="none">{scoreboardItem.value}</text
 											>
 										{/if}
 										{#if tool !== 'laser' && tool !== 'free-draw'}
 											<rect
 												data-field-element
 												data-scoreboard-control={scoreboardItem.kind}
-												data-hover-tooltip={scoreboardItem.kind === 'quarter' ? 'Cycle Through Periods' : 'Set Game Time'}
-												role="button"
-												tabindex="0"
-												aria-label={scoreboardItem.label}
+												data-hover-tooltip={viewOnly ? undefined : scoreboardItem.kind === 'quarter' ? 'Cycle Through Periods' : 'Set Game Time'}
+												role="button" aria-disabled={viewOnly}
+												tabindex={viewOnly ? undefined : 0}
+												aria-label={viewOnly ? scoreboardItem.value : scoreboardItem.label}
 												x={scoreboardItem.x}
 												y={scoreboardTeamBoxY}
 												width={scoreboardWidth}
@@ -6857,7 +7551,34 @@
 							{/key}
 						</g>
 
-						{#if hoverPoint && !hoveringElement && !drawing && !dragTarget}
+						<g data-field-x-layer aria-hidden="true" pointer-events="none">
+							{#if fieldSettings.showTenYardMarker}
+								{#each fieldLayout.tenYardXs as yards}
+									<text
+										x={xForYards(yards)}
+										y={fieldTop + fieldHeight / 2 + 7}
+										text-anchor="middle"
+										fill="rgba(255,255,255,0.9)"
+										font-size="24"
+										font-weight="900">×</text
+									>
+								{/each}
+							{/if}
+							{#if fieldSettings.showFourteenYardX}
+								{#each fieldLayout.fourteenYardXs as yards}
+									<text
+										x={xForYards(yards)}
+										y={fieldTop + fieldHeight / 2 + 7}
+										text-anchor="middle"
+										fill="rgba(255,255,255,0.9)"
+										font-size="24"
+										font-weight="900">×</text
+									>
+								{/each}
+							{/if}
+						</g>
+
+						{#if !viewOnly && hoverPoint && !hoveringElement && !drawing && !dragTarget}
 							{#if isGuideTool(tool)}
 								{@const rawGuidePreviewX = placementSnapX ?? hoverPoint.x}
 								{@const guidePreviewX =
@@ -7042,27 +7763,30 @@
 							{/if}
 						{/if}
 
-						{#each guides as guide}
+						<g data-animation-route-underlay data-export-exclude></g>
+						<g data-scene-layers>
+{#each guides as guide}
 							<g
 								data-layer-type="guide"
 								data-layer-id={guide.id}
 								data-tutorial-kind={guide.kind}
 								data-field-element
 								data-field-type="guide"
-								role="button"
-								tabindex="0"
+								role="button" aria-disabled={viewOnly}
+								tabindex={viewOnly ? undefined : 0}
 								aria-label={`${guideLabel(guide)}, double-click to format`}
 								on:pointerdown|stopPropagation={(event) => beginOnGuide(event, guide)}
 								on:pointerenter={() => (hoveringElement = tool !== 'ball' && tool !== 'event')}
 								on:pointerleave={() => (hoveringElement = false)}
 								on:dblclick|stopPropagation={(event) => startEditingGuide(event, guide)}
+								on:contextmenu|preventDefault|stopPropagation={(event) => startEditingGuide(event, guide)}
 								on:keydown|stopPropagation={(event) => handleGuideKeydown(event, guide)}
 								class="focus:outline-none"
 								class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('guide', guide.id)}
 								class:cursor-grabbing={tool !== 'free-draw' && tool !== 'event' && isDragging('guide', guide.id)}
 							>
 								<line x1={guide.x} y1={fieldTop} x2={guide.x} y2={fieldBottom} stroke="transparent" stroke-width="14" />
-								<line
+								<line id={`animation-guide-art-${guide.id}`}
 									x1={guide.x}
 									y1={fieldTop + guideSidelineInset}
 									x2={guide.x}
@@ -7076,32 +7800,7 @@
 							</g>
 						{/each}
 
-						<g data-field-x-layer aria-hidden="true" pointer-events="none">
-							{#if fieldSettings.showTenYardMarker}
-								{#each fieldLayout.tenYardXs as yards}
-									<text
-										x={xForYards(yards)}
-										y={fieldTop + fieldHeight / 2 + 7}
-										text-anchor="middle"
-										fill="rgba(255,255,255,0.9)"
-										font-size="24"
-										font-weight="900">×</text
-									>
-								{/each}
-							{/if}
-							{#if fieldSettings.showFourteenYardX}
-								{#each fieldLayout.fourteenYardXs as yards}
-									<text
-										x={xForYards(yards)}
-										y={fieldTop + fieldHeight / 2 + 7}
-										text-anchor="middle"
-										fill="rgba(255,255,255,0.9)"
-										font-size="24"
-										font-weight="900">×</text
-									>
-								{/each}
-							{/if}
-						</g>
+
 
 						{#each paths as path}
 							{@const start = pathStart(path)}
@@ -7115,8 +7814,8 @@
 										fill="none"
 										stroke="transparent"
 										stroke-width="44"
-										role="button"
-										tabindex="0"
+										role="button" aria-disabled={viewOnly}
+										tabindex={viewOnly ? undefined : 0}
 										aria-label={`${path.kind} line`}
 										class="focus:outline-none"
 										class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
@@ -7125,6 +7824,7 @@
 										on:pointerleave={() => (hoveringElement = false)}
 										on:pointerdown|stopPropagation={(event) => beginOnPath(event, path)}
 										on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
+										on:contextmenu|preventDefault|stopPropagation={(event) => startEditingPath(event, path)}
 										on:keydown={(event) => handlePathKeydown(event, path)}
 									/>
 									<g pointer-events="none">
@@ -7155,8 +7855,8 @@
 										fill="none"
 										stroke="transparent"
 										stroke-width="44"
-										role="button"
-										tabindex="0"
+										role="button" aria-disabled={viewOnly}
+										tabindex={viewOnly ? undefined : 0}
 										aria-label={`${path.kind} line`}
 										class="focus:outline-none"
 										class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
@@ -7165,6 +7865,7 @@
 										on:pointerleave={() => (hoveringElement = false)}
 										on:pointerdown|stopPropagation={(event) => beginOnPath(event, path)}
 										on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
+										on:contextmenu|preventDefault|stopPropagation={(event) => startEditingPath(event, path)}
 										on:keydown={(event) => handlePathKeydown(event, path)}
 									/>
 									<path
@@ -7187,8 +7888,8 @@
 										y2={path.end.y}
 										stroke="transparent"
 										stroke-width="44"
-										role="button"
-										tabindex="0"
+										role="button" aria-disabled={viewOnly}
+										tabindex={viewOnly ? undefined : 0}
 										aria-label={`${path.kind} line`}
 										class="focus:outline-none"
 										class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
@@ -7197,6 +7898,7 @@
 										on:pointerleave={() => (hoveringElement = false)}
 										on:pointerdown|stopPropagation={(event) => beginOnPath(event, path)}
 										on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
+										on:contextmenu|preventDefault|stopPropagation={(event) => startEditingPath(event, path)}
 										on:keydown={(event) => handlePathKeydown(event, path)}
 									/>
 									<line
@@ -7223,7 +7925,7 @@
 										r="18"
 										fill="transparent"
 										pointer-events="all"
-										role="button"
+										role="button" aria-disabled={viewOnly}
 										tabindex="-1"
 										aria-label={`Move ${path.kind} origin`}
 										class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
@@ -7232,6 +7934,7 @@
 										on:pointerleave={() => (hoveringElement = false)}
 										on:pointerdown|stopPropagation={(event) => beginOnPath(event, path, 'start')}
 										on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
+										on:contextmenu|preventDefault|stopPropagation={(event) => startEditingPath(event, path)}
 										on:keydown={(event) => handlePathKeydown(event, path)}
 									/>
 									<line
@@ -7245,7 +7948,7 @@
 										stroke="transparent"
 										stroke-width="36"
 										pointer-events="all"
-										role="button"
+										role="button" aria-disabled={viewOnly}
 										tabindex="-1"
 										aria-label={`Move ${path.kind} destination`}
 										class:cursor-grab={tool !== 'free-draw' && tool !== 'event' && !isDragging('path', path.id)}
@@ -7254,6 +7957,7 @@
 										on:pointerleave={() => (hoveringElement = false)}
 										on:pointerdown|stopPropagation={(event) => beginOnPath(event, path, 'end')}
 										on:dblclick|stopPropagation={(event) => startEditingPath(event, path)}
+										on:contextmenu|preventDefault|stopPropagation={(event) => startEditingPath(event, path)}
 										on:keydown={(event) => handlePathKeydown(event, path)}
 									/>
 								{/if}
@@ -7365,10 +8069,11 @@
 										tool === 'event' ? marker.kind === 'ball' || marker.kind === 'event' : !(isGuideTool(tool) && marker.kind === 'ball'))}
 								on:pointerleave={() => (hoveringElement = false)}
 								on:dblclick|stopPropagation={(event) => startEditingMarker(event, marker)}
+								on:contextmenu|preventDefault|stopPropagation={(event) => startEditingMarker(event, marker)}
 								on:keydown|stopPropagation={(event) => handleMarkerKeydown(event, marker)}
-								role="button"
-								tabindex={isEditableMarker(marker) ? 0 : -1}
-								aria-label={isTeamMarker(marker)
+								role="button" aria-disabled={viewOnly}
+								tabindex={!viewOnly && isEditableMarker(marker) ? 0 : -1}
+								aria-label={viewOnly ? (marker.label || marker.name || (isOfficialMarker(marker) ? officialNames[marker.kind] : marker.kind)) : isTeamMarker(marker)
 									? `${marker.label}, double-click to rename`
 									: isOfficialMarker(marker)
 										? `${marker.label ? `${marker.label}, ` : ''}${officialNames[marker.kind]}, double-click to add official name`
@@ -7439,109 +8144,7 @@
 										pointer-events="all"
 									/>
 								{/if}
-								{#if isTeamMarker(marker)}
-									{@const markerColor = playerMarkerColor(marker)}
-									<circle
-										cx={marker.x}
-										cy={marker.y}
-										r={playerRadius}
-										fill={guideColor(markerColor)}
-										stroke={playerTextColor(markerColor)}
-										stroke-width={playerStrokeWidth}
-									/>
-									<text
-										x={marker.x}
-										y={marker.y + 3.4}
-										text-anchor="middle"
-										fill={playerTextColor(markerColor)}
-										font-size={marker.label && marker.label.length >= 4 ? 7.65 : 8.925}
-										font-weight="900"
-										pointer-events="none">{marker.label}</text
-									>
-								{:else if isOfficialMarker(marker)}
-									<image
-										href={officialImages[marker.kind]}
-										x={marker.x - officialSize / 2}
-										y={marker.y - officialSize / 2}
-										width={officialSize}
-										height={officialSize}
-										pointer-events="none"
-									/>
-								{:else if marker.kind === 'ball'}
-									<image
-										href="/images/football.webp"
-										x={marker.x - footballSize / 2}
-										y={marker.y - footballSize / 2}
-										width={footballSize}
-										height={footballSize}
-										pointer-events="none"
-									/>
-								{:else if marker.kind === 'deflag'}
-									<image
-										href={deflagImage(marker.color)}
-										x={marker.x - deflagSize / 2}
-										y={marker.y - deflagSize / 2}
-										width={deflagSize}
-										height={deflagSize}
-										pointer-events="none"
-									/>
-								{:else if marker.kind === 'bean-bag'}
-									<image
-										href={beanBagImage(marker.color)}
-										x={marker.x - beanBagSize / 2}
-										y={marker.y - beanBagSize / 2}
-										width={beanBagSize}
-										height={beanBagSize}
-										pointer-events="none"
-									/>
-								{:else if marker.kind === 'event'}
-									{@const eventLines = eventTagLines(marker.label)}
-									<rect
-										x={marker.x - eventWidth(marker.label) / 2}
-										y={marker.y - eventHeight(marker.label) / 2}
-										width={eventWidth(marker.label)}
-										height={eventHeight(marker.label)}
-										fill="#fff"
-										stroke="#1c1917"
-										stroke-width="2.25"
-										pointer-events="none"
-									/>
-									<text x={marker.x} text-anchor="middle" fill="#1c1917" font-size="8.5" font-weight="900" pointer-events="none">
-										{#each eventLines as line, lineIndex}
-											<tspan x={marker.x} y={marker.y - ((eventLines.length - 1) * eventTagLineHeight) / 2 + 3.5 + lineIndex * eventTagLineHeight}
-												>{line}</tspan
-											>
-										{/each}
-									</text>
-								{:else}
-									<image
-										href="/images/penalty-flag.webp"
-										x={marker.x - foulFlagSize / 2}
-										y={marker.y - foulFlagSize / 2}
-										width={foulFlagSize}
-										height={foulFlagSize}
-										pointer-events="none"
-									/>
-								{/if}
-								{#if marker.label && (isOfficialMarker(marker) || ['ball', 'flag', 'bean-bag', 'deflag'].includes(marker.kind))}
-									{@const labelLines = penaltyLabelLines(marker.label)}
-									<text
-										x={marker.x}
-										y={markerDescriptionY(marker)}
-										text-anchor="middle"
-										fill="#fff"
-										stroke="#1c1917"
-										stroke-width="2"
-										paint-order="stroke"
-										font-size="8"
-										font-weight="900"
-										pointer-events="none"
-									>
-										{#each labelLines as line, lineIndex}
-											<tspan x={marker.x} dy={lineIndex === 0 ? 0 : 9}>{line}</tspan>
-										{/each}
-									</text>
-								{/if}
+								<g id={`animation-marker-art-${marker.id}`}><MarkerArtwork {marker} /></g>
 							</g>
 						{/each}
 
@@ -7651,7 +8254,7 @@
 						</g>
 
 						<g data-down-marker-layer>
-							{#if hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-to-gain' && fieldSettings.showDownMarker}
+							{#if !viewOnly && hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-to-gain' && fieldSettings.showDownMarker}
 								{@const previewGuideX = wholeYardLineToGainX(placementSnapX ?? hoverPoint.x)}
 								{@const previewDownMarker = downMarkerDisplay(currentLineToGain?.down ?? '1st', previewGuideX, lineOfScrimmageX)}
 								<g class="down-marker-graphic" opacity="0.72" pointer-events="none">
@@ -7680,16 +8283,17 @@
 									<g
 										class="down-marker-graphic"
 										data-down-marker
-										data-hover-tooltip={editingDownGuideId === guide.id ? undefined : 'Click to Edit'}
+										data-hover-tooltip={viewOnly || editingDownGuideId === guide.id ? undefined : 'Click to Edit'}
 										data-export-down-marker
 										data-field-element
 										data-field-type="guide"
-										role="button"
-										tabindex="0"
+										role="button" aria-disabled={viewOnly}
+										tabindex={viewOnly ? undefined : 0}
 										aria-label={`${downMarkerText(guide.down ?? '1st', guide.x, lineOfScrimmageX)} down marker`}
 										on:pointerdown|stopPropagation={(event) => beginOnGuide(event, guide, true)}
 										on:click|stopPropagation={(event) => startEditingDownMarker(event, guide)}
 										on:dblclick|stopPropagation={(event) => startEditingDownMarker(event, guide)}
+										on:contextmenu|preventDefault|stopPropagation={(event) => startEditingDownMarker(event, guide)}
 										on:keydown|stopPropagation={(event) => {
 											if (event.key === 'Enter' || event.key === ' ') startEditingDownMarker(event, guide);
 										}}
@@ -7724,7 +8328,7 @@
 									</g>
 								{/each}
 							{/if}
-							{#if hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-of-scrimmage' && fieldSettings.showLineOfScrimmageMarker}
+							{#if !viewOnly && hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-of-scrimmage' && fieldSettings.showLineOfScrimmageMarker}
 								{@const previewGuideX = wholeYardLineOfScrimmageX(placementSnapX ?? hoverPoint.x)}
 								{@const previewLosMarker = lineOfScrimmageMarkerDisplay(previewGuideX)}
 								<g class="los-marker-graphic" opacity="0.72" pointer-events="none">
@@ -7760,16 +8364,17 @@
 									<g
 										class="los-marker-graphic"
 										data-los-marker
-										data-hover-tooltip={editingGuideId === guide.id ? undefined : 'Click to Edit'}
+										data-hover-tooltip={viewOnly || editingGuideId === guide.id ? undefined : 'Click to Edit'}
 										data-export-los-marker
 										data-field-element
 										data-field-type="guide"
-										role="button"
-										tabindex="0"
+										role="button" aria-disabled={viewOnly}
+										tabindex={viewOnly ? undefined : 0}
 										aria-label={`Line of Scrimmage at the ${losYardLine(guide.x)} yard line`}
 										on:pointerdown|stopPropagation={(event) => beginOnGuide(event, guide, true)}
 										on:click|stopPropagation={(event) => startEditingLineOfScrimmageMarker(event, guide)}
 										on:dblclick|stopPropagation={(event) => startEditingGuide(event, guide)}
+										on:contextmenu|preventDefault|stopPropagation={(event) => startEditingGuide(event, guide)}
 										on:keydown|stopPropagation={(event) => {
 											if (event.key === 'Enter' || event.key === ' ') startEditingLineOfScrimmageMarker(event, guide);
 										}}
@@ -7946,7 +8551,7 @@
 										filter="url(#builder-neon-glow)"
 									/>
 								{/if}
-								{#if tool === 'laser' && laserPointer && pointerOnField}
+								{#if !viewOnly && tool === 'laser' && laserPointer && pointerOnField}
 									<circle
 										cx={laserPointer.x}
 										cy={laserPointer.y}
@@ -7963,6 +8568,20 @@
 									/>
 								{/if}
 							</g>
+						{/if}
+						</g>
+{#if animation && animationOpen && !viewOnly && !animationPreview}
+							<AnimationOverlay
+								animation={animationContent.animation!}
+								scene={animationContent.scene}
+								stepIndex={animationStep}
+								selection={selectedTargets.filter((target): target is AnimationTarget => target.type !== 'path')}
+								ghosts={animationGhosts}
+								drawingRoute={animationDrawingRoute}
+								onchange={updateAnimationMotion}
+ ondraw={(active) => (animationDrawingRoute = active)}
+ onselect={selectAnimationObject}
+							/>
 						{/if}
 					</svg>
 				</HoverTooltip>
@@ -8249,8 +8868,19 @@
 					</form>
 				{/if}
 
-				{#if !viewOnly && deleteTarget && deletePosition}
-					<div class="absolute z-20 -translate-y-1/2" style:left={`${deletePosition.x / 10}%`} style:top={`${(deletePosition.y / 484) * 100}%`}>
+				{#if !viewOnly && !animationPreview && selectedTargets.length > 0 && deleteTarget && deletePosition}
+					<div data-element-actions class="absolute z-20 -translate-y-1/2" style:left={`${deletePosition.x / 10}%`} style:top={`${(deletePosition.y / 484) * 100}%`}>
+ {#if canRevertPosition}
+  <div class="absolute right-full mr-1">
+   <HoverTooltip text="Revert to Original Position" placement="above" minWidthPx={0} wrapperClass="flex h-7 w-7 shrink-0">
+    <button type="button" aria-label="Revert to original position" on:pointerdown|preventDefault|stopPropagation={revertElementPosition}
+     class="element-delete-button flex h-7 w-7 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white">
+     <svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+    </button>
+   </HoverTooltip>
+  </div>
+ {/if}
+
 						<HoverTooltip
 							text={selectedTargets.length > 1 ? 'Delete Selected Elements' : 'Delete Element'}
 							placement="above"
@@ -8264,7 +8894,7 @@
 								on:pointerdown|preventDefault|stopPropagation={deleteHoveredElement}
 								class="element-delete-button flex h-7 w-7 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white"
 							>
-								<img src="/images/toolbar/trash-can.webp" alt="" class="h-4 w-4 object-contain invert" draggable="false" loading="lazy" />
+								<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" fill="none" stroke="currentColor" stroke-width="2" /></svg>
 							</button>
 						</HoverTooltip>
 					</div>
@@ -8272,34 +8902,38 @@
 			</div>
 		</div>
 	</div>
-	{#if viewOnly}
-		<div class="view-only-actions flex items-center justify-end gap-2 border-t border-stone-700 bg-stone-800 px-2 py-2 max-lg:hidden">
-			<button
-				type="button"
-				class="cursor-pointer border-2 border-stone-100 bg-stone-100 px-3 py-2 text-xs font-black text-stone-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-				disabled={actionInProgress !== null}
-				on:click={makeCopyFromSharedPlay}>Make Copy</button
-			>
+	{#if animation && animationOpen && !viewOnly}
+		<div use:animationPortal class="animation-dock" class:invisible={showSetupConfirm || showSettings || showExportSettings || showFeedback || showHelp || tutorialActive && !animationTutorialActive} style:left={`${animationDockLeft}px`} style:width={`${animationDockWidth}px`}>
+			<AnimationPanel
+				animation={animationContent.animation!}
+				scene={animationContent.scene}
+				stepIndex={animationStep}
+				selection={selectedTargets.filter((target): target is AnimationTarget => target.type !== 'path')}
+				readOnly={viewOnly}
+ minimumStepCount={animationTutorialActive ? 3 : 1}
+ shortcutsEnabled={!((tutorialActive && !animationTutorialActive) || actionInProgress!==null || showSetupConfirm || showDraftRestore || showNewPrompt || showShare || showExportSettings || showSettings || showHelp || showFeedback || editingPlayId!==null)}
+				playing={animationPlaying}
+				preview={animationPreview}
+				time={animationTime}
+				bind:rate={animationRate}
+				bind:loop={animationLoop}
+				bind:ghosts={animationGhosts}
+				onchange={changeAnimation}
+				onstep={(index) => { if (hasActiveInlineEditor()) commitActiveEditor(); selectAnimationStep(index); }}
+				onseek={seekAnimation}
+ onshuttle={shuttleAnimation}
+				onplay={toggleAnimationPlayback}
+				onclose={closeAnimation}
+ onreset={requestAnimationReset}
+ ontutorial={startAnimationEditorTutorial}
+ tutorialAttention={animationTutorialAttention}
+ oncreateplay={createPlayFromStep}
+ canCreatePlay={playEntries.length < PLAY_BUILDER_MAX_PLAYS}
+				onerror={showActionMessage}
+			/>
 		</div>
-		<nav
-			class="view-only-play-tabs play-tabs-scroll overflow-x-auto overflow-y-hidden bg-stone-800 p-2"
-			aria-label="Plays in this shared play builder"
-		>
-			<div class="flex w-max min-w-full items-stretch gap-1">
-				{#each playEntries as play, index (play.id)}
-					<button
-						type="button"
-						aria-label={`View ${play.name}`}
-						aria-current={index === activePlayIndex ? 'page' : undefined}
-						on:click={() => switchPlay(play.id)}
-						class="flex h-9 min-w-20 shrink-0 cursor-pointer items-center justify-center border border-stone-500 bg-stone-100 px-3 text-[10px] font-black whitespace-nowrap text-stone-800 hover:bg-white aria-[current=page]:border-white aria-[current=page]:bg-stone-950 aria-[current=page]:text-white max-lg:h-7 max-lg:min-w-14 max-lg:px-2 max-lg:text-[8px]"
-					>
-						{play.name}
-					</button>
-				{/each}
-			</div>
-		</nav>
 	{/if}
+
 </section>
 
 {#snippet exportColorSpectrum(picker: 'background' | 'border', color: string)}
@@ -8399,6 +9033,33 @@
 		</div>
 	</div>
 {/snippet}
+
+{#if showSetupConfirm}
+ <div class="fixed inset-0 z-[80] flex items-center justify-center p-4">
+  <button type="button" aria-label="Cancel default setup" on:click={dismissSetupConfirm} class="absolute inset-0 cursor-default bg-stone-950/75 backdrop-blur-[1px]"></button>
+  <div role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="setup-confirm-title" aria-describedby="setup-confirm-description"
+   class="scroll-modal fixed z-10 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto border-2 border-stone-950 bg-stone-50 text-stone-800 shadow-2xl"
+   style:left={`${diagramModalCenterX}px`} style:top={`${diagramModalCenterY}px`} style:max-height={`${diagramModalMaxHeight}px`}
+   on:keydown={(event) => {
+    if (event.key !== 'Tab') return;
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button'));
+    const first = buttons[0], last = buttons[buttons.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+   }}>
+   <header class="border-b-2 border-stone-900 bg-stone-900 px-5 py-3 text-white">
+    <h2 id="setup-confirm-title" class="text-lg font-black tracking-tight">Clear Animation?</h2>
+   </header>
+   <div class="p-5">
+    <p id="setup-confirm-description" class="text-sm leading-relaxed text-stone-700">This will remove all animation steps and motion settings, keeping the starting formation.</p>
+    <div class="mt-5 flex justify-end gap-2">
+     <button bind:this={setupCancelButton} type="button" on:click={dismissSetupConfirm} class="h-10 cursor-pointer border-2 border-stone-900 bg-white px-4 text-xs font-black tracking-wide uppercase hover:bg-stone-200">Cancel</button>
+     <button type="button" on:click={confirmAnimationReset} class="h-10 cursor-pointer bg-stone-900 px-4 text-xs font-black tracking-wide text-white uppercase hover:bg-stone-700">Clear Animation</button>
+    </div>
+   </div>
+  </div>
+ </div>
+{/if}
 
 {#if showDraftRestore && pendingDraft}
 	<div class="fixed inset-0 z-[80] flex items-center justify-center p-4">
@@ -8774,19 +9435,21 @@
 					<h3 class="mb-2 text-sm font-black tracking-wide uppercase">Field Type</h3>
 					<div data-tutorial="field-type-options" class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label="Field type">
 						{#each fieldTypeOptions as option}
-							<button
+							<HoverTooltip text={animation && animation.steps.length > 1 && option.id !== fieldSettings.fieldType ? 'Clear Animation to Change Field Type' : ''} minWidthPx={0} wrapperClass="flex h-full">
+ <button
 								type="button"
 								role="radio"
+ disabled={Boolean(animation && animation.steps.length > 1 && option.id !== fieldSettings.fieldType)}
 								aria-checked={fieldSettings.fieldType === option.id}
 								on:click={() => updateFieldSetting('fieldType', option.id)}
-								class="flex h-full cursor-pointer flex-col justify-start border-2 border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90 aria-checked:border-stone-950 aria-checked:bg-stone-900 aria-checked:text-white"
+								class="flex h-full w-full disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer flex-col justify-start border-2 border-stone-400 bg-white/75 p-3 text-left hover:border-stone-900 hover:bg-white/90 aria-checked:border-stone-950 aria-checked:bg-stone-900 aria-checked:text-white"
 							>
 								<span class="flex w-full items-baseline justify-between gap-2">
 									<strong class="text-sm font-black">{option.label}</strong>
 									<span class="text-[10px] font-bold opacity-75">{option.dimensions}</span>
 								</span>
 								<span class="mt-1 block text-xs leading-snug opacity-75">{option.description}</span>
-							</button>
+							</button></HoverTooltip>
 						{/each}
 					</div>
 				</section>
@@ -8869,10 +9532,10 @@
 							onToggle={() => (showYardLineCursorEnabled = !showYardLineCursorEnabled)}
 						/>
 						<BuilderToggleCard
-							label="Show Ads"
-							description="Show the Play Builder ad panel beside the diagram."
-							checked={adsEnabled}
-							onToggle={() => (adsEnabled = !adsEnabled)}
+							label="Extended Grass"
+							description="Extend darker field grass around the diagram."
+							checked={extendedGrassEnabled}
+							onToggle={() => (extendedGrassEnabled = !extendedGrassEnabled)}
 						/>
 					</div>
 				</section>
@@ -9127,7 +9790,7 @@
 							first.
 						</p>
 						<p>
-							<strong>Save / Make Copy:</strong> Save updates a play builder created in this browser. A shared URL shows Make Copy and saves your changes
+							<strong>Save / Duplicate:</strong> Save updates a play builder created in this browser. A shared URL shows Duplicate and saves your changes
 							under a new shareable address.
 						</p>
 						<p>
@@ -9147,6 +9810,30 @@
 {/if}
 
 <style>
+ :global(.animation-tutorial-active [data-tutorial="interaction-area"]), :global(.animation-tutorial-active [data-tutorial="interaction-area"] *),
+ :global(.animation-tutorial-active .tool-column), :global(.animation-tutorial-active .tool-column *),
+ :global(.animation-tutorial-active .animation-dock), :global(.animation-tutorial-active .animation-dock *),
+ :global(.animation-tutorial-active [data-step-menu]), :global(.animation-tutorial-active [data-step-menu] *),
+ :global(.animation-tutorial-active [role="dialog"]), :global(.animation-tutorial-active [role="dialog"] *),
+ :global(.animation-tutorial-active [data-element-actions]), :global(.animation-tutorial-active [data-element-actions] *),
+ :global(.animation-tutorial-active [data-animation-path-picker]), :global(.animation-tutorial-active [data-animation-path-picker] *),
+ :global(.animation-tutorial-active .step-duration), :global(.animation-tutorial-active .step-duration *),
+ :global(.animation-tutorial-active [data-tutorial="marker-editor"]), :global(.animation-tutorial-active [data-tutorial="marker-editor"] *) { pointer-events: auto; }
+ :global(.animation-tutorial-active .field-canvas [pointer-events="none"]), :global(.animation-tutorial-active .field-canvas [pointer-events="none"] *) { pointer-events: none !important; }
+ :global(.animation-tutorial-active [data-animation-path-picker] .easing-menu) { position: static; }
+ :global(.animation-tutorial-resize .dock-resize svg) { opacity: 1 !important; }
+ .animation-tool-disabled {opacity:.35;cursor:not-allowed !important;}
+
+	.animation-dock {
+		position: fixed;
+		bottom: 8px;
+		z-index: 1000;
+		height: 112px;
+		pointer-events: none;
+	}
+	.animation-dock :global([data-animation-ui]) {
+		pointer-events: auto;
+	}
 	:global([data-tutorial='draw-workspace'].driver-active-element) {
 		position: relative;
 		z-index: 1000000001;
@@ -9280,25 +9967,11 @@
 	.field-canvas {
 		aspect-ratio: 1000 / 484;
 	}
-	.view-only {
-		border: 0;
-		box-shadow: none;
-	}
-	.view-only [data-tutorial='draw-workspace'] {
-		gap: 0;
-		padding: 0;
-	}
-	.view-only .tool-column,
-	.view-only .play-builder-interaction > :not(.field-canvas) {
-		display: none !important;
-	}
-	.view-only .play-builder-interaction,
-	.view-only .field-canvas {
-		width: 100%;
-	}
-	.view-only .field-canvas {
-		pointer-events: none;
-	}
+ .view-only .tool-column { visibility: hidden; pointer-events: none; }
+ .view-only [data-tutorial='history-actions'] { display: none; }
+ .view-only [data-tutorial='file-actions'] { margin-left: 0; }
+ .view-only .field-canvas,
+ .view-only .field-canvas :global(*) { pointer-events: none !important; cursor: default !important; }
 	.high-contrast-mode {
 		border-color: #000;
 		filter: contrast(1.35) saturate(1.1);

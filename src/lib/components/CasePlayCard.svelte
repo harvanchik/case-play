@@ -31,7 +31,7 @@
 >
 	<div class="flex flex-row items-start justify-start">
 		<div
-			class={`line-clamp-2 flex flex-1 flex-row pb-1 text-xl leading-tight font-bold text-stone-800 transition-colors duration-300 group-hover:text-black ${compact ? 'sm:text-xl' : 'sm:text-2xl'}`}
+			class={`line-clamp-2 min-w-0 flex-1 break-words pb-1 text-xl leading-tight font-bold text-stone-800 transition-colors duration-300 group-hover:text-black ${compact ? 'sm:text-xl' : 'sm:text-2xl'}`}
 		>
 			<p>{casePlay.title}</p>
 		</div>
