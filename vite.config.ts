@@ -9,6 +9,9 @@ export default defineConfig(async ({ command, mode }) => {
 	const workflows = command === 'build' || videoEnabled ? [(await import('workflow/sveltekit')).workflowPlugin()] : [];
 	return {
 		plugins: [sveltekit(), ...workflows],
+		server: {
+			watch: { ignored: ['**/.pnpm-store/**', '**/.vercel/**'] }
+		},
 		optimizeDeps: {
 			include: ['@iconify/svelte', 'mark.js']
 		}

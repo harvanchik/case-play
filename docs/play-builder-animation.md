@@ -11,26 +11,15 @@ Each play can optionally contain a version 7 animation. Existing version 1–6 d
 - The ball may attach only to team players. Release and catch positions are evaluated at their actual transition times, allowing moving receivers. Carry offsets remain editable.
 - Limits: 61 steps, 60 seconds, 256 intermediate route points, and the existing 1.5 MB document limit. Social/library images use Start. Raster/PDF exports exclude animation handles and ghosts.
 
-## MP4 infrastructure
+## Browser video downloads
 
-The source includes the complete export pipeline, but **exports default to disabled**. Animation editing, saving, sharing, and playback work without export infrastructure.
+Signed-in users can export the active animation as a single MP4, MOV, WebM, or GIF file. The MP4 split button exposes the other video formats. The PNG split button exposes JPG, WebP, and PDF. Menus close on outside clicks or Escape and render above the page.
 
-Before enabling MP4 in a deployment:
+`canvas-record` performs encoding entirely in the browser. No export job, database record, uploaded frames, Blob output, Sandbox, or paid rendering service is used. The old export API endpoints return 410; the legacy server pipeline is disconnected. Leave its feature flag disabled. No export rate limit is necessary because rendering runs on the user's device. Ordinary static asset delivery still uses hosting bandwidth.
 
-1. Apply migrations, including `0009_play_builder_exports.sql`, to that deployment's database.
-2. Configure Workflow for the Vercel project. The SvelteKit Vite plugin creates its workflow routes during the build.
-3. Provide Sandbox access to the project through Vercel OIDC. For development outside Vercel, use the SDK's documented local OIDC setup.
-4. Connect a **private Vercel Blob store** and provide its SDK credentials to the deployment. Never use a public store for job outputs.
-5. Optionally set `PLAY_BUILDER_VIDEO_SANDBOX_SNAPSHOT_ID` to a snapshot containing Node 24, `ffmpeg` with `libx264`, and `@resvg/resvg-js@2.6.2` under `/vercel/sandbox/node_modules`. Without it, each job prepares those dependencies in its disposable sandbox.
-6. Set `PLAY_BUILDER_VIDEO_EXPORT_ENABLED=true`, deploy, and run a signed-in staging export. Verify job progress, the downloaded MP4, cache reuse, and expiration before enabling in production.
+MP4, MOV, and WebM use 1920×1080 at 30 fps; GIF uses 960×540 at 15 fps to limit memory use. Exports have no audio and use authored timing at 1×, independently of preview speed. Export backgrounds, grass, padding, borders, prompts, branding, and layer order use the existing image renderer. Video letterboxing uses the darkest extended grass, derived from the live end-zone color, with the same grass stripe pattern. Image assets are cached across frames. The submitted play snapshot is fixed during export; progress and Cancel are shown, then the editing step and selection are restored.
 
-The sandbox renderer is bundled at build time into `.svelte-kit/video-renderer-source.js`. The Workflow build consumes this ordinary module, including embedded fonts and marker assets. The renderer and browser share the same evaluator. Untrusted document strings are validated data; they are never executed as commands.
-
-Exports use 1920×1080, 30 fps, H.264/yuv420p, no audio, and authored timing at 1×. FFmpeg runs detached inside a disposable sandbox; durable Workflow steps poll progress and store the result privately. Sandbox execution is bounded to twelve minutes. Workflow cleans up resources after success/failure and removes output after 24 hours.
-
-Submission snapshots only the active play, without saving or changing the diagram. The database atomically enforces one active export per account and five new jobs per UTC day. Identical active/completed requests are reused per account and do not consume another quota slot. Completed downloads expire after 24 hours. Status and download endpoints check the requesting account. A signed-in viewer can export a shared play; anonymous users can animate, save, and share but must sign in for MP4.
-
-Provisioning services or enabling the switch may incur Vercel processing/storage charges. No services are provisioned by installation or local tests.
+Codec support is checked before encoding. MP4 has a bundled software fallback; MOV and WebM require a compatible WebCodecs encoder and show an actionable error otherwise. Files remain on the user's device and are downloaded individually without ZIP packaging.
 
 ## Verification
 
@@ -44,14 +33,12 @@ pnpm test:e2e
 
 Browser tests use a separate `caseplay-animation-test.db` and cover authoring, undo/redo, custom paths, possession, timing, saving, reopening in the same browser, shared playback, unauthorized updates/exports, and Make Copy. Chrome and Edge projects use installed browsers; Firefox and WebKit use Playwright engines. On Windows the Firefox binary may require the Visual C++ runtime; a side-by-side configuration launch failure is an environment failure, not an application result.
 
-For the actual production-renderer MP4 test, supply `FFMPEG_PATH` pointing to a local FFmpeg executable when running `pnpm test`. Without it, only that binary integration test is skipped. This test compiles the renderer, creates a short real video, and checks codec, resolution, frame rate, and decoding.
-
-Live Workflow/Sandbox/Blob verification requires configured credentials and an enabled deployment; local video generation does not establish that those remote services are provisioned correctly.
+`tests/browser/browser-video.spec.ts` verifies actual playable video files and their dimensions, sign-in gating, dropdown dismissal, cancellation, editing-state restoration, MP4 software fallback, and the absence of export API calls. Full codec coverage runs in Chromium; WebKit checks MP4 and the software fallback. Tests create and delete temporary account sessions only in the disposable local test database.
 
 On Windows, the Vercel adapter may require directory-link privileges to finish packaging. Local bundle validation used an untracked build-only junction fallback; it does not change application code or production configuration.
 
 
-Editor refinements: new transitions default to one second. Adding an object changes only the selected step; newly duplicated steps inherit it, and existing later steps stay unchanged. The draggable 960px dock uses attached inspectors, a horizontally scrolling step row, and playback speeds from 0.25× through 2×. The MP4 toolbar control is temporarily disabled with a Coming Soon tooltip while backend provisioning and cloud verification remain pending.
+Editor refinements: new transitions default to one second. Adding an object changes only the selected step; newly duplicated steps inherit it, and existing later steps stay unchanged. The draggable 960px dock uses attached inspectors, a horizontally scrolling step row, and playback speeds from 0.25× through 2×. The MP4 toolbar control is enabled for signed-in users when an animation exists.
 
 The + control appends a copy of the last pose at the end. Duplicate remains a separate step action. Motion inspector titles use proper object names and can be edited in place; optional names are stored separately from field labels and survive saving, copying, and Undo/Redo.
 
@@ -140,3 +127,7 @@ Tutorial follow-up: ghost toggling selects Step 2; animation editing selects the
 Hold Shift while dragging an interior timeline step marker for 0.01-second duration adjustments; ordinary dragging remains at 0.05 seconds. Neighboring transition durations adjust together and preserve the total.
 
 Animate has a first-use bouncing NEW badge, remembered per browser. Opening Animate clears it permanently for that browser. The animation tutorial button pulses with its normal hover background until the tutorial is first started; that choice also persists across reloads. Shared playback controls remain disabled until browser initialization finishes.
+
+With multiple plays, opening either format menu exposes vertically stacked ALL controls. ALL images and videos download as ZIP archives with one numbered file per play; ALL PDF creates one document with one page per play. A normal PDF button exports only the selected play. Video exports include only animated plays. ALL is shown only when multiple animated plays exist; with one animated play, it downloads directly even if a static play is selected. Single-play builders show no ALL controls. Local development permits video exports without sign-in; production requires sign-in.
+
+Downloads use the play name, with ` Animation` before video file extensions. Export progress and cancellation replace the primary image/video square button; its background fills from left to right as progress advances. Duplicate names in ZIPs receive numbered suffixes.

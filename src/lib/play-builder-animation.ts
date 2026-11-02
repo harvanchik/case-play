@@ -3,7 +3,7 @@ import type { FieldMarker, PlayBuilderScene, Point } from './play-builder-scene'
 export const MAX_ANIMATION_SECONDS = 60;
 export const MAX_ANIMATION_STEPS = 61;
 export type AnimationTarget = { type: 'marker' | 'guide'; id: number };
-export type AnimationPose = AnimationTarget & Point & { visible: boolean; label?: string | null; name?: string | null; carrierId?: number; offset?: Point };
+export type AnimationPose = AnimationTarget & Point & { visible: boolean; animationOpacity?: number; label?: string | null; name?: string | null; carrierId?: number; offset?: Point };
 export type AnimationStep = { id: string; name: string; poses: AnimationPose[] };
 export type Motion = AnimationTarget & {
 	path: 'straight' | 'curve' | 'custom' | 'jump';
@@ -126,7 +126,7 @@ export const captureAnimationEdits = (base: PlayBuilderScene, live: PlayBuilderS
 	});
 	scene.guides = scene.guides.map((guide) => {
 		const pose = initial.poses.find((item) => item.type === 'guide' && item.id === guide.id);
-		return pose ? { ...guide, x: pose.x, name: pose.name === undefined ? guide.name : pose.name ?? undefined } : guide;
+		return pose ? { ...guide, animationOpacity: pose.animationOpacity, x: pose.x, name: pose.name === undefined ? guide.name : pose.name ?? undefined } : guide;
 	});
 	return { scene, animation: next };
 };
@@ -138,14 +138,14 @@ export const applyAnimationStep = (scene: PlayBuilderScene, step: AnimationStep)
 		if (!pose?.visible) return null;
 		const carrier = pose.carrierId === undefined ? undefined : poses.get(`marker:${pose.carrierId}`);
 		const position = carrier?.visible ? { x: carrier.x + (pose.offset?.x ?? 12), y: carrier.y + (pose.offset?.y ?? 8) } : pose;
-		return { ...marker, x: position.x, y: position.y, label: pose.label === undefined ? marker.label : pose.label ?? undefined, name: pose.name === undefined ? marker.name : pose.name ?? undefined };
+		return { ...marker, animationOpacity: pose.animationOpacity, x: position.x, y: position.y, label: pose.label === undefined ? marker.label : pose.label ?? undefined, name: pose.name === undefined ? marker.name : pose.name ?? undefined };
 	};
 	return {
 		...scene,
 		markers: scene.markers.map(markerAt).filter((item): item is FieldMarker => item !== null),
 		guides: scene.guides.flatMap((guide) => {
 			const pose = poses.get(`guide:${guide.id}`);
-			return pose?.visible ? [{ ...guide, x: pose.x, name: pose.name === undefined ? guide.name : pose.name ?? undefined }] : [];
+			return pose?.visible ? [{ ...guide, animationOpacity: pose.animationOpacity, x: pose.x, name: pose.name === undefined ? guide.name : pose.name ?? undefined }] : [];
 		})
 	};
 };
@@ -239,7 +239,16 @@ export const evaluateAnimation = (play: { scene: PlayBuilderScene; animation?: P
 		if (!a.visible) return b.visible ? resolveAttachment(b, progress) : { ...a };
 		if (!b.visible) return { ...b };
 		const motion = transition.motions.find((item) => sameTarget(item, target)) ?? defaultMotion(target);
-        if (motion.path === 'jump') return progress < motion.start ? resolveAttachment(a, progress) : { ...resolveAttachment(b, progress), label: a.label, name: a.name };
+        if (motion.path === 'jump') {
+          // Fade around the jump without interpolating through positions along its route.
+          const jumpTime = motion.start * transition.duration;
+          const seconds = progress * transition.duration;
+          const fadeOut = Math.min(.06, jumpTime);
+          const fadeIn = Math.min(.06, transition.duration - jumpTime);
+          const before = seconds < jumpTime;
+          const opacity = before ? (fadeOut ? clamp((jumpTime-seconds)/fadeOut) : 1) : (fadeIn ? clamp((seconds-jumpTime)/fadeIn) : 1);
+          return { ...resolveAttachment(before ? a : b, progress), label:a.label, name:a.name, animationOpacity:opacity };
+        }
 		const carrierA = attached && a.carrierId !== undefined ? a.carrierId : undefined;
 		const carrierB = attached && b.carrierId !== undefined ? b.carrierId : undefined;
 		if (carrierA !== undefined && carrierA === carrierB) return resolveAttachment(a, progress);

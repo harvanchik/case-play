@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto, replaceState } from '$app/navigation';
+	import { dev } from '$app/environment';
 	import { onMount, tick } from 'svelte';
 	import { driver, type DriveStep, type Driver } from 'driver.js';
 	import 'driver.js/dist/driver.css';
@@ -69,6 +70,8 @@
 		type FlagFootballToolDefinition
 	} from '$lib/flag-football-play-builder-definition';
 	import HoverTooltip from './HoverTooltip.svelte';
+	import ExportDropdown from './play-builder/ExportDropdown.svelte';
+ import { downloadBrowserVideo, type VideoFormat } from '$lib/play-builder-browser-video';
 	import BuilderActionButton from './play-builder/BuilderActionButton.svelte';
 	import AnimationPanel from './play-builder/AnimationPanel.svelte';
 	import MarkerArtwork from './play-builder/MarkerArtwork.svelte';
@@ -313,7 +316,7 @@
 	let history: BuilderState[] = [];
 	let future: BuilderState[] = [];
 	let nextId = Math.max(0, ...loadedIds) + 1;
-	let actionInProgress: 'save' | 'png' | 'jpg' | 'webp' | 'pdf' | null = null;
+	let actionInProgress: 'save' | 'png' | 'jpg' | 'webp' | 'pdf' | VideoFormat | null = null;
 	let actionMessage = '';
 	let actionMessageTimer: ReturnType<typeof setTimeout> | null = null;
 	let canEditSavedPlay = savedPlayId === null || accountOwnedByCurrentUser;
@@ -2117,7 +2120,7 @@
 		return {
 			backgroundColor:
 				exportBackground === 'grass'
-					? darkerExportColor(fieldPalette.endZone)
+					? extendedGrassColor
 					: exportBackground === 'color'
 						? colorWithOpacity(exportBackgroundColor, exportBackgroundOpacity)
 						: undefined,
@@ -2187,60 +2190,72 @@
 			paddingLeft: Number.parseFloat(style?.paddingLeft ?? '') || 16
 		};
 	};
-	const exportImage = async (format: 'png' | 'jpg' | 'webp' | 'pdf') => {
-		if (actionInProgress) return;
-		pauseAnimation();
-		const animationRestore = { step: animationStep, time: animationTime, preview: animationPreview, scene: sceneSnapshot() };
-		actionInProgress = format;
-		showPendingActionMessage(`Preparing ${format.toUpperCase()}…`);
-		let restorePlayId: number | null = null;
-		try {
-			if (format !== 'pdf') {
-				await exportPlayBuilderRaster(svg, format, {
-					...exportRenderOptions(format),
-					prompt: exportPromptOptions()
-				});
-			} else {
-				storeActivePlayState();
-				restorePlayId = playEntries[activePlayIndex].id;
-				const canvases: HTMLCanvasElement[] = [];
-				for (let index = 0; index < playEntries.length; index += 1) {
-					loadPlayAtIndex(index, false);
-					if (playEntries[index].id === restorePlayId && animation) {
-						animationPreview = true;
-						applyScene(animationRestore.scene);
-					}
-					await tick();
-					await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-					canvases.push(
-						await renderPlayBuilderCanvas(svg, {
-							pdfOutlines: false,
-							...exportRenderOptions('pdf')
-						})
-					);
-				}
-				await exportPlayBuilderPdf(canvases);
-			}
-			showActionMessage(`${format.toUpperCase()} exported`);
-		} catch (error) {
-			showActionMessage(error instanceof Error ? error.message : 'Unable to export play.');
-		} finally {
-			if (restorePlayId !== null) {
-				const restoreIndex = playEntries.findIndex((play) => play.id === restorePlayId);
-				if (restoreIndex >= 0) {
-					loadPlayAtIndex(restoreIndex, false);
-					if (animation) {
-						animationStep = animationRestore.step;
-						animationTime = animationRestore.time;
-						animationPreview = animationRestore.preview;
-						applyScene(animationRestore.scene);
-					}
-					await tick();
-				}
-			}
-			actionInProgress = null;
-		}
-	};
+ $: animatedPlayIndexes = playEntries.flatMap((play,index) => animationDuration(index === activePlayIndex ? animation : play.animation) > 0 ? [index] : []);
+ const exportImage = async (format: 'png'|'jpg'|'webp'|'pdf') => exportBatch(format,false);
+ const exportBatch = async (format: string, all = true) => {
+  if(actionInProgress || (['mp4','mov','webm','gif'].includes(format) && !dev && !accountSessionActive))return;
+  pauseAnimation();commitAnimation();storeActivePlayState();
+  const restore={index:activePlayIndex,scene:sceneSnapshot(),step:animationStep,time:animationTime,preview:animationPreview,open:animationOpen,selection:selectedTargets,tool};
+  const controller=new AbortController();videoController=controller;videoProgress=0;actionInProgress=format as 'png'|'jpg'|'webp'|'pdf'|VideoFormat;
+  const files:Record<string,Uint8Array>={},canvases:HTMLCanvasElement[]=[];
+  const video=['mp4','mov','webm','gif'].includes(format);
+  const eligible=video?playEntries.flatMap((play,index)=>animationDuration(play.animation)>0?[index]:[]):playEntries.map((_,index)=>index);
+  const indexes=all?eligible:[eligible.includes(activePlayIndex)?activePlayIndex:eligible[0]].filter(index=>index!==undefined);
+  if(!indexes.length){actionInProgress=null;videoController=null;return;}
+
+  try {
+   for(let count=0;count<indexes.length;count++){
+    controller.signal.throwIfAborted();loadPlayAtIndex(indexes[count],false);await tick();
+    const options={...exportRenderOptions(format === 'pdf'?'pdf':format === 'jpg'?'jpg':'png'),prompt:exportPromptOptions(),assetCache:new Map<string,Promise<string>>()};
+    let blob:Blob;
+    if(video){
+     const snapshot=currentAnimationContent();animationPreview=true;
+     blob=(await downloadBrowserVideo(format as VideoFormat,animationDuration(snapshot.animation)||1,async time=>{animationTime=time;applyScene(evaluateAnimation(snapshot,time));await tick();return renderPlayBuilderCanvas(svg,options);},controller.signal,value=>videoProgress=Math.round((count+value/100)/indexes.length*100),playEntries[indexes[count]].name,false,extendedGrassColor))!;
+    }else{
+     if(indexes[count]===restore.index){animationPreview=true;applyScene(restore.scene);await tick();}
+     videoProgress=Math.round((count+.2)/indexes.length*100);
+     const canvas=await renderPlayBuilderCanvas(svg,options);
+     videoProgress=Math.round((count+.8)/indexes.length*100);
+     if(format==='pdf'){canvases.push(canvas);continue;}
+     blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('Unable to create image.')),`image/${format==='jpg'?'jpeg':format}`,0.94));
+    }
+    videoProgress=Math.round((count+1)/indexes.length*100);controller.signal.throwIfAborted();
+    const baseName=(playEntries[indexes[count]].name.replace(/[<>:"/\\|?*]/g,'').trim() || 'Play')+(video?' Animation':'');
+    let filename=`${baseName}.${format}`,suffix=2;
+    while(files[filename])filename=`${baseName} (${suffix++}).${format}`;
+    files[filename]=new Uint8Array(await blob.arrayBuffer());
+   }
+   controller.signal.throwIfAborted();
+   if(format==='pdf')await exportPlayBuilderPdf(canvases, all?'Plays':playEntries[restore.index].name);
+   else if(!all || indexes.length===1){const [name,bytes]=Object.entries(files)[0];const url=URL.createObjectURL(new Blob([bytes as BlobPart]));const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+   else {const {zipSync}=await import('fflate');const blob=new Blob([zipSync(files,{level:0}) as BlobPart],{type:'application/zip'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`plays-${format}.zip`;link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+   showActionMessage(`${format.toUpperCase()} exported`);
+  }catch(error){showActionMessage(controller.signal.aborted?'Export canceled':error instanceof Error?error.message:'Unable to export plays.');}
+  finally{loadPlayAtIndex(restore.index,false);animationStep=restore.step;animationTime=restore.time;animationPreview=restore.preview;animationOpen=restore.open;applyScene(restore.scene);selectedTargets=restore.selection;tool=restore.tool;refreshSelectionUi();actionInProgress=null;videoController=null;}
+ };
+ let videoProgress=0;
+ let videoController:AbortController|null=null;
+ const exportVideo=async(format:VideoFormat)=>{
+  if((!dev && !accountSessionActive) || actionInProgress || !animatedPlayIndexes.length)return;
+  if(!animationDuration(animation)){await exportBatch(format,false);return;}
+  pauseAnimation();commitAnimation();
+  const snapshot=currentAnimationContent();
+  const restore={scene:sceneSnapshot(),step:animationStep,time:animationTime,preview:animationPreview,selection:selectedTargets,tool};
+  const options={...exportRenderOptions('png'),prompt:exportPromptOptions(),assetCache:new Map<string,Promise<string>>()};
+  const controller=new AbortController();videoController=controller;videoProgress=0;actionInProgress=format;
+  animationPreview=true;
+  try {
+   await downloadBrowserVideo(format,animationDuration(snapshot.animation),async(time)=>{
+    animationTime=time;applyScene(evaluateAnimation(snapshot,time));await tick();
+    return renderPlayBuilderCanvas(svg,options);
+   },controller.signal,value=>videoProgress=value,playEntries[activePlayIndex].name,true,extendedGrassColor);
+   showActionMessage(`${format.toUpperCase()} exported`);
+  } catch(error) {showActionMessage(controller.signal.aborted?'Export canceled':error instanceof Error?error.message:'Unable to export video in this browser.');}
+  finally {
+   animationStep=restore.step;animationTime=restore.time;animationPreview=restore.preview;applyScene(restore.scene);selectedTargets=restore.selection;tool=restore.tool;refreshSelectionUi();
+   actionInProgress=null;videoController=null;
+  }
+ };
 	const currentShareUrl = () => {
 		const url = new URL(window.location.href);
 		if (playEntries.length > 1) url.searchParams.set('play', String(activePlayIndex + 1));
@@ -2623,7 +2638,7 @@
  if (!sceneLayers) return;
 		for (const layer of layerOrder.filter((item) => item.type === 'guide')) {
 			const element = svg.querySelector<SVGGElement>(`[data-layer-type="${layer.type}"][data-layer-id="${layer.id}"]`);
-			if (element) sceneLayers.appendChild(element);
+			if (element) svg.querySelector('[data-guide-layers]')?.appendChild(element);
 		}
 		const footballMarkerIds = new Set(markers.filter((marker) => marker.kind === 'ball').map((marker) => marker.id));
 		const attachedMarkerIds = new Set(paths.flatMap((path) => (path.startMarkerId === undefined ? [] : [path.startMarkerId])));
@@ -2860,6 +2875,7 @@
 		point.y >= selectedGroupBounds.top - 6 &&
 		point.y <= selectedGroupBounds.bottom + 6;
 	const selectTarget = (target: SelectedTarget, additive: boolean, selectionPoint?: Point) => {
+		singleMarqueeSelection = false;
 		const selected = selectedTargets.some((item) => sameTarget(item, target));
 		if (additive) selectedTargets = selected ? selectedTargets.filter((item) => !sameTarget(item, target)) : [...selectedTargets, target];
 		else if (!selected) selectedTargets = [target];
@@ -2911,11 +2927,13 @@
 		marqueeSelection = { pointerId: event.pointerId, start, current: start };
 		svg.setPointerCapture(event.pointerId);
 	};
+	let singleMarqueeSelection = false;
 	const finishMarqueeSelection = () => {
 		if (!marqueeSelection) return;
 		const bounds = normalizedSelectionBounds(marqueeSelection.start, marqueeSelection.current);
 		const dragged = bounds.right - bounds.left >= 4 || bounds.bottom - bounds.top >= 4;
 		selectedTargets = dragged ? allElementTargets().filter((target) => targetMatchesMarquee(target, bounds)) : [];
+		singleMarqueeSelection = dragged && selectedTargets.length === 1;
 		marqueeSelection = null;
 		refreshSelectionUi();
 	};
@@ -3214,7 +3232,7 @@
 		fieldSettings = { ...fieldSettings, gameClockSeconds: nextSeconds };
 	};
 	const parseGameClock = (value: string) => {
-		const match = value.trim().match(/^(\d{1,2}):([0-5]\d)$/);
+		const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
 		if (!match) return null;
 		return Number(match[1]) * 60 + Number(match[2]);
 	};
@@ -3834,6 +3852,11 @@
   return true;
  };
 	const handleGlobalKeydown = (event: KeyboardEvent) => {
+  if (videoController) {
+   if (event.key === 'Escape') videoController.abort();
+   event.preventDefault();
+   return;
+  }
   if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'c' && (window.getSelection()?.toString() || (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) && event.target.selectionStart !== event.target.selectionEnd)) { event.stopImmediatePropagation(); return; }
   if (animationTutorialActive && animationTutorialKeys !== 'playback' && !(event.target as Element)?.closest('input,textarea,select,[contenteditable="true"],[data-timing-rail]')) {
    const navigation = ['ArrowLeft','ArrowRight','Home','End','Space','KeyJ','KeyK','KeyL'].includes(event.code) || event.altKey && ['ArrowUp','ArrowDown'].includes(event.key);
@@ -6157,6 +6180,7 @@
 		if (showDraftRestore) void tick().then(() => restoreDraftButton?.focus());
 		syncLayerDom();
 		return () => {
+   videoController?.abort();
    viewerScrubber.stop();
 			pauseAnimation();
 			tutorialDriver?.destroy();
@@ -6182,6 +6206,7 @@
 	bind:this={builderRoot}
 	on:pointerdown={markTutorialSeen}
 	class="relative isolate border-2 border-stone-900 bg-stone-800 shadow-lg select-none"
+	class:video-exporting={videoController!==null}
 	class:view-only={viewOnly}
 	class:animation-preview={animationPreview}
 	class:high-contrast-mode={highContrastEnabled}
@@ -6686,36 +6711,9 @@
 				style="top: calc(50% - 23.8cqw);"
 				aria-label="Export controls"
 			>
-				{#each [{ format: 'png' as const, label: 'PNG', ariaLabel: 'Export PNG image' }, { format: 'jpg' as const, label: 'JPG', ariaLabel: 'Export JPG image' }, { format: 'webp' as const, label: 'WebP', ariaLabel: 'Export WebP image' }] as exportOption}
-					<BuilderActionButton
-						tooltip={`Export ${exportOption.label}`}
-						ariaLabel={exportOption.ariaLabel}
-						label={exportOption.label}
-						disabled={tutorialActive || actionInProgress !== null}
-						onclick={() => exportImage(exportOption.format)}
-					>
-						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-							<rect x="3" y="4" width="18" height="16" fill="none" stroke="currentColor" stroke-width="2" />
-							<circle cx="8" cy="9" r="1.5" fill="currentColor" />
-							<path d="m5 18 5-5 3 3 2-2 4 4" fill="none" stroke="currentColor" stroke-width="2" />
-						</svg>
-					</BuilderActionButton>
-				{/each}
-				<BuilderActionButton
-					tooltip="Export PDF"
-					ariaLabel="Export PDF"
-					label="PDF"
-					disabled={tutorialActive || actionInProgress !== null}
-					onclick={() => exportImage('pdf')}
-				>
-					<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-						<path d="M6 2h8l4 4v16H6zM14 2v5h4" fill="none" stroke="currentColor" stroke-width="2" />
-						<path d="M8 16h8M8 12h8" stroke="currentColor" stroke-width="2" />
-					</svg>
-				</BuilderActionButton>
-<BuilderActionButton tooltip="Coming Soon" ariaLabel="Download MP4 — Coming Soon" label="MP4" disabled={true} disabledOpacity="35" onclick={() => {}}>
- <svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4" fill="none" stroke="currentColor" stroke-width="2" /></svg>
- </BuilderActionButton>
+ <ExportDropdown progress={videoController && !['mp4','mov','webm','gif'].includes(actionInProgress ?? '')?videoProgress:null} oncancel={()=>videoController?.abort()} multiple={playEntries.length>1} onall={format=>exportBatch(format)} formats={['png','jpg','webp','pdf']} disabled={tutorialActive||actionInProgress!==null} onselect={format=>exportImage(format as 'png'|'jpg'|'webp'|'pdf')} />
+ <ExportDropdown progress={videoController && ['mp4','mov','webm','gif'].includes(actionInProgress ?? '')?videoProgress:null} oncancel={()=>videoController?.abort()} allDisabled={(!dev && !accountSessionActive)||tutorialActive||actionInProgress!==null} multiple={animatedPlayIndexes.length>1} onall={format=>exportBatch(format)} formats={['mp4','mov','webm','gif']} video={true} disabled={(!dev && !accountSessionActive)||!animatedPlayIndexes.length||tutorialActive||actionInProgress!==null} tooltip={!dev && !accountSessionActive?'Sign in to Use':!animatedPlayIndexes.length?'Create an Animation First':''} onselect={format=>exportVideo(format as VideoFormat)} />
+
 				<BuilderActionButton
 					tooltip="Export Settings"
 					shortcutKeys={[primaryModifierKey, 'Shift', 'O']}
@@ -6975,7 +6973,7 @@
  </div>
  {/if}
  <div class="field-canvas relative my-auto w-full shrink-0">
-				<HoverTooltip text={viewOnly ? "" : fieldControlTooltip} minWidthPx={0} wrapperClass="contents">
+				<HoverTooltip text={viewOnly ? "" : animationPreview ? "Select a Step to Move Elements" : fieldControlTooltip} minWidthPx={0} wrapperClass="contents">
 					<!-- svelte-ignore a11y_no_noninteractive_element_interactions (Capture listeners block editing in shared view; individual field controls handle keyboard interaction.) -->
 					<svg
 						bind:this={svg}
@@ -6989,14 +6987,10 @@
 							!isGuideTool(tool) &&
 							!isPathTool(tool) &&
 							pointerOnField}
-						class:cursor-grab={!dragTarget?.moved &&
-							!marqueeSelection &&
-							tool === 'select' &&
-							(selectedTargets.length < 2 || pointerInsideSelectedGroup)}
 						class:group-selection-outside={selectedTargets.length > 1 && !pointerInsideSelectedGroup}
 						class:group-selection-inside={selectedTargets.length > 1 && pointerInsideSelectedGroup && !dragTarget?.moved}
 						class:laser-cursor={tool === 'laser' && pointerOnField}
-						class:cursor-crosshair={!dragTarget?.moved && (Boolean(marqueeSelection) || ((isGuideTool(tool) || isPathTool(tool)) && pointerOnField))}
+						class:cursor-crosshair={!dragTarget?.moved && (tool === 'select' || Boolean(marqueeSelection) || ((isGuideTool(tool) || isPathTool(tool)) && pointerOnField))}
 						class:drawing-cursor={tool === 'free-draw' && freeDrawMode === 'draw'}
 						class:erasing-cursor={tool === 'free-draw' && freeDrawMode === 'erase'}
 						class:!cursor-grabbing={dragTarget?.moved}
@@ -7764,9 +7758,10 @@
 						{/if}
 
 						<g data-animation-route-underlay data-export-exclude></g>
-						<g data-scene-layers>
+						<g data-guide-layers>
 {#each guides as guide}
 							<g
+								opacity={guide.animationOpacity ?? 1}
 								data-layer-type="guide"
 								data-layer-id={guide.id}
 								data-tutorial-kind={guide.kind}
@@ -7799,6 +7794,8 @@
 								/>
 							</g>
 						{/each}
+						</g>
+						<g data-scene-layers>
 
 
 
@@ -8057,6 +8054,7 @@
 
 						{#each markers as marker}
 							<g
+								opacity={marker.animationOpacity ?? 1}
 								data-layer-type="marker"
 								data-layer-id={marker.id}
 								data-tutorial-kind={marker.kind}
@@ -8428,7 +8426,7 @@
 							/>
 						{/if}
 
-						{#if selectedTargets.length > 1 && selectedGroupBounds}
+						{#if (selectedTargets.length > 1 || singleMarqueeSelection && selectedTargets.length === 1) && selectedGroupBounds}
 							<rect
 								data-selection-wireframe
 								x={selectedGroupBounds.left - 6}
@@ -8903,7 +8901,7 @@
 		</div>
 	</div>
 	{#if animation && animationOpen && !viewOnly}
-		<div use:animationPortal class="animation-dock" class:invisible={showSetupConfirm || showSettings || showExportSettings || showFeedback || showHelp || tutorialActive && !animationTutorialActive} style:left={`${animationDockLeft}px`} style:width={`${animationDockWidth}px`}>
+		<div use:animationPortal class="animation-dock" class:invisible={videoController !== null || showSetupConfirm || showSettings || showExportSettings || showFeedback || showHelp || tutorialActive && !animationTutorialActive} style:left={`${animationDockLeft}px`} style:width={`${animationDockWidth}px`}>
 			<AnimationPanel
 				animation={animationContent.animation!}
 				scene={animationContent.scene}
@@ -9798,7 +9796,7 @@
 							copied as an image or downloaded as a PNG.
 						</p>
 						<p>
-							<strong>Exports:</strong> PNG, JPG, and WebP export the selected play. PDF exports every play in tab order on its own page. Export Settings
+							<strong>Exports:</strong> PNG, JPG, and WebP export the selected play. PDF exports every play in tab order on its own page. Signed-in users can download the selected animation as MP4, MOV, WebM, or GIF, generated on their device. Video uses a white backdrop for transparent areas. Export Settings
 							controls transparent, grassy, or solid-color backgrounds and an optional outer field border. All formats preserve the live builder’s typography
 							and layer order.
 						</p>
@@ -9810,6 +9808,8 @@
 {/if}
 
 <style>
+ .video-exporting {pointer-events:none;}
+ .video-exporting :global([aria-label="Cancel export"]) {pointer-events:auto;}
  :global(.animation-tutorial-active [data-tutorial="interaction-area"]), :global(.animation-tutorial-active [data-tutorial="interaction-area"] *),
  :global(.animation-tutorial-active .tool-column), :global(.animation-tutorial-active .tool-column *),
  :global(.animation-tutorial-active .animation-dock), :global(.animation-tutorial-active .animation-dock *),
@@ -9822,6 +9822,8 @@
  :global(.animation-tutorial-active .field-canvas [pointer-events="none"]), :global(.animation-tutorial-active .field-canvas [pointer-events="none"] *) { pointer-events: none !important; }
  :global(.animation-tutorial-active [data-animation-path-picker] .easing-menu) { position: static; }
  :global(.animation-tutorial-resize .dock-resize svg) { opacity: 1 !important; }
+ .animation-preview:not(.view-only) .field-canvas :global(svg),
+ .animation-preview:not(.view-only) .field-canvas :global(svg *) {cursor:not-allowed !important;}
  .animation-tool-disabled {opacity:.35;cursor:not-allowed !important;}
 
 	.animation-dock {
@@ -10105,7 +10107,7 @@
 		cursor: none !important;
 	}
 	.group-selection-outside {
-		cursor: default !important;
+		cursor: crosshair !important;
 	}
 	.group-selection-outside [data-field-element],
 	.group-selection-inside,

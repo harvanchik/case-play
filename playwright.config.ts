@@ -1,11 +1,13 @@
 import { defineConfig } from '@playwright/test';
+const port = Number(process.env.PLAYWRIGHT_PORT || 5173);
+const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
 	testDir: './tests/browser',
 	fullyParallel: false,
 	timeout: 120_000,
 	expect: { timeout: 30_000 },
-	use: { baseURL: 'http://127.0.0.1:5173', viewport: { width: 1440, height: 1100 }, trace: 'retain-on-failure' },
+	use: { baseURL, viewport: { width: 1440, height: 1100 }, trace: 'retain-on-failure' },
 	projects: [
 		{ name: 'chrome', use: { browserName: 'chromium', channel: 'chrome' } },
 		{ name: 'edge', use: { browserName: 'chromium', channel: 'msedge' } },
@@ -13,10 +15,10 @@ export default defineConfig({
 		{ name: 'webkit', use: { browserName: 'webkit' } }
 	],
 	webServer: {
-		command: 'node node_modules/tsx/dist/cli.mjs scripts/migrate.ts && node node_modules/vite/bin/vite.js dev --host 127.0.0.1',
-		url: 'http://127.0.0.1:5173',
+		command: `node node_modules/tsx/dist/cli.mjs scripts/migrate.ts && node node_modules/vite/bin/vite.js dev --host 127.0.0.1 --port ${port}`,
+		url: baseURL,
 		reuseExistingServer: !process.env.CI,
 		timeout: 240_000,
-		env: { TURSO_DATABASE_URL: 'file:caseplay-animation-test.db', PLAY_BUILDER_VIDEO_EXPORT_ENABLED: 'false' }
+		env: { TURSO_DATABASE_URL: 'file:caseplay-animation-test.db', PLAY_BUILDER_VIDEO_EXPORT_ENABLED: 'false', ACCOUNT_SESSION_SECRET: process.env.ACCOUNT_SESSION_SECRET || 'local-browser-test-session-secret-not-for-production' }
 	}
 });

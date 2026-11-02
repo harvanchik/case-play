@@ -193,6 +193,9 @@ const addPromptHeader = (diagram: HTMLCanvasElement, prompt: ExportPrompt) => {
 	return output;
 };
 
+// Preserve the SVG grass coordinate system when a video adds space around its frame.
+export const canvasGrassAlignment = new WeakMap<HTMLCanvasElement, { x:number; y:number; scaleX:number; scaleY:number }>();
+
 export const renderPlayBuilderCanvas = async (
 	source: SVGSVGElement,
 	{
@@ -201,7 +204,8 @@ export const renderPlayBuilderCanvas = async (
 		backgroundColor,
 		stripedBackground = false,
 		fieldBorderColor,
-		prompt
+		prompt,
+		assetCache = new Map<string, Promise<string>>()
 	}: {
 		pdfOutlines?: boolean;
 		padding?: number;
@@ -209,6 +213,7 @@ export const renderPlayBuilderCanvas = async (
 		stripedBackground?: boolean;
 		fieldBorderColor?: string;
 		prompt?: ExportPrompt;
+		assetCache?: Map<string, Promise<string>>;
 	} = {}
 ) => {
 	const bounds = exportBounds(source, pdfOutlines, padding);
@@ -257,9 +262,15 @@ export const renderPlayBuilderCanvas = async (
 		images.map(async (image) => {
 			const href = image.getAttribute('href') || image.getAttribute('xlink:href');
 			if (!href || href.startsWith('data:')) return;
-			const response = await fetch(new URL(href, window.location.origin));
-			if (!response.ok) throw new Error('Unable to load an image used by the diagram.');
-			image.setAttribute('href', await blobToDataUrl(await response.blob()));
+			let asset = assetCache.get(href);
+			if (!asset) {
+				asset = fetch(new URL(href, window.location.origin)).then(async (response) => {
+					if (!response.ok) throw new Error('Unable to load an image used by the diagram.');
+					return blobToDataUrl(await response.blob());
+				});
+				assetCache.set(href, asset);
+			}
+			image.setAttribute('href', await asset);
 		})
 	);
 	const markup = new XMLSerializer().serializeToString(clone);
@@ -281,7 +292,10 @@ export const renderPlayBuilderCanvas = async (
 			context.fillRect(0, 0, canvas.width, canvas.height);
 		}
 		context.drawImage(image, 0, 0, canvas.width, canvas.height);
-		return prompt?.text.trim() ? addPromptHeader(canvas, prompt) : canvas;
+		const output = prompt?.text.trim() ? addPromptHeader(canvas, prompt) : canvas;
+        const scaleX=canvas.width/bounds.width,scaleY=canvas.height/bounds.height;
+        canvasGrassAlignment.set(output,{x:-bounds.x*scaleX,y:-bounds.y*scaleY+output.height-canvas.height,scaleX,scaleY});
+        return output;
 	} finally {
 		URL.revokeObjectURL(url);
 	}
@@ -386,4 +400,4 @@ export const exportPlayBuilderRaster = async (
 	}
 	downloadBlob(await canvasBlob(canvas, mimeType, quality), `flag-football-play.${format}`);
 };
-export const exportPlayBuilderPdf = async (canvases: HTMLCanvasElement[]) => downloadBlob(await createPdf(canvases), 'flag-football-plays.pdf');
+export const exportPlayBuilderPdf = async (canvases: HTMLCanvasElement[], name = 'Plays') => downloadBlob(await createPdf(canvases), `${name.replace(/[<>:"/\\|?*]/g, '').trim() || 'Play'}.pdf`);

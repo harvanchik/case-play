@@ -806,6 +806,7 @@ test('Animate NEW bounce and animation tutorial pulse stop after first use in th
  const tutorial=page.getByRole('button',{name:'Start animation tutorial',exact:true});
  await expect(tutorial).toHaveClass(/pulse-tutorial/);
  await page.reload();
+ await page.waitForLoadState('networkidle');
  await expect(group).not.toHaveClass(/tutorial-launch-bouncing/);
  await expect(launch.locator('[data-animation-new]')).toHaveCount(0);
  await launch.click();
@@ -814,6 +815,7 @@ test('Animate NEW bounce and animation tutorial pulse stop after first use in th
  await page.getByRole('button',{name:'End tutorial',exact:true}).click();
  await expect(tutorial).not.toHaveClass(/pulse-tutorial/);
  await page.reload();
+ await page.waitForLoadState('networkidle');
  await launch.click();
  await expect(tutorial).not.toHaveClass(/pulse-tutorial/);
 });

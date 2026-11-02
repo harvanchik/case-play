@@ -67,7 +67,9 @@
 		"@vercel/blob": "^2.8.2",
 		"@vercel/sandbox": "^3.9.1",
 		"@vercel/speed-insights": "^2.0.0",
+		"canvas-record": "^6.0.0",
 		"driver.js": "^1.8.0",
+		"fflate": "^0.8.3",
 		"openid-client": "6.8.4",
 		"qrcode": "^1.5.4",
 		"workflow": "^5.2.3"
