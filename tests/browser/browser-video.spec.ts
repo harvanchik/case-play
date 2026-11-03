@@ -58,7 +58,7 @@ test('signed-in builder downloads its active animation and restores the editing 
 		const file = await download;
 		expect(file.suggestedFilename()).toMatch(/\.mp4$/);
 		await expect(page.getByRole('button', { name: 'Cancel export' })).toHaveCount(0);
-		await expect(seconds).toHaveValue('0.1');
+		await expect(seconds).toHaveValue('0.10');
 		expect(await page.locator('.field-canvas').innerHTML()).toBe(before);
 		expect(jobs).toBe(0);
 		await seconds.fill('5');

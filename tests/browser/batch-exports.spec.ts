@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, chromium } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { unzipSync } from 'fflate';
-test('multi-play ALL controls export image/video ZIPs and multipage PDF', async ({ page }) => {
+test('multi-play ALL controls export image/video ZIPs and multipage PDF', async ({ page, browserName }) => {
 	await page.goto('/diagram/flag-football');
 	await page.waitForSelector('.tutorial-launch-bouncing');
 	const consent = page.getByRole('button', { name: /^Essential Cookies Only/ });
@@ -43,11 +43,31 @@ test('multi-play ALL controls export image/video ZIPs and multipage PDF', async 
  await page.keyboard.press('Alt+a');
  await page.getByRole('button',{name:'Add another play',exact:true}).click();
 	await page.getByRole('button', { name: 'More video formats', exact: true }).click();
-	pending = page.waitForEvent('download');
+	await page.evaluate(()=>{
+  const state={sawFrozen:false,stable:true,play:document.querySelector('[data-play-id][aria-pressed="true"]')?.getAttribute('data-play-id')};
+  const observer=new MutationObserver(()=>{if(document.querySelector('[data-export-preview]')){state.sawFrozen=true;state.stable&&=document.querySelector('[data-play-id][aria-pressed="true"]')?.getAttribute('data-play-id')===state.play;}});
+  observer.observe(document.body,{subtree:true,childList:true,attributes:true});
+  (window as unknown as {exportObservation:typeof state;exportObserver:MutationObserver}).exportObservation=state;(window as unknown as {exportObserver:MutationObserver}).exportObserver=observer;
+ });
+ pending = page.waitForEvent('download');
 	await page.getByRole('button', { name: 'Export All Plays as MP4', exact: true }).click();
 	file = await pending;
 	const files = unzipSync(await readFile((await file.path())!));
 	expect(Object.keys(files)).toHaveLength(2);
 	for (const bytes of Object.values(files)) expect(Buffer.from(bytes).toString('ascii', 4, 8)).toBe('ftyp');
  await expect(page.locator('[data-play-id][aria-pressed="true"]')).toHaveText('Play 3');
+ await expect(page.locator('[data-export-preview]')).toHaveCount(0);
+ const observation=await page.evaluate(()=>{const state=window as unknown as {exportObservation:{sawFrozen:boolean;stable:boolean};exportObserver:MutationObserver};state.exportObserver.disconnect();return state.exportObservation;});
+ expect(observation.sawFrozen).toBe(true);expect(observation.stable).toBe(true);
+ const decoderBrowser=browserName==='webkit'?await chromium.launch({channel:'chrome'}):undefined;
+ const decodePage=decoderBrowser?await decoderBrowser.newPage():page;
+ if(decoderBrowser)test.info().annotations.push({type:'note',description:'WebKit-produced MP4 pixel content is decoded in Chrome on this Windows runner.'});
+ let pixels:{white:number;grass:number};
+ try{pixels=await decodePage.evaluate(async(bytes)=>{
+  const url=URL.createObjectURL(new Blob([new Uint8Array(bytes)],{type:'video/mp4'}));const video=document.createElement('video');video.muted=true;video.preload='auto';
+  try{await new Promise<void>((resolve,reject)=>{video.onloadeddata=()=>resolve();video.onerror=()=>reject(new Error('Video decode failed'));video.src=url;video.load();});
+   const canvas=document.createElement('canvas');canvas.width=video.videoWidth;canvas.height=video.videoHeight;const context=canvas.getContext('2d')!;context.drawImage(video,0,0);const data=context.getImageData(0,0,canvas.width,canvas.height).data;let white=0,grass=0;for(let i=0;i<data.length;i+=4){if(data[i]>230&&data[i+1]>230&&data[i+2]>230)white++;if(data[i+1]>data[i]*1.2&&data[i+1]>data[i+2]&&data[i+1]>20)grass++;}return {white,grass};
+  }finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url);}
+ },Array.from(Object.values(files)[0]));}finally{await decoderBrowser?.close();}
+ expect(pixels.white).toBeGreaterThan(1000);expect(pixels.grass).toBeGreaterThan(100000);
 });

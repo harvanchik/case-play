@@ -221,6 +221,7 @@ export const renderPlayBuilderCanvas = async (
 	const outputWidth = Math.ceil(bounds.width * outputScale);
 	const outputHeight = Math.ceil(bounds.height * outputScale);
 	const clone = source.cloneNode(true) as SVGSVGElement;
+    clone.style.visibility='visible';
 	clone.querySelector('[data-laser-pointer-layer]')?.remove();
 	clone.querySelectorAll('[data-export-exclude]').forEach((element) => element.remove());
 	clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');

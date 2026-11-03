@@ -1821,7 +1821,7 @@
 		}
 	};
 	const scheduleLocalDraft = (_sceneKey: string, unsaved: boolean) => {
-		if (!draftHydrated || viewOnly || !draftsEnabled || accountSessionActive || animationTutorialActive) return;
+		if (!draftHydrated || viewOnly || !draftsEnabled || accountSessionActive || animationTutorialActive || videoController) return;
 		if (draftSaveTimer) clearTimeout(draftSaveTimer);
 		draftSaveTimer = null;
 		if (!unsaved) {
@@ -2203,13 +2203,13 @@
  $: animatedPlayIndexes = playEntries.flatMap((play,index) => animationDuration(index === activePlayIndex ? animation : play.animation) > 0 ? [index] : []);
  const exportImage = async (format: 'png'|'jpg'|'webp'|'pdf') => exportBatch(format,false);
  const exportBatch = async (format: string, all = true) => {
-  if(actionInProgress || (['mp4','mov','webm','gif'].includes(format) && !dev && !accountSessionActive))return;
+  if(['mp4','mov','webm','gif'].includes(format)){await exportVideoBatch(format as VideoFormat,all);return;}
+  if(actionInProgress)return;
   pauseAnimation();commitAnimation();storeActivePlayState();
   const restore={index:activePlayIndex,scene:sceneSnapshot(),step:animationStep,time:animationTime,preview:animationPreview,open:animationOpen,selection:selectedTargets,tool};
   const controller=new AbortController();videoController=controller;videoProgress=0;actionInProgress=format as 'png'|'jpg'|'webp'|'pdf'|VideoFormat;
   const files:Record<string,Uint8Array>={},canvases:HTMLCanvasElement[]=[];
-  const video=['mp4','mov','webm','gif'].includes(format);
-  const eligible=video?playEntries.flatMap((play,index)=>animationDuration(play.animation)>0?[index]:[]):playEntries.map((_,index)=>index);
+  const eligible=playEntries.map((_,index)=>index);
   const indexes=all?eligible:[eligible.includes(activePlayIndex)?activePlayIndex:eligible[0]].filter(index=>index!==undefined);
   if(!indexes.length){actionInProgress=null;videoController=null;return;}
 
@@ -2218,19 +2218,14 @@
     controller.signal.throwIfAborted();loadPlayAtIndex(indexes[count],false);await tick();
     const options={...exportRenderOptions(format === 'pdf'?'pdf':format === 'jpg'?'jpg':'png'),prompt:exportPromptOptions(),assetCache:new Map<string,Promise<string>>()};
     let blob:Blob;
-    if(video){
-     const snapshot=currentAnimationContent();animationPreview=true;
-     blob=(await downloadBrowserVideo(format as VideoFormat,animationDuration(snapshot.animation)||1,async time=>{animationTime=time;applyScene(evaluateAnimation(snapshot,time));await tick();return renderPlayBuilderCanvas(svg,options);},controller.signal,value=>videoProgress=Math.round((count+value/100)/indexes.length*100),playEntries[indexes[count]].name,false,extendedGrassColor))!;
-    }else{
      if(indexes[count]===restore.index){animationPreview=true;applyScene(restore.scene);await tick();}
      videoProgress=Math.round((count+.2)/indexes.length*100);
      const canvas=await renderPlayBuilderCanvas(svg,options);
      videoProgress=Math.round((count+.8)/indexes.length*100);
      if(format==='pdf'){canvases.push(canvas);continue;}
      blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('Unable to create image.')),`image/${format==='jpg'?'jpeg':format}`,0.94));
-    }
     videoProgress=Math.round((count+1)/indexes.length*100);controller.signal.throwIfAborted();
-    const baseName=(playEntries[indexes[count]].name.replace(/[<>:"/\\|?*]/g,'').trim() || 'Play')+(video?' Animation':'');
+    const baseName=(playEntries[indexes[count]].name.replace(/[<>:"/\\|?*]/g,'').trim() || 'Play');
     let filename=`${baseName}.${format}`,suffix=2;
     while(files[filename])filename=`${baseName} (${suffix++}).${format}`;
     files[filename]=new Uint8Array(await blob.arrayBuffer());
@@ -2245,27 +2240,62 @@
  };
  let videoProgress=0;
  let videoController:AbortController|null=null;
- const exportVideo=async(format:VideoFormat)=>{
-  if((!dev && !accountSessionActive) || actionInProgress || !animatedPlayIndexes.length)return;
-  if(!animationDuration(animation)){await exportBatch(format,false);return;}
-  pauseAnimation();commitAnimation();
-  const snapshot=currentAnimationContent();
-  const restore={scene:sceneSnapshot(),step:animationStep,time:animationTime,preview:animationPreview,selection:selectedTargets,tool};
-  const options={...exportRenderOptions('png'),prompt:exportPromptOptions(),assetCache:new Map<string,Promise<string>>()};
+ const exportVideo=async(format:VideoFormat)=>exportVideoBatch(format,false);
+ const exportVideoBatch=async(format:VideoFormat,all:boolean)=>{
+  if((!dev&&!accountSessionActive)||actionInProgress||!animatedPlayIndexes.length)return;
+  pauseAnimation();commitAnimation();storeActivePlayState();
+  const restore={scene:sceneSnapshot(),settings:{...fieldSettings},step:animationStep,time:animationTime,preview:animationPreview,selection:selectedTargets,drawings:selectedDrawingIds.slice(),drawingOptions,drawingColorOptions,tool};
+  const eligible=playEntries.filter(play=>animationDuration(play.animation)>0);
+  const selected=playEntries[activePlayIndex];
+  const jobs=structuredClone(all?eligible:[animationDuration(selected.animation)>0?selected:eligible[0]]);
+  const settings=exportRenderOptions('png'),prompt=exportPromptOptions(),assetCache=new Map<string,Promise<string>>();
+  if(draftSaveTimer)clearTimeout(draftSaveTimer);
   const controller=new AbortController();videoController=controller;videoProgress=0;actionInProgress=format;
+  const progress=jobs.map(()=>0);let captureQueue=Promise.resolve();
+  // Freeze the visible field. Frame generation uses its hidden SVG without changing play tabs.
+  const frozen=svg.cloneNode(true) as SVGSVGElement;
+  frozen.setAttribute('data-export-preview','');frozen.setAttribute('aria-hidden','true');frozen.removeAttribute('role');
+  Object.assign(frozen.style,{position:'absolute',inset:'0',width:'100%',height:'100%',pointerEvents:'none',zIndex:'50',visibility:'visible'});
+  const ids=new Map(Array.from(frozen.querySelectorAll('[id]')).map(node=>[node.id,`export-preview-${node.id}`]));
+  for(const node of [frozen,...Array.from(frozen.querySelectorAll('*'))]){for(const attribute of Array.from(node.attributes)){let value=attribute.value;for(const [id,replacement] of ids){value=value.replaceAll(`url(#${id})`,`url(#${replacement})`);if(value===`#${id}`)value=`#${replacement}`;}if(attribute.name==='id')value=ids.get(value)??value;if(value!==attribute.value)node.setAttribute(attribute.name,value);}(node as SVGElement).style.pointerEvents='none';}
+  const previousVisibility=svg.style.visibility;svg.parentElement!.appendChild(frozen);svg.style.visibility='hidden';
   animationPreview=true;
-  try {
-   await downloadBrowserVideo(format,animationDuration(snapshot.animation),async(time)=>{
-    animationTime=time;applyScene(evaluateAnimation(snapshot,time));await tick();
-    return renderPlayBuilderCanvas(svg,options);
-   },controller.signal,value=>videoProgress=value,playEntries[activePlayIndex].name,true,extendedGrassColor);
+  try{
+   const {concurrentVideoExports}=await import('$lib/play-builder-video-batch');
+   const memory=(navigator as Navigator&{deviceMemory?:number}).deviceMemory??8;
+   const parallelism=(navigator.hardwareConcurrency??2)<4||memory<=4?1:2;
+   const results=await concurrentVideoExports(jobs,parallelism,async(job,index)=>{
+    const palette=fieldColorOptions.find(option=>option.id===job.settings.fieldColor)??fieldColorOptions[0];
+    const grass=`rgb(${[1,3,5].map(index=>Math.round(parseInt(palette.endZone.slice(index,index+2),16)*.8)).join(', ')})`;
+    const options={...settings,...(exportBackground==='grass'?{backgroundColor:grass}:{}),prompt,assetCache};
+    const draw=async(time:number)=>{
+     let raster!:Promise<HTMLCanvasElement>;
+     const capture=captureQueue.then(async()=>{
+      controller.signal.throwIfAborted();fieldSettings={...job.settings};animationTime=time;
+      applyScene(evaluateAnimation(job,time));await tick();controller.signal.throwIfAborted();
+      // renderPlayBuilderCanvas clones the complete SVG synchronously before its first await.
+      raster=renderPlayBuilderCanvas(svg,options);raster.catch(()=>{});
+     });
+     captureQueue=capture.catch(()=>{});await capture;return raster;
+    };
+    const blob=(await downloadBrowserVideo(format,animationDuration(job.animation),draw,controller.signal,value=>{progress[index]=value;videoProgress=Math.round(progress.reduce((a,b)=>a+b,0)/jobs.length);},job.name,false,grass,2))!;
+    return {name:job.name,blob};
+   },controller.signal,error=>controller.abort(error));
+   controller.signal.throwIfAborted();
+   const files:Record<string,Uint8Array>={};
+   for(const result of results){const base=(result.name.replace(/[<>:"/\\|?*]/g,'').trim()||'Play')+' Animation';let name=`${base}.${format}`,suffix=2;while(files[name])name=`${base} (${suffix++}).${format}`;files[name]=new Uint8Array(await result.blob.arrayBuffer());}
+   const entries=Object.entries(files);let blob:Blob,name:string;
+   if(entries.length===1){name=entries[0][0];blob=new Blob([entries[0][1] as BlobPart]);}
+   else{const {zipSync}=await import('fflate');name=`plays-${format}.zip`;blob=new Blob([zipSync(files,{level:0}) as BlobPart],{type:'application/zip'});}
+   controller.signal.throwIfAborted();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
    showActionMessage(`${format.toUpperCase()} exported`);
-  } catch(error) {showActionMessage(controller.signal.aborted?'Export canceled':error instanceof Error?error.message:'Unable to export video in this browser.');}
-  finally {
-   animationStep=restore.step;animationTime=restore.time;animationPreview=restore.preview;applyScene(restore.scene);selectedTargets=restore.selection;tool=restore.tool;refreshSelectionUi();
-   actionInProgress=null;videoController=null;
+  }catch(error){const reason=controller.signal.reason;showActionMessage(controller.signal.aborted&&!(reason instanceof Error&&reason.name!=='AbortError')?'Export canceled':error instanceof Error?error.message:'Unable to export video in this browser.');}
+  finally{
+   await captureQueue;fieldSettings=restore.settings;animationStep=restore.step;animationTime=restore.time;animationPreview=restore.preview;applyScene(restore.scene);selectedTargets=restore.selection;selectedDrawingIds=restore.drawings;drawingOptions=restore.drawingOptions;drawingColorOptions=restore.drawingColorOptions;tool=restore.tool;refreshSelectionUi();
+   await tick();svg.style.visibility=previousVisibility;frozen.remove();actionInProgress=null;videoController=null;scheduleLocalDraft(currentSceneKey,hasUnsavedChanges);
   }
  };
+
 	const currentShareUrl = () => {
 		const url = new URL(window.location.href);
 		if (playEntries.length > 1) url.searchParams.set('play', String(activePlayIndex + 1));

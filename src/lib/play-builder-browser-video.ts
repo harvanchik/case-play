@@ -8,7 +8,8 @@ export async function downloadBrowserVideo(
 	progress: (percent: number) => void,
 	name: string,
 	download = true,
-	grassColor = "#214b37"
+	grassColor = "#214b37",
+ renderAhead = 1
 ) {
 	const { Recorder, Encoders } = await import('canvas-record');
 	const codec = format === 'webm' ? 'vp09.00.10.08' : 'avc1.420028';
@@ -43,6 +44,7 @@ export async function downloadBrowserVideo(
 						: new Encoders.H264MP4Encoder()
 				})
 	});
+	const pending = new Map<number,Promise<HTMLCanvasElement>>();
 	try {
 		try {
 			await recorder.start({ initOnly: true });
@@ -53,9 +55,13 @@ export async function downloadBrowserVideo(
 			await recorder.start({ initOnly: true });
 		}
 		const frames = Math.max(1, Math.ceil(duration * fps));
+        let requested=0;
+        const fillQueue=()=>{while(requested<frames&&pending.size<Math.max(1,Math.min(2,renderAhead))){const index=requested++;const task=Promise.resolve().then(()=>{signal.throwIfAborted();return draw(index/fps);});task.catch(()=>{});pending.set(index,task);}};
+        fillQueue();
 		for (let frame = 0; frame < frames; frame++) {
 			signal.throwIfAborted();
-			const image = await draw(frame / fps);
+			const image = await pending.get(frame)!;
+            pending.delete(frame);
 			signal.throwIfAborted();
 			context.fillStyle = grassColor;
 			context.fillRect(0, 0, canvas.width, canvas.height);
@@ -77,9 +83,12 @@ export async function downloadBrowserVideo(
 				image.width * scale,
 				image.height * scale
 			);
+            // Start rasterizing the next frame while the encoder consumes this one.
+            fillQueue();
 			await recorder.step();
+            if(renderAhead>1)image.width=image.height=0;
 			progress(Math.round(((frame + 1) / frames) * 100));
-			await new Promise((resolve) => setTimeout(resolve, 0));
+			if(frame%8===7)await new Promise((resolve) => setTimeout(resolve, 0));
 		}
 		const buffer = await recorder.stop();
 		signal.throwIfAborted();
@@ -94,6 +103,8 @@ export async function downloadBrowserVideo(
 		setTimeout(() => URL.revokeObjectURL(url), 60000);
 	} finally {
 		await recorder.dispose();
+        const leftovers=await Promise.allSettled(pending.values());
+        if(renderAhead>1)for(const result of leftovers)if(result.status==='fulfilled')result.value.width=result.value.height=0;
 		canvas.width = canvas.height = 0;
 	}
 }
