@@ -518,7 +518,7 @@ test('near-end timing bars stay inside the rail and Shift arrows adjust hundredt
 });
 
 
-test('focus borders are keyboard-only, Shift placement is free, lasers clear on every tool exit, and seconds keep trailing zeros',async({page})=>{
+test('focus borders are keyboard-only, Ctrl placement is free, lasers clear on every tool exit, and seconds keep trailing zeros',async({page})=>{
  await ready(page,'1');
  const a=page.getByRole('button',{name:'Team A',exact:true});await a.click();
  expect(await a.locator('[data-player-tool-letter]').evaluate(node=>getComputedStyle(node).boxShadow)).not.toContain('rgb(30, 144, 255)');
@@ -529,13 +529,14 @@ test('focus borders are keyboard-only, Shift placement is free, lasers clear on 
  const svg=page.locator('svg[role="application"]');const box=(await svg.boundingBox())!;
  await page.getByRole('button',{name:'Line of Scrimmage',exact:true}).click();
  const x=317.37,y=270;
- await page.keyboard.down('Shift');await page.mouse.move(box.x+x/1000*box.width,box.y+y/484*box.height);await page.mouse.down();await page.mouse.up();await page.keyboard.up('Shift');
+ await page.keyboard.down('Control');await page.mouse.move(box.x+x/1000*box.width,box.y+y/484*box.height);await page.mouse.down();await page.mouse.up();await page.keyboard.up('Control');
  const los=page.locator('[data-layer-type="guide"][data-tutorial-kind="line-of-scrimmage"] line').first();expect(Math.abs(Number(await los.getAttribute('x1'))-x)).toBeLessThan(1.1);
  await page.getByRole('button',{name:'Animate play',exact:true}).click();await page.keyboard.press('End');
  const marker=page.locator('[data-layer-type="marker"][data-field-kind="team-a"]').first();const id=await marker.getAttribute('data-layer-id');const bounds=(await marker.boundingBox())!;
  await page.keyboard.press('v');await page.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height/2);await page.mouse.down();await page.mouse.move(bounds.x+bounds.width/2+80,bounds.y+bounds.height/2+40,{steps:10});await page.mouse.up();
  await page.locator(`[data-animation-route="${id}"] path[pointer-events="stroke"]`).dispatchEvent('dblclick',{clientX:650,clientY:300});const picker=page.locator('[data-animation-path-picker]');await picker.getByRole('button',{name:'Jump',exact:true}).click();const time=picker.getByRole('textbox',{name:'Transition time seconds',exact:true});await time.fill('.3');await time.press('Enter');await expect(time).toHaveValue('0.30s');await time.fill('.5');await time.press('Enter');await expect(time).toHaveValue('0.50s');
 });
+
 
 test('Revert and Delete tooltips open below-left and Revert inverts on hover',async({page})=>{
  await ready(page,'1');const marker=page.locator('[data-layer-type="marker"][data-field-kind="team-a"]').first();const b=(await marker.boundingBox())!;
@@ -545,4 +546,23 @@ test('Revert and Delete tooltips open below-left and Revert inverts on hover',as
   expect(tip.x+tip.width).toBeLessThan(box.x+box.width/2);expect(tip.y).toBeGreaterThan(box.y+box.height/2);
   if(name.startsWith('Revert'))await expect.poll(()=>button.evaluate(node=>{const s=getComputedStyle(node);return [s.backgroundColor,s.color,s.borderTopColor];})).toEqual(['rgb(255, 255, 255)','rgb(0, 0, 0)','rgb(0, 0, 0)']);
  }
+});
+
+
+test('Ctrl and Cmd bypass placement and drag snapping while Shift keeps angle constraints',async({page})=>{
+ await ready(page,'1');const svg=page.locator('svg[role="application"]');const field=(await svg.boundingBox())!;
+ for(const [modifier,x] of [['Control',615.37],['Meta',655.13]] as const){
+  await page.getByRole('button',{name:'Line of Scrimmage',exact:true}).click();
+  await page.keyboard.down(modifier);await page.mouse.move(field.x+x/1000*field.width,field.y+350/484*field.height);await page.mouse.down();await page.mouse.up();await page.keyboard.up(modifier);
+  const line=page.locator('[data-layer-type="guide"][data-tutorial-kind="line-of-scrimmage"] line').first();expect(Math.abs(Number(await line.getAttribute('x1'))-x)).toBeLessThan(1.1);
+  await page.keyboard.press('v');const box=(await line.boundingBox())!,before=Number(await line.getAttribute('x1'));
+  await page.keyboard.down(modifier);await page.mouse.move(box.x+box.width/2,box.y+box.height*.55);await page.mouse.down();await page.mouse.move(box.x+box.width/2+27.3,box.y+box.height*.55,{steps:8});await page.mouse.up();await page.keyboard.up(modifier);
+  expect(Math.abs(Number(await line.getAttribute('x1'))-before-27.3/field.width*1000)).toBeLessThan(1.1);
+ }
+ const marker=page.locator('[data-layer-type="marker"][data-field-kind="team-a"]').first();let b=(await marker.boundingBox())!;
+ await page.keyboard.down('Shift');await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width/2+80,b.y+b.height/2+20,{steps:8});await page.mouse.up();await page.keyboard.up('Shift');
+ expect((await marker.boundingBox())!.y).toBeCloseTo(b.y,0);
+ b=(await marker.boundingBox())!;
+ await page.keyboard.down('Control');await page.keyboard.down('Shift');await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width/2+80,b.y+b.height/2+20,{steps:8});await page.mouse.up();await page.keyboard.up('Shift');await page.keyboard.up('Control');
+ expect((await marker.boundingBox())!.y-b.y).toBeCloseTo(20,0);
 });

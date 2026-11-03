@@ -521,7 +521,7 @@
 	let laserTrailFrame: number | null = null;
 	let hoveringElement = false;
 	let placementSnapX: number | null = null;
- let placementShiftHeld=false;
+ let placementIgnoreSnap=false;
 	let placementSnapTimer: ReturnType<typeof setTimeout> | null = null;
 	let lastPlacementHoverPoint: Point | null = null;
 	let suppressNextClick = false;
@@ -3005,7 +3005,7 @@
   if(!drawingDrag)return;event.stopPropagation();const point=canvasPointFromEvent(event);let dx=point.x-drawingDrag.start.x,dy=point.y-drawingDrag.start.y;
   if(!drawingDrag.moved&&Math.hypot(dx,dy)<3)return;
   if(!drawingDrag.moved){saveHistory();drawingDrag.moved=true;drawingColorOptions=null;}
-  if(event.shiftKey){const angle=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*Math.PI/4;const length=Math.hypot(dx,dy);dx=Math.cos(angle)*length;dy=Math.sin(angle)*length;}
+  if(event.shiftKey&&!ignoresSnapping(event)){const angle=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*Math.PI/4;const length=Math.hypot(dx,dy);dx=Math.cos(angle)*length;dy=Math.sin(angle)*length;}
   freeStrokes=freeStrokes.map(stroke=>{const original=drawingDrag!.strokes.find(item=>item.id===stroke.id);return original?{...stroke,points:original.points.map(point=>({x:point.x+dx,y:point.y+dy}))}:stroke;});
  };
  const endDrawingDrag=(event:PointerEvent)=>{
@@ -5354,8 +5354,9 @@
 	};
 	const isStylusEraserEvent = (event: PointerEvent) => event.pointerType === 'pen' && (event.button === 5 || (event.buttons & 32) === 32);
 	const isStylusBarrelButtonActive = (event: PointerEvent) => event.pointerType === 'pen' && (event.button === 2 || (event.buttons & 2) === 2);
-	const shouldSnapElements = (event: PointerEvent) => snappingEnabled || event.shiftKey;
-	const shouldSnapStraightDrawing = (event: PointerEvent) => shouldSnapElements(event) || isStylusBarrelButtonActive(event);
+	const ignoresSnapping = (event: Pick<PointerEvent,'ctrlKey'|'metaKey'>) => event.ctrlKey || event.metaKey;
+ const shouldSnapElements = (event: PointerEvent) => !ignoresSnapping(event) && snappingEnabled;
+	const shouldSnapStraightDrawing = (event: PointerEvent) => !ignoresSnapping(event) && (snappingEnabled || event.shiftKey || isStylusBarrelButtonActive(event));
 	const selectedTargetAtClientPoint = (clientX: number, clientY: number): SelectedTarget | null => {
 		const hit = document.elementFromPoint(clientX, clientY);
 		const layer = hit?.closest<SVGElement>('[data-layer-type][data-layer-id]');
@@ -5546,15 +5547,15 @@
 			return;
 		}
 		if (isGuideTool(tool)) {
-			const x = event.shiftKey?point.x:placementSnapX ?? point.x;
+			const x = ignoresSnapping(event)?point.x:placementSnapX ?? point.x;
 			clearPlacementSnap();
 			lastPlacementHoverPoint = null;
-			placeGuide(tool, x,event.shiftKey);
+			placeGuide(tool, x,ignoresSnapping(event));
 			return;
 		}
 
 		if (isMarkerTool(tool)) {
-			const markerPoint = tool === 'ball' ? { ...point, x: event.shiftKey?point.x:placementSnapX ?? point.x } : point;
+			const markerPoint = tool === 'ball' ? { ...point, x: ignoresSnapping(event)?point.x:placementSnapX ?? point.x } : point;
 			if (tool === 'ball') {
 				clearPlacementSnap();
 				lastPlacementHoverPoint = null;
@@ -5595,7 +5596,7 @@
 			beginLaserDrawing(event, canvasPointFromEvent(event));
 			return;
 		}
-		const snappedX = placementSnapX;
+		const snappedX = ignoresSnapping(event)?null:placementSnapX;
 		clearPlacementSnap();
 		lastPlacementHoverPoint = null;
 		if (tool === 'event' && marker.kind !== 'ball' && marker.kind !== 'event') {
@@ -5603,7 +5604,7 @@
 			return;
 		}
 		if (isGuideTool(tool) && marker.kind === 'ball') {
-			placeGuide(tool,event.shiftKey?pointFromEvent(event).x:snappedX ?? marker.x,event.shiftKey);
+			placeGuide(tool,ignoresSnapping(event)?pointFromEvent(event).x:snappedX ?? marker.x,ignoresSnapping(event));
 			return;
 		}
 		if (tool === 'free-draw') {
@@ -5715,7 +5716,7 @@
 		}
 		if (dismissEditorForAction()) return;
 		event.preventDefault();
-		const snappedX = placementSnapX;
+		const snappedX = ignoresSnapping(event)?null:placementSnapX;
 		clearPlacementSnap();
 		lastPlacementHoverPoint = null;
 		if (tool === 'event') {
@@ -5724,7 +5725,7 @@
 		}
 		if (tool === 'ball') {
 			const point = pointFromEvent(event);
-			placeBall({ ...point, x:event.shiftKey?point.x:snappedX ?? guide.x });
+			placeBall({ ...point, x:ignoresSnapping(event)?point.x:snappedX ?? guide.x });
 			return;
 		}
 		if (tool === 'free-draw') {
@@ -5803,7 +5804,7 @@
 			!lastPlacementHoverPoint || Math.hypot(point.x - lastPlacementHoverPoint.x, point.y - lastPlacementHoverPoint.y) > 0.1;
 		if (groupSelectionActive || drawing || activeFreeStroke || (dragTarget && placementPointerMoved)) clearPlacementSnap();
 		else if (!dragTarget && placementPointerMoved) {
-			if (!event.shiftKey && shouldSnapElements(event)) schedulePlacementSnap(point, true);
+			if (shouldSnapElements(event)) schedulePlacementSnap(point, true);
 			else clearPlacementSnap();
 		}
 		lastPlacementHoverPoint = groupSelectionActive ? null : point;
@@ -5850,7 +5851,7 @@
 		const dragPoint = dragTarget.type === 'group' || draggingOfficial ? canvasPoint : point;
 		let rawDx = dragPoint.x - dragTarget.pointerStart.x;
 		let rawDy = dragPoint.y - dragTarget.pointerStart.y;
-  if (event.shiftKey) {
+  if (event.shiftKey && !ignoresSnapping(event)) {
    clearPlacementSnap();
    const increment = Math.PI / 4;
    let originOffset = { x: 0, y: 0 };
@@ -5931,6 +5932,7 @@
 			const draggedGuide = guides.find((guide) => guide.id === target.id);
 			const rawX = Math.max(fieldLeft, Math.min(fieldRight, target.xStart + rawDx));
 			const x =
+                ignoresSnapping(event)?rawX:
 				draggedGuide?.kind === 'line-to-gain'
 					? wholeYardLineToGainX(rawX)
 					: draggedGuide?.kind === 'line-of-scrimmage'
@@ -6332,7 +6334,7 @@
 	});
 </script>
 
-<svelte:window on:keyup={(event) => {if(event.key==='Shift')placementShiftHeld=false;viewerScrubber.keyup(event);}} on:keydown|capture={(event)=>{if(event.key==='Shift'){placementShiftHeld=true;clearPlacementSnap();}}} on:blur={() => viewerScrubber.stop()} on:keydown|capture={handleGlobalKeydown} on:beforeunload={handleBeforeUnload} />
+<svelte:window on:keyup={(event) => {placementIgnoreSnap=event.ctrlKey||event.metaKey;viewerScrubber.keyup(event);}} on:keydown|capture={(event)=>{placementIgnoreSnap=event.ctrlKey||event.metaKey;if(placementIgnoreSnap)clearPlacementSnap();}} on:blur={() => {placementIgnoreSnap=false;clearPlacementSnap();viewerScrubber.stop();}} on:keydown|capture={handleGlobalKeydown} on:beforeunload={handleBeforeUnload} />
 
 <section
 	bind:this={builderRoot}
@@ -7145,8 +7147,8 @@
       on:dblclick|capture={(event) => { if (viewOnly) { event.preventDefault(); event.stopImmediatePropagation(); } }}
 						on:pointerdown={beginOnField}
 						on:pointermove={(event) => {
-       placementShiftHeld=event.shiftKey;
-       if(event.shiftKey)clearPlacementSnap();
+       placementIgnoreSnap=ignoresSnapping(event);
+       if(ignoresSnapping(event))clearPlacementSnap();
        if (viewOnly) return;
 							updateFieldControlTooltip(event);
 							continuePointer(event);
@@ -7163,7 +7165,7 @@
 							hoverPoint = !groupSelectionActive && (pointerOnField || tool === 'free-draw') ? point : null;
 							if (tool === 'laser' && pointerOnField) updateLaserPointer(point);
 							lastPlacementHoverPoint = !groupSelectionActive && pointerOnField ? point : null;
-							if (!groupSelectionActive && pointerOnField && !event.shiftKey && shouldSnapElements(event)) schedulePlacementSnap(point, true);
+							if (!groupSelectionActive && pointerOnField && shouldSnapElements(event)) schedulePlacementSnap(point, true);
 							else clearPlacementSnap();
 						}}
 						on:pointerleave={() => {
@@ -7716,9 +7718,9 @@
 
 						{#if !viewOnly && hoverPoint && !hoveringElement && !drawing && !dragTarget}
 							{#if isGuideTool(tool)}
-								{@const rawGuidePreviewX = placementShiftHeld?hoverPoint.x:placementSnapX ?? hoverPoint.x}
+								{@const rawGuidePreviewX = placementIgnoreSnap?hoverPoint.x:placementSnapX ?? hoverPoint.x}
 								{@const guidePreviewX =
-									placementShiftHeld?rawGuidePreviewX:tool === 'line-to-gain' ? wholeYardLineToGainX(rawGuidePreviewX) : wholeYardLineOfScrimmageX(rawGuidePreviewX)}
+									placementIgnoreSnap?rawGuidePreviewX:tool === 'line-to-gain' ? wholeYardLineToGainX(rawGuidePreviewX) : wholeYardLineOfScrimmageX(rawGuidePreviewX)}
 								<line
 									x1={guidePreviewX}
 									y1={fieldTop + guideSidelineInset}
@@ -8409,7 +8411,7 @@
 
 						<g data-down-marker-layer>
 							{#if !viewOnly && hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-to-gain' && fieldSettings.showDownMarker}
-								{@const previewGuideX = (placementShiftHeld?hoverPoint.x:wholeYardLineToGainX(placementSnapX ?? hoverPoint.x))}
+								{@const previewGuideX = (placementIgnoreSnap?hoverPoint.x:wholeYardLineToGainX(placementSnapX ?? hoverPoint.x))}
 								{@const previewDownMarker = downMarkerDisplay(currentLineToGain?.down ?? '1st', previewGuideX, lineOfScrimmageX)}
 								<g class="down-marker-graphic" opacity="0.72" pointer-events="none">
 									<rect x={previewGuideX - 32} y={fieldTop - 9} width="64" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
@@ -8484,7 +8486,7 @@
 								{/each}
 							{/if}
 							{#if !viewOnly && hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-of-scrimmage' && fieldSettings.showLineOfScrimmageMarker}
-								{@const previewGuideX = (placementShiftHeld?hoverPoint.x:wholeYardLineOfScrimmageX(placementSnapX ?? hoverPoint.x))}
+								{@const previewGuideX = (placementIgnoreSnap?hoverPoint.x:wholeYardLineOfScrimmageX(placementSnapX ?? hoverPoint.x))}
 								{@const previewLosMarker = lineOfScrimmageMarkerDisplay(previewGuideX)}
 								<g class="los-marker-graphic" opacity="0.72" pointer-events="none">
 									<rect x={previewGuideX - 26} y={fieldBottom - 9} width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
