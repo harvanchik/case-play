@@ -4,6 +4,9 @@
 	import { playerLetter, renamePlayerLetter } from '$lib/play-builder-player-letters';
  import DrawingAnimationPicker from './play-builder/DrawingAnimationPicker.svelte';
  import {defaultDrawingAnimation,type DrawingAnimation} from '$lib/play-builder-drawing-animation';
+	import { fade } from 'svelte/transition';
+	import SetupDropdown from './play-builder/SetupDropdown.svelte';
+ import {setupYardPositions,type SetupVariant} from '$lib/play-builder-setups';
 	import { onMount, tick } from 'svelte';
 	import { driver, type DriveStep, type Driver } from 'driver.js';
 	import 'driver.js/dist/driver.css';
@@ -77,7 +80,9 @@
  import { downloadBrowserVideo, type VideoFormat } from '$lib/play-builder-browser-video';
 	import BuilderActionButton from './play-builder/BuilderActionButton.svelte';
 	import AnimationPanel from './play-builder/AnimationPanel.svelte';
+	import DrawnArrow from './play-builder/DrawnArrow.svelte';
 	import MarkerArtwork from './play-builder/MarkerArtwork.svelte';
+	import { draggablePopover, rememberPopoverAnchor } from '$lib/play-builder-popover';
 	import AnimationOverlay from './play-builder/AnimationOverlay.svelte';
  import DrawingStylePicker from './play-builder/DrawingStylePicker.svelte';
  import AnimationIcon from './play-builder/AnimationIcon.svelte';
@@ -92,7 +97,9 @@
 		cloneAnimation,
 		createAnimation,
 		defaultMotion,
+        passBallToElement,
 		evaluateAnimation,
+		animationTargetChanged,
 		sameTarget as sameAnimationTarget,
 		stepTime,
 		type AnimationTarget,
@@ -112,6 +119,7 @@
 	type SelectionBounds = { left: number; top: number; right: number; bottom: number };
 	type MarqueeSelection = { pointerId: number; start: Point; current: Point };
 	type ElementClipboard = {
+ sourcePlayId:number;sourceField:{left:number;top:number;width:number;height:number};freeStrokes:FreeStroke[];
 		markers: FieldMarker[];
 		paths: FieldPath[];
 		guides: FieldGuide[];
@@ -326,7 +334,9 @@
 	let actionMessageTimer: ReturnType<typeof setTimeout> | null = null;
 	let canEditSavedPlay = savedPlayId === null || accountOwnedByCurrentUser;
 	// Saved links remain editable in the browser holding their private edit token.
-	$: viewOnly = !canEditSavedPlay;
+	let presentation=false;
+ let presentationRestore:{tool:ActiveTool;open:boolean;step:number}|null=null;
+ $: viewOnly = !canEditSavedPlay||presentation;
 	let ownershipResolved = savedPlayId === null || accountSessionActive;
 	let saveFeedbackState: 'idle' | 'saved' | 'failed' = 'idle';
 	let saveActionLabel = '';
@@ -466,6 +476,14 @@
 		draggedYardPathMode = target?.type === 'path' && target.moved ? target.mode : 'whole';
 	}
 	let editingMarkerId: number | null = null;
+ let passBallId:number|null=null;
+ $: if(!animationOpen||animationPreview||editingMarkerId!==passBallId)passBallId=null;
+ const finishPass=(receiver:FieldMarker)=>{
+  const id=passBallId;if(id===null||!animation||animationStep<1)return;
+  commitMarkerEditor();passBallId=null;const content=currentAnimationContent();
+  changeAnimation(passBallToElement(content.scene,content.animation!,animationStep,id,receiver.id));
+  tool='select';selectedTargets=[{type:'marker',id}];refreshSelectionUi();
+ };
 	let editingMarker: FieldMarker | undefined;
 	let editValue = '';
 	let editInput: HTMLInputElement;
@@ -1175,7 +1193,7 @@
 	};
 	const finishLaserDrawing = () => {
 		if (activeLaserDrawing && activeLaserDrawing.points.length > 1) {
-			saveHistory();
+			if(!presentation)saveHistory();
 			laserDrawings = [...laserDrawings, { ...activeLaserDrawing, releasedAt: null, appearedAt: null }];
 		}
 		activeLaserDrawing = null;
@@ -1336,11 +1354,31 @@
 		selectAnimationStep(Math.min(index, next.steps.length - 1));
 	};
  // Keep floating controls outside the page's isolated stacking and clipping contexts.
- const animationPortal = (node: HTMLElement) => {
-  document.body.appendChild(node);
-  return { destroy: () => node.remove() };
+ const animationPortal = (node: HTMLElement, fullscreen: boolean) => {
+  const move = (active: boolean) => (active ? builderRoot : document.body).appendChild(node);
+  move(fullscreen);
+  return { update: move, destroy: () => node.remove() };
  };
+ const togglePresentation=async()=>{
+  if(document.fullscreenElement===builderRoot){await document.exitFullscreen();return;}
+  if(!builderRoot.requestFullscreen){showActionMessage('Full Screen is not supported in this browser.');return;}
+  if(hasActiveInlineEditor())commitActiveEditor();pauseAnimation();commitAnimation();storeActivePlayState();
+  presentationRestore={tool,open:animationOpen,step:animationStep};animationOpen=false;clearEditorState();selectedTargets=[];selectedDrawingIds=[];tool='select';presentation=true;
+  try{await builderRoot.requestFullscreen();builderRoot.focus();}catch{presentation=false;animationOpen=presentationRestore?.open??false;tool=presentationRestore?.tool??'select';presentationRestore=null;showActionMessage('Unable to enter Full Screen.');}
+ };
+ const syncFullscreen=()=>{
+  if(presentation&&document.fullscreenElement!==builderRoot){
+   pauseAnimation();releaseLaserDrawings();animationOpen=false;presentation=false;animationPreview=true;
+   const restored=presentationRestore;presentationRestore=null;
+   if(animation)selectAnimationStep(Math.min(restored?.step??0,animation.steps.length-1));
+   animationOpen=restored?.open??false;tool=restored?.tool??'select';
+  }
+ };
+ const togglePresentationLaser=()=>{if(tool==='laser'){releaseLaserDrawings();tool='select';}else tool='laser';};
+ const clickPresentationLaser=()=>{const wasRainbow=rainbowLaserEnabled;registerLaserToolbarClick('laser');togglePresentationLaser();if(!wasRainbow&&rainbowLaserEnabled)tool='laser';};
+
 	const openAnimation = () => {
+  if(presentation){if(animation)animationOpen=true;return;}
 		if (viewOnly) return;
 		if (!animation) {
 			saveHistory();
@@ -1358,6 +1396,7 @@
         refreshSelectionUi();
 	};
 	const closeAnimation = () => {
+  if(presentation){animationOpen=false;return;}
 		selectAnimationStep(0);
 		animationOpen = false;
 	};
@@ -2657,7 +2696,7 @@
 		return point.y + yardLinePreviewGap;
 	};
 	const guideDash = playBuilderGuideDash;
-	const renderedGuideColor = (guide: FieldGuide) => guideColor(guide.color);
+	const renderedGuideColor = (guide: FieldGuide) => guide.animationColor ?? guideColor(guide.color);
 	const renderedGuideDash = (guide: FieldGuide) => guideDash(guide.style);
 	const guideLabel = (guide: FieldGuide) =>
 		guide.kind === 'line-of-scrimmage' ? 'Line of Scrimmage' : guide.kind === 'line-to-gain' ? 'Line to Gain' : 'Custom cross-field line';
@@ -2850,7 +2889,7 @@
 		target.type === 'marker'
 			? markers.some((item) => item.id === target.id) || Boolean(animationOpen && animationStep>0 && revertOriginScene?.markers.some(item=>item.id===target.id))
 			: target.type === 'path'
-				? paths.some((item) => item.id === target.id)
+				? paths.some((item) => item.id === target.id) || Boolean(animationOpen && animationStep>0 && revertOriginScene?.paths.some(item=>item.id===target.id))
 				: guides.some((item) => item.id === target.id) || Boolean(animationOpen && animationStep>0 && revertOriginScene?.guides.some(item=>item.id===target.id));
 	const targetBounds = (target: SelectedTarget): SelectionBounds | null => {
 		if (target.type === 'marker') {
@@ -2874,7 +2913,7 @@
 			return { left: marker.x - halfWidth, top: marker.y - halfHeight, right: marker.x + halfWidth, bottom: marker.y + halfHeight };
 		}
 		if (target.type === 'path') {
-			const path = paths.find((item) => item.id === target.id);
+			const path = paths.find((item) => item.id === target.id) ?? (animationOpen ? revertOriginScene?.paths.find(item=>item.id===target.id) : undefined);
 			if (!path) return null;
 			const start = pathStart(path);
 			const points = pathPoints(path, start) ?? [start, path.end];
@@ -3010,17 +3049,27 @@
  };
  const endDrawingDrag=(event:PointerEvent)=>{
   if(!drawingDrag)return;event.stopPropagation();const moved=drawingDrag.moved;drawingDrag=null;
-  if(moved){if(animation)commitAnimation();}else drawingColorOptions={x:event.clientX+8,y:event.clientY+8};
+  if(moved){if(animation)commitAnimation();}else {rememberPopoverAnchor(event,document.querySelector(`[data-drawing-id="${selectedDrawingIds[0]}"]`));drawingColorOptions={x:event.clientX+8,y:event.clientY+8};}
  };
  let drawingOptions:{x:number;y:number;stepId:string}|null=null;
  $: drawingMotion = animation && animationStep>0 && selectedDrawingIds.length ? animation.drawings?.find(item=>item.id===selectedDrawingIds[0]&&item.stepId===animation!.steps[animationStep].id) ?? {...defaultDrawingAnimation(selectedDrawingIds[0],animation.steps[animationStep].id), ...(animation.steps[animationStep-1].strokeIds?.includes(selectedDrawingIds[0])?{mode:'linear' as const,start:0}: {})} : null;
  $: if(animationPreview || viewOnly){drawingOptions=null;drawingColorOptions=null;selectedDrawingIds=[];}
  $: if(!animationOpen || drawingOptions && drawingOptions.stepId!==animation?.steps[animationStep]?.id)drawingOptions=null;
  const drawingBounds=(id:number)=>{const points=freeStrokes.find(stroke=>stroke.id===id)?.points??[];return points.length?{left:Math.min(...points.map(p=>p.x)),right:Math.max(...points.map(p=>p.x)),top:Math.min(...points.map(p=>p.y)),bottom:Math.max(...points.map(p=>p.y))}:null;};
+ const drawingChanged = (id:number) => {
+  const value=animationContent.animation;if(!value||animationStep<1)return false;
+  const before=value.steps[animationStep-1],after=value.steps[animationStep];
+  if((before.strokeIds?.includes(id)??true)!==(after.strokeIds?.includes(id)??true))return true;
+  const state=(step:typeof before)=>{const offset=step.strokeOffsets?.find(item=>item.id===id);return [offset?.x??0,offset?.y??0,offset?.color??animationBaseScene.freeStrokes.find(stroke=>stroke.id===id)?.color];};
+  return JSON.stringify(state(before))!==JSON.stringify(state(after));
+ };
  const openDrawingOptions=(id:number,event:PointerEvent|MouseEvent)=>{
+ rememberPopoverAnchor(event,document.querySelector(`[data-drawing-id="${id}"]`));
   if(viewOnly||tool!=='select'||!animationOpen||animationPreview)return;
   event.preventDefault();event.stopPropagation();selectedTargets=[];clearDeleteState();
+  editingMarkerId=null;editingGuideId=null;editingPathId=null;editingDownGuideId=null;
   drawingColorOptions=null;selectedDrawingIds=event.shiftKey?[...new Set([...selectedDrawingIds,id])]:selectedDrawingIds.includes(id)?selectedDrawingIds:[id];
+  if(!selectedDrawingIds.some(drawingChanged)){drawingOptions=null;drawingColorOptions={x:event.clientX+8,y:event.clientY+8};return;}
   drawingOptions=animation && animationStep>0 && selectedDrawingIds.length?{x:event.clientX+8,y:event.clientY+8,stepId:animation.steps[animationStep].id}:null;
  };
  const updateDrawingAnimation=(value:DrawingAnimation)=>{
@@ -3076,10 +3125,11 @@
 		return true;
 	};
 	const copySelectedElements = () => {
-		if (selectedTargets.length === 0 || !selectedGroupBounds) return false;
+		if (selectedTargets.length+selectedDrawingIds.length === 0 || !selectedGroupBounds) return false;
 		const selected = orderedTargets(selectedTargets);
 		const selectedKeys = new Set(selected.map(targetKey));
 		elementClipboard = {
+ sourcePlayId:playEntries[activePlayIndex].id,sourceField:{left:fieldLeft,top:fieldTop,width:fieldWidth,height:fieldHeight},freeStrokes:structuredClone(freeStrokes.filter(stroke=>selectedDrawingIds.includes(stroke.id))),
 			markers: markers.filter((marker) => selectedKeys.has(targetKey({ type: 'marker', id: marker.id }))).map((marker) => ({ ...marker })),
 			paths: paths
 				.filter((path) => selectedKeys.has(targetKey({ type: 'path', id: path.id })))
@@ -3089,7 +3139,7 @@
 			bounds: { ...selectedGroupBounds },
 			pasteCount: 0
 		};
-		showActionMessage(`${selected.length === 1 ? 'Element' : `${selected.length} elements`} copied`);
+		const count=selected.length+selectedDrawingIds.length;showActionMessage(`${count===1?'Element':`${count} elements`} copied`);
 		return true;
 	};
 	const pasteOffset = (minimum: number, maximum: number, desired: number) => {
@@ -3099,10 +3149,13 @@
 	};
 	const pasteElements = () => {
 		if (!elementClipboard) return false;
-		const desiredOffset = 14 * (elementClipboard.pasteCount + 1);
+		const samePlay=elementClipboard.sourcePlayId===playEntries[activePlayIndex].id;
+		const desiredOffset = samePlay?14*(elementClipboard.pasteCount+1):0;
 		const dx = pasteOffset(-elementClipboard.bounds.left, 1000 - elementClipboard.bounds.right, desiredOffset);
 		const dy = pasteOffset(-elementClipboard.bounds.top, 484 - elementClipboard.bounds.bottom, desiredOffset);
-		const idMap = new Map<string, number>();
+		const sx=samePlay?1:fieldWidth/elementClipboard.sourceField.width,sy=samePlay?1:fieldHeight/elementClipboard.sourceField.height;
+  const offset=(point:Point)=>samePlay?{x:point.x+dx,y:point.y+dy}:{x:fieldLeft+(point.x-elementClipboard!.sourceField.left)*sx,y:fieldTop+(point.y-elementClipboard!.sourceField.top)*sy};
+  const idMap = new Map<string, number>();
 		for (const marker of elementClipboard.markers) idMap.set(targetKey({ type: 'marker', id: marker.id }), nextId++);
 		for (const path of elementClipboard.paths) idMap.set(targetKey({ type: 'path', id: path.id }), nextId++);
 		for (const guide of elementClipboard.guides) idMap.set(targetKey({ type: 'guide', id: guide.id }), nextId++);
@@ -3110,24 +3163,23 @@
 			...marker,
 			id: idMap.get(targetKey({ type: 'marker', id: marker.id }))!,
  setupDefault: false,
-			x: marker.x + dx,
-			y: marker.y + dy
+			...offset(marker)
 		}));
 		const pastedPaths = elementClipboard.paths.map((path) => ({
 			...path,
 			id: idMap.get(targetKey({ type: 'path', id: path.id }))!,
-			start: { x: path.start.x + dx, y: path.start.y + dy },
-			end: { x: path.end.x + dx, y: path.end.y + dy },
-			points: path.points?.map((point) => ({ x: point.x + dx, y: point.y + dy })),
+			start: offset(path.start),
+			end: offset(path.end),
+			points: path.points?.map(offset),
 			startMarkerId: path.startMarkerId === undefined ? undefined : idMap.get(targetKey({ type: 'marker', id: path.startMarkerId }))
 		}));
 		const pastedGuides = elementClipboard.guides.map((guide) => ({
 			...guide,
 			id: idMap.get(targetKey({ type: 'guide', id: guide.id }))!,
  setupDefault: false,
-			kind: 'custom' as const,
-			x: guide.x + dx,
-			down: undefined
+			kind: guides.some(existing=>existing.kind===guide.kind)?'custom' as const:guide.kind,
+			x: offset({x:guide.x,y:fieldTop}).x,
+			down: guides.some(existing=>existing.kind===guide.kind)?undefined:guide.down
 		}));
 		const pastedLayerOrder = elementClipboard.layerOrder
 			.map((layer) => {
@@ -3135,8 +3187,10 @@
 				return id === undefined ? null : { type: layer.type, id };
 			})
 			.filter((layer): layer is LayerRef => layer !== null);
-		if (pastedLayerOrder.length === 0) return false;
+		const pastedStrokes=elementClipboard.freeStrokes.map(stroke=>({...stroke,id:nextId++,points:stroke.points.map(offset)}));
+		if(pastedLayerOrder.length+pastedStrokes.length===0)return false;
 		saveHistory();
+		freeStrokes=[...freeStrokes,...pastedStrokes];selectedDrawingIds=pastedStrokes.map(stroke=>stroke.id);
 		markers = [...markers, ...pastedMarkers];
 		paths = [...paths, ...pastedPaths];
 		guides = [...guides, ...pastedGuides];
@@ -3145,7 +3199,7 @@
 		elementClipboard = { ...elementClipboard, pasteCount: elementClipboard.pasteCount + 1 };
 		refreshSelectionUi();
 		syncLayerDom();
-		showActionMessage(`${pastedLayerOrder.length === 1 ? 'Element' : `${pastedLayerOrder.length} elements`} pasted`);
+		const count=pastedLayerOrder.length+pastedStrokes.length;showActionMessage(`${count===1?'Element':`${count} elements`} pasted`);
 		return true;
 	};
 	const beginGroupDrag = (event: PointerEvent) => {
@@ -3176,23 +3230,19 @@
 	};
  $: revertOriginScene = animation && animationStep > 0 ? applyAnimationStep(animationBaseScene, animation.steps[animationStep - 1]) : null;
  $: revertSelection = animationOpen && !animationPreview && selectedTargets.length === 1 ? selectedTargets[0] : null;
- $: revertOrigin = revertSelection?.type === 'marker' ? revertOriginScene?.markers.find(item => item.id === revertSelection!.id)
-  : revertSelection?.type === 'guide' ? revertOriginScene?.guides.find(item => item.id === revertSelection!.id) : undefined;
- $: revertCurrent = revertSelection?.type === 'marker' ? markers.find(item => item.id === revertSelection!.id)
-  : revertSelection?.type === 'guide' ? guides.find(item => item.id === revertSelection!.id) : undefined;
- $: canRevertPosition = !!(revertOrigin && (!revertCurrent || (revertOrigin.x !== revertCurrent.x || ('y' in revertOrigin && 'y' in revertCurrent && revertOrigin.y !== revertCurrent.y))));
+ $: revertOriginPose = revertSelection && animationStep>0 ? animation?.steps[animationStep-1].poses.find(item=>sameAnimationTarget(item,revertSelection!)) : undefined;
+ $: revertOriginMarker = revertSelection?.type==='marker' ? revertOriginScene?.markers.find(item=>item.id===revertSelection!.id) : undefined;
+ $: revertOrigin = revertOriginPose && revertOriginMarker ? {...revertOriginPose,x:revertOriginMarker.x,y:revertOriginMarker.y} : revertOriginPose;
+ $: revertCurrent = revertSelection ? animationContent.animation?.steps[animationStep].poses.find(item=>sameAnimationTarget(item,revertSelection!)) : undefined;
+ $: canRevertPosition = !!(revertOrigin?.visible && (!revertCurrent?.visible || JSON.stringify([revertOrigin.x,revertOrigin.y,revertOrigin.end,revertOrigin.points])!==JSON.stringify([revertCurrent.x,revertCurrent.y,revertCurrent.end,revertCurrent.points])));
  const revertElementPosition = () => {
-  if (viewOnly || !animation || !revertSelection || revertSelection.type === 'path' || !revertOrigin || !canRevertPosition) return;
-  const target: AnimationTarget = { type: revertSelection.type, id: revertSelection.id };
-  const next = currentAnimationContent().animation!;
-  const pose = next.steps[animationStep].poses.find(item => sameAnimationTarget(item, target));
-  if (!pose) return;
-  pose.visible=true;
-  pose.x = revertOrigin.x;
-  if ('y' in revertOrigin) pose.y = revertOrigin.y;
-  delete pose.carrierId;
-  delete pose.offset;
-  next.transitions[animationStep - 1].motions = next.transitions[animationStep - 1].motions.filter(item => !sameAnimationTarget(item, target));
+  if(viewOnly||!animation||!revertSelection||!revertOrigin||!canRevertPosition)return;
+  const next=currentAnimationContent().animation!;
+  const pose=next.steps[animationStep].poses.find(item=>sameAnimationTarget(item,revertSelection!));
+  if(!pose)return;
+  Object.assign(pose,{visible:true,x:revertOrigin.x,y:revertOrigin.y,end:structuredClone(revertOrigin.end),points:structuredClone(revertOrigin.points)});
+  delete pose.carrierId;delete pose.offset;
+  next.transitions[animationStep-1].motions=next.transitions[animationStep-1].motions.filter(item=>!sameAnimationTarget(item,revertSelection!));
   changeAnimation(next);
  };
 	const deleteHoveredElement = () => {
@@ -3217,6 +3267,7 @@
 		removeLayer(target.type, target.id);
 	};
 	const commitMarkerEditor = () => {
+ passBallId=null;
 		if (!editingMarker) return;
 		const editedKind = editingMarker.kind;
 		const label = editValue.trim();
@@ -3565,6 +3616,7 @@
 		editingScoreboard !== null ||
 		editingDownGuideId !== null;
 	const startEditingDownMarker = async (event: Event, guide: FieldGuide) => {
+ rememberPopoverAnchor(event,document.querySelector(`[data-layer-type="guide"][data-layer-id="${guide.id}"]`));
 		if (viewOnly) return;
 		if (guide.kind !== 'line-to-gain' || suppressDownMarkerClick || tool === 'event' || tool === 'free-draw' || tool === 'laser') return;
 		event.preventDefault();
@@ -3606,6 +3658,7 @@
 		gameClockEditInput?.select();
 	};
 	const startEditingTeamBox = async (event: Event, teamBoxY: number, teamBoxIndex: number) => {
+ rememberPopoverAnchor(event,event.currentTarget as Element|null);
 		if (viewOnly || animationPreview || tool === 'laser' || tool === 'free-draw') return;
 		event.preventDefault();
 		clearDeleteState();
@@ -3621,7 +3674,10 @@
 		teamBoxEditInput?.focus();
 		teamBoxEditInput?.select();
 	};
-	const startEditingMarker = async (event: Event, marker: FieldMarker, preserveSelection = false) => {
+	const startEditingMarker = async (event: Event, marker: FieldMarker, preserveSelection = false, elementMode=false) => {
+ rememberPopoverAnchor(event,document.querySelector(`[data-layer-type="marker"][data-layer-id="${marker.id}"]`));
+  if(!elementMode&&!viewOnly&&animationOpen&&!animationPreview&&animationContent.animation&&animationTargetChanged(animationContent.animation,animationStep,{type:'marker',id:marker.id})){editingMarkerId=null;editingGuideId=null;editingPathId=null;editingDownGuideId=null;animationOverlay?.openPicker(event as MouseEvent,{type:'marker',id:marker.id});return;}
+
 		if (viewOnly) return;
 		if (!isEditableMarker(marker) || tool === 'laser' || (tool === 'event' && marker.kind !== 'ball' && marker.kind !== 'event')) return;
 		event.preventDefault();
@@ -3662,7 +3718,10 @@
 		editingMarkerId = null;
 		completeTutorialAction('label:ball');
 	};
-	const startEditingGuide = async (event: Event, guide: FieldGuide, fromLosMarker = false, preserveSelection = false) => {
+	const startEditingGuide = async (event: Event, guide: FieldGuide, fromLosMarker = false, preserveSelection = false, elementMode=false) => {
+ rememberPopoverAnchor(event,document.querySelector(`[data-layer-type="guide"][data-layer-id="${guide.id}"]`));
+  if(!elementMode&&!viewOnly&&animationOpen&&!animationPreview&&animationContent.animation&&animationTargetChanged(animationContent.animation,animationStep,{type:'guide',id:guide.id})){editingMarkerId=null;editingGuideId=null;editingPathId=null;editingDownGuideId=null;animationOverlay?.openPicker(event as MouseEvent,{type:'guide',id:guide.id});return;}
+
 		if (viewOnly) return;
 		if (tool === 'event' || tool === 'laser') return;
 		event.preventDefault();
@@ -3690,9 +3749,12 @@
 		if (viewOnly) return;
 		if (guide.kind !== 'line-of-scrimmage' || suppressDownMarkerClick || tool === 'event' || tool === 'free-draw' || tool === 'laser') return;
 		fieldControlTooltip = '';
-		await startEditingGuide(event, guide, true);
+		await startEditingGuide(event, guide, true, false, true);
 	};
-	const startEditingPath = (event: Event, path: FieldPath, preserveSelection = false) => {
+	let animationOverlay: AnimationOverlay | undefined;
+	const startEditingPath = (event: Event, path: FieldPath, preserveSelection = false, elementMode=false) => {
+ rememberPopoverAnchor(event,document.querySelector(`[data-layer-type="path"][data-layer-id="${path.id}"]`));
+ if(!elementMode && !viewOnly && animationOpen && animationStep>0 && !animationPreview && animationContent.animation && animationTargetChanged(animationContent.animation,animationStep,{type:'path',id:path.id})){editingMarkerId=null;editingGuideId=null;editingDownGuideId=null;editingPathId=null;animationOverlay?.openPicker(event as MouseEvent,{type:'path',id:path.id});return;}
 		if (viewOnly) return;
 		if (tool === 'event' || tool === 'laser') return;
 		event.preventDefault();
@@ -3706,6 +3768,12 @@
 		guideEditStyle = path.style;
 		completeTutorialAction(`edit:${path.kind}`);
 	};
+ const openElementProperties = (target:AnimationTarget,event:MouseEvent) => {
+  if(target.type==='marker'){const marker=markers.find(item=>item.id===target.id);if(marker)void startEditingMarker(event,marker,false,true);}
+  else if(target.type==='guide'){const guide=guides.find(item=>item.id===target.id);if(guide)void startEditingGuide(event,guide,false,false,true);}
+  else {const path=paths.find(item=>item.id===target.id);if(path)startEditingPath(event,path,false,true);}
+ };
+
 	const openSelectedElementEditor = (event: KeyboardEvent) => {
 		if (selectedTargets.length !== 1) return false;
 		const [selectedTarget] = selectedTargets;
@@ -3924,8 +3992,9 @@
   if (event.key === 'Escape' && (showShare || showExportSettings)) {
    event.preventDefault(); showShare = false; showExportSettings = false; return true;
   }
-  if (showShare || showExportSettings || showHelp || showFeedback || (event.target as Element)?.closest('input,textarea,select,[contenteditable="true"]')) return false;
+  if (showShare || showExportSettings || showHelp || showFeedback || (event.target as Element)?.closest('input:not([type="range"]),textarea,select,[contenteditable="true"]')) return false;
   const command = event.ctrlKey || event.metaKey;
+  if(presentation&&command){event.preventDefault();return true;}
   let viewerAction: (() => unknown) | undefined;
   if (command && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'l') viewerAction = openShare;
   else if (command && !event.altKey && event.shiftKey && event.key.toLowerCase() === 'o') viewerAction = openExportSettings;
@@ -3960,6 +4029,25 @@
   return true;
  };
 	const handleGlobalKeydown = (event: KeyboardEvent) => {
+  if(actionInProgress==='save'){if(event.key!=='Tab')event.preventDefault();event.stopImmediatePropagation();return;}
+  const editingText=(event.target as Element)?.closest('input:not([type="range"]),textarea,select,[contenteditable="true"]');
+  const inBuilder=builderRoot?.contains(event.target as Node)||(event.target as Element)?.closest('[data-animation-ui],[data-draggable-popover]');
+  if(!viewOnly&&!animationPreview&&!videoController&&!tutorialActive&&actionInProgress===null&&inBuilder&&!editingText&&(event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&['a','c','x','v'].includes(event.key.toLowerCase())){
+   const key=event.key.toLowerCase();if(key==='c'&&window.getSelection()?.toString())return;
+   event.preventDefault();event.stopImmediatePropagation();
+   if(key==='a'){selectedTargets=allElementTargets();selectedDrawingIds=freeStrokes.map(stroke=>stroke.id);tool='select';singleMarqueeSelection=false;refreshSelectionUi();}
+   else if(key==='c')copySelectedElements();
+   else if(key==='v')pasteElements();
+   else if(copySelectedElements()){saveHistory();const drawingIds=[...selectedDrawingIds];for(const target of [...selectedTargets])removeElementTarget(target);freeStrokes=freeStrokes.filter(stroke=>!drawingIds.includes(stroke.id));selectedTargets=[];selectedDrawingIds=[];clearDeleteState();if(animation)commitAnimation();}
+   return;
+  }
+
+  if(presentation&&!(event.target as Element)?.closest('input:not([type="range"]),textarea,select,[contenteditable="true"]')){
+   if(event.altKey&&!event.ctrlKey&&!event.metaKey&&event.key.toLowerCase()==='a'){event.preventDefault();animationOpen=animation?!animationOpen:false;return;}
+   if(!event.altKey&&!event.ctrlKey&&!event.metaKey&&event.key.toLowerCase()==='c'){event.preventDefault();fadeLaserDrawings();return;}
+   if(!event.altKey&&!event.ctrlKey&&!event.metaKey&&event.shiftKey&&event.key.toLowerCase()==='l'){event.preventDefault();togglePresentationLaser();return;}
+   if(!event.altKey&&!event.ctrlKey&&!event.metaKey&&event.key.toLowerCase()==='v'){event.preventDefault();releaseLaserDrawings();tool='select';return;}
+  }
   if (videoController) {
    if (event.key === 'Escape') videoController.abort();
    event.preventDefault();
@@ -3988,7 +4076,7 @@
   }
   if(event.altKey && !event.shiftKey && !event.ctrlKey && !event.metaKey && event.code==='KeyA') {
    const target=event.target as HTMLElement | null;
-   const editing=target?.closest('input,textarea,select,[contenteditable="true"]');
+   const editing=target?.closest('input:not([type="range"]),textarea,select,[contenteditable="true"]');
    const busy=tutorialActive || actionInProgress!==null || showSetupConfirm || showDraftRestore || showNewPrompt || showShare || showExportSettings || showSettings || showHelp || showFeedback || editingPlayId!==null || hasActiveInlineEditor();
    if(!event.repeat && !event.isComposing && !editing && !busy && !viewOnly) {event.preventDefault();if(animationOpen) closeAnimation();else openAnimation();}
    return;
@@ -3997,7 +4085,7 @@
   // Animation commands use their own modifier family; never feed them to drawing tools.
   if(event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey) {
    const target=event.target as HTMLElement | null;
-   const editing=target?.closest('input,textarea,select,[contenteditable="true"]');
+   const editing=target?.closest('input:not([type="range"]),textarea,select,[contenteditable="true"]');
    const busy=tutorialActive || actionInProgress!==null || showSetupConfirm || showDraftRestore || showNewPrompt || showShare || showExportSettings || showSettings || showHelp || showFeedback || editingPlayId!==null || hasActiveInlineEditor();
    if(busy && !editing) {event.preventDefault(); return;}
 
@@ -4009,7 +4097,7 @@
 
   if (animationOpen && !viewOnly && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'v') {
    const target = event.target as Element | null;
-   if (target?.closest('input,textarea,select,[contenteditable="true"]') || tutorialActive || showSetupConfirm || showDraftRestore || showNewPrompt || showShare || showExportSettings || showSettings || showHelp || showFeedback) return;
+   if (target?.closest('input:not([type="range"]),textarea,select,[contenteditable="true"]') || tutorialActive || showSetupConfirm || showDraftRestore || showNewPrompt || showShare || showExportSettings || showSettings || showHelp || showFeedback) return;
    event.preventDefault();
    if (hasActiveInlineEditor()) commitActiveEditor();
    animationDrawingRoute = false;
@@ -4020,7 +4108,7 @@
 		if (animationPreview && !((event.ctrlKey || event.metaKey) && ['s', 'z', 'y'].includes(event.key.toLowerCase())) && !( !event.ctrlKey && !event.metaKey && !event.altKey && (event.key.toLowerCase()==='d' || event.shiftKey && event.key.toLowerCase()==='l' || tool==='laser' && event.key.toLowerCase()==='c'))) return;
 		if (viewOnly) return;
 		const target = event.target as HTMLElement | null;
-		if ((tool === 'laser' || tool === 'free-draw') && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'c' && !target?.closest('input,textarea,select,[contenteditable="true"]')) {
+		if ((tool === 'laser' || tool === 'free-draw') && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'c' && !target?.closest('input:not([type="range"]),textarea,select,[contenteditable="true"]')) {
 			event.preventDefault(); if(tool==='laser')fadeLaserDrawings();else clearFreeDrawings(); return;
 		}
 		if (target?.closest('[data-animation-ui], [data-animation-overlay]') && !event.ctrlKey && !event.metaKey) return;
@@ -4074,17 +4162,17 @@
 		}
 		if (showNewPrompt) {
 			const key = event.key.toLowerCase();
-			if (!event.altKey && !event.shiftKey && !event.ctrlKey && !event.metaKey && key === 'd' && actionInProgress !== 'save') {
+			if (!event.altKey && !event.shiftKey && !event.ctrlKey && !event.metaKey && key === 'd') {
 				event.preventDefault();
 				void openBlankBoard();
 				return;
 			}
-			if (!event.altKey && !event.shiftKey && (event.ctrlKey || event.metaKey) && key === 's' && actionInProgress !== 'save') {
+			if (!event.altKey && !event.shiftKey && (event.ctrlKey || event.metaKey) && key === 's') {
 				event.preventDefault();
 				void saveFromNewPrompt();
 				return;
 			}
-			if (event.key === 'Escape' && actionInProgress !== 'save') {
+			if (event.key === 'Escape') {
 				event.preventDefault();
 				showNewPrompt = false;
 			}
@@ -4323,6 +4411,14 @@
 	const handleWindowPointerDown = (event: PointerEvent) => {
 		if (viewOnly) return;
 		const target = event.target as Node;
+  if(passBallId!==null&&event.button===0){
+   if(editorElement?.contains(target))return;
+   const hit=target instanceof Element?target.closest('[data-field-kind][data-layer-id]'):null;
+   const receiver=hit?markers.find(marker=>marker.id===Number(hit.getAttribute('data-layer-id'))&&marker.id!==passBallId&&marker.kind!=='event'):undefined;
+   if(receiver){event.preventDefault();event.stopImmediatePropagation();finishPass(receiver);return;}
+   if(target instanceof Element&&target.closest('svg[role="application"]')){event.preventDefault();event.stopImmediatePropagation();return;}
+   passBallId=null;
+  }
 		if (target instanceof Element && target.closest('[data-animation-ui]')) {
 			commitActiveEditor();
 			return;
@@ -5115,11 +5211,12 @@
   selectAnimationStep(0);
   showSetupConfirm = false;
  };
- const setupDefaultScenario = () => {
-  if (dismissEditorForAction() || suppressNextClick || viewOnly || animation && animationPreview) return;
-  applyDefaultSetup();
+ const setupDefaultScenario = () => setupScenario('default');
+ const setupScenario = (variant:SetupVariant) => {
+  if (actionInProgress || dismissEditorForAction() || suppressNextClick || viewOnly || animation && animationPreview) return;
+  applyDefaultSetup(variant);
  };
- const applyDefaultSetup = () => {
+ const applyDefaultSetup = (variant:SetupVariant='default') => {
   if (viewOnly) return;
   saveHistory();
   pauseAnimation();
@@ -5143,9 +5240,12 @@
 			unified: { lineOfScrimmage: 15, lineToGain: 30, quarterbackDepth: 5 },
 			'nfl-flag': { lineOfScrimmage: 15, lineToGain: 35, quarterbackDepth: 5 }
 		};
-		const setup = setupByFieldType[fieldSettings.fieldType];
+		const standard = setupByFieldType[fieldSettings.fieldType];
+  const positions = setupYardPositions(variant,{total:fieldLayout.totalYards,aGoal:leftGoalYards(),bGoal:rightGoalYards()},standard);
+  const setup = {lineOfScrimmage:positions.los,lineToGain:positions.ltg,quarterbackDepth:positions.depth};
 		const lineOfScrimmageX = xForYards(setup.lineOfScrimmage);
 		const lineToGainX = xForYards(setup.lineToGain);
+		const backJudgeX = xForYards(positions.backJudge);
 		const centerY = fieldTop + fieldHeight / 2;
 		const quarterbackX = xForYards(setup.lineOfScrimmage - setup.quarterbackDepth);
 		const lineOfScrimmage: FieldGuide = {
@@ -5155,19 +5255,21 @@
 			color: 'white',
 			style: 'dashed'
 		};
-		const lineToGain: FieldGuide = { id: guideId('line-to-gain'), kind: 'line-to-gain', x: lineToGainX, color: 'yellow', style: 'solid', down: '1st' };
+		const lineToGain: FieldGuide = { id: guideId('line-to-gain'), kind: 'line-to-gain', x: lineToGainX, color: 'yellow', style: 'solid', down: positions.fourthDown ? '4th' : '1st' };
 		const football: FieldMarker = { id: markerId('ball'), kind: 'ball', x: lineOfScrimmageX, y: centerY };
-		const quarterback: FieldMarker = { id: markerId('team-a'), kind: 'team-a', sequence: 1, label: `${teamLetter('team-a')}-1`, x: quarterbackX, y: centerY };
-		const standardRefereeX = xForYards(setup.lineOfScrimmage - setup.quarterbackDepth - 7);
-		const standardRefereeY = fieldTop + fieldHeight * Math.min(0.82, 0.5 + 7 / fieldLayout.widthYards);
-		const lineJudgeY = fieldTop - officialSize / 2 - 3;
+		const offenseKind=variant==='punt'?'team-k':'team-a';
+  const quarterback: FieldMarker = { id: markerId(offenseKind), kind: offenseKind, sequence: 1, label: `${teamLetter(offenseKind)}-1`, x: quarterbackX, y: centerY };
+  const puntReceiver:FieldMarker|undefined=variant==='punt'?{id:markerId('team-r'),kind:'team-r',sequence:1,label:`${teamLetter('team-r')}-1`,x:xForYards(positions.receiver),y:centerY}:undefined;
+		const standardRefereeX = xForYards(positions.referee);
+		const standardRefereeY = fieldTop + fieldHeight * Math.min(0.82, 0.5 + (positions.wideReferee ? 10 : 7) / fieldLayout.widthYards);
+		const lineJudgeY = fieldTop - officialSize / 2 - (fieldLineWidth / 2 + 0.5);
 		const fieldJudgeY = fieldBottom + officialSize * 0.12;
 		const officialPositions: Record<PlayBuilderFieldType, { kind: OfficialKind; x: number; y: number }[]> = {
 			traditional: [
 				{ kind: 'official-r', x: standardRefereeX, y: standardRefereeY },
 				{ kind: 'official-l', x: lineOfScrimmageX, y: lineJudgeY },
-				{ kind: 'official-b', x: xForYards(setup.lineOfScrimmage + 20), y: fieldTop + fieldHeight * 0.375 },
-				{ kind: 'official-f', x: xForYards(setup.lineOfScrimmage + 10), y: fieldJudgeY }
+				{ kind: 'official-b', x: backJudgeX, y: variant==='punt'?centerY-8*(fieldWidth/fieldLayout.totalYards):fieldTop + fieldHeight * 0.375 },
+				{ kind: 'official-f', x: xForYards(positions.fieldJudge), y: fieldJudgeY }
 			],
 			'four-on-four': [
 				{ kind: 'official-r', x: standardRefereeX, y: standardRefereeY },
@@ -5175,10 +5277,10 @@
 			],
 			unified: [
 				// A begins inside its 10-yard line, so the R starts on A's end line under reverse-goal-line mechanics.
-				{ kind: 'official-r', x: xForYards(0), y: standardRefereeY },
+				{ kind: 'official-r', x: variant==='default'?xForYards(0):standardRefereeX, y: standardRefereeY },
 				{ kind: 'official-l', x: lineOfScrimmageX, y: lineJudgeY },
-				{ kind: 'official-b', x: xForYards(setup.lineOfScrimmage + 20), y: fieldTop + fieldHeight * 0.375 },
-				{ kind: 'official-f', x: xForYards(setup.lineOfScrimmage + 10), y: fieldJudgeY }
+				{ kind: 'official-b', x: backJudgeX, y: variant==='punt'?centerY-8*(fieldWidth/fieldLayout.totalYards):fieldTop + fieldHeight * 0.375 },
+				{ kind: 'official-f', x: xForYards(positions.fieldJudge), y: fieldJudgeY }
 			],
 			'nfl-flag': [
 				{ kind: 'official-r', x: standardRefereeX, y: standardRefereeY },
@@ -5186,14 +5288,14 @@
 			]
 		};
 		const officials = officialPositions[fieldSettings.fieldType].map((position) => ({ id: markerId(position.kind), ...position }));
-		markers = [football, quarterback, ...officials].map(marker => {
+		markers = [football, quarterback, ...(puntReceiver?[puntReceiver]:[]), ...officials].map(marker => {
    const old = originalAnimation ? originalMarker(marker.kind) : undefined;
    return { ...marker, ...old, id: marker.id, x: marker.x, y: marker.y, setupDefault: true };
   });
 		paths = [];
 		guides = [lineOfScrimmage, lineToGain].map(guide => {
    const old = originalAnimation ? originalGuide(guide.kind) : undefined;
-   return { ...guide, ...old, id: guide.id, x: guide.x, setupDefault: true };
+   return { ...guide, ...old, id: guide.id, x: guide.x, down:guide.down, setupDefault: true };
   });
 		freeStrokes = [];
 		activeFreeStroke = null;
@@ -5202,6 +5304,7 @@
 			{ type: 'guide', id: lineToGain.id },
 			{ type: 'marker', id: football.id },
 			{ type: 'marker', id: quarterback.id },
+   ...(puntReceiver?[{type:'marker' as const,id:puntReceiver.id}]:[]),
 			...officials.map((official): LayerRef => ({ type: 'marker', id: official.id }))
 		];
   if (originalAnimation) {
@@ -5832,7 +5935,9 @@
 		if (!drawing && !dragTarget) return;
 		if (drawing) {
 			const pointerDistance = Math.hypot(point.x - drawing.pointerStart.x, point.y - drawing.pointerStart.y);
-			if (drawing.kind === 'run' && drawing.points) {
+			if(event.shiftKey && !ignoresSnapping(event) && drawing.kind==='run' && drawing.points){
+ const end=snapStraightDrawPoint(drawing.start,point);drawing={...drawing,end,points:[drawing.start,end],hasDragged:drawing.hasDragged||pointerDistance>=4};
+ } else if (drawing.kind === 'run' && drawing.points) {
 				const last = drawing.points.at(-1)!;
 				const nextPoints = Math.hypot(point.x - last.x, point.y - last.y) >= 1.5 ? [...drawing.points, point] : drawing.points;
 				drawing = {
@@ -5842,7 +5947,7 @@
 					hasDragged: drawing.hasDragged || pointerDistance >= 4
 				};
 			} else {
-				drawing = { ...drawing, end: drawingPathEnd(drawing, point), hasDragged: drawing.hasDragged || pointerDistance >= 4 };
+				drawing = { ...drawing, end: event.shiftKey && !ignoresSnapping(event) ? snapStraightDrawPoint(drawing.start,drawingPathEnd(drawing,point)) : drawingPathEnd(drawing, point), hasDragged: drawing.hasDragged || pointerDistance >= 4 };
 			}
 		}
 		if (!dragTarget) return;
@@ -6334,10 +6439,15 @@
 	});
 </script>
 
+<svelte:document on:fullscreenchange={syncFullscreen}/>
 <svelte:window on:keyup={(event) => {placementIgnoreSnap=event.ctrlKey||event.metaKey;viewerScrubber.keyup(event);}} on:keydown|capture={(event)=>{placementIgnoreSnap=event.ctrlKey||event.metaKey;if(placementIgnoreSnap)clearPlacementSnap();}} on:blur={() => {placementIgnoreSnap=false;clearPlacementSnap();viewerScrubber.stop();}} on:keydown|capture={handleGlobalKeydown} on:beforeunload={handleBeforeUnload} />
 
+<fieldset class="contents" disabled={actionInProgress==='save'}>
 <section
+ inert={actionInProgress==='save'}
 	bind:this={builderRoot}
+ tabindex="-1"
+ class:presentation-mode={presentation}
 	on:pointerdown={markTutorialSeen}
 	class="relative isolate border-2 border-stone-900 bg-stone-800 shadow-lg select-none"
 	class:video-exporting={videoController!==null}
@@ -6493,7 +6603,7 @@
 				{@const showToolbarLineFormatReset =
 					toolbarDefaultFormat !== null && (toolbarPresetColor !== toolbarDefaultFormat.color || toolbarPresetStyle !== toolbarDefaultFormat.style)}
 				<div
-					bind:this={toolbarEditorElement}
+					bind:this={toolbarEditorElement} use:draggablePopover
 					data-line-format-editor
 					class="absolute left-full z-[70] ml-px flex items-center gap-2 bg-white p-2 shadow-xl ring-2 ring-stone-900"
 					style:top={`${toolbarEditorTop}px`}
@@ -6814,7 +6924,7 @@
 										: 'Save play'
 							: 'Determining save access'}
 						label={saveActionLabel}
-                        buttonClass={saveFeedbackState === 'failed' && actionInProgress !== 'save' ? '!bg-red-800 !text-white hover:!bg-red-900' : ''}
+                        buttonClass={saveFeedbackState === 'failed' ? '!bg-red-800 !text-white hover:!bg-red-900' : ''}
 						wrapperClass={saveActionLabel === 'Duplicate' ? 'flex h-9 w-10 shrink-0 max-lg:hidden' : 'flex h-9 w-10 shrink-0'}
 						busy={!ownershipResolved || actionInProgress === 'save'}
 						disabled={!ownershipResolved || !hasUnsavedChanges || tutorialActive || actionInProgress !== null}
@@ -6846,7 +6956,7 @@
 					{/if}
 				</div>
 			</div>
-			<div
+			{#if !presentation}<div
 				data-tutorial="export-buttons"
 				class="export-action-toolbar absolute right-2 z-30 flex gap-1.5"
 				style="top: calc(50% - 23.8cqw);"
@@ -6869,7 +6979,15 @@
 						<path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" fill="none" stroke="currentColor" stroke-width="2" />
 					</svg>
 				</BuilderActionButton>
-			</div>
+			<BuilderActionButton tooltip="Enter Full Screen" ariaLabel="Enter full screen" label="Full Screen" disabled={tutorialActive||actionInProgress!==null} onclick={togglePresentation}><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/></svg></BuilderActionButton>
+</div>
+{/if}
+{#if presentation}<div class="presentation-actions absolute left-2 top-2 z-30 flex gap-1.5" aria-label="Presentation controls">
+ <BuilderActionButton tooltip="Laser Pointer" shortcutKeys={['Shift','L']} ariaLabel="Toggle presentation laser pointer" label="Laser" pressed={tool==='laser'} onclick={clickPresentationLaser}><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 20 8-8M10 4l1 3M20 14l-3-1M17 3l-2 4M21 7l-4 2"/></svg></BuilderActionButton>
+ <BuilderActionButton tooltip="Clear Laser Drawings" shortcutKeys={['C']} ariaLabel="Clear presentation laser drawings" label="Clear" onclick={fadeLaserDrawings}><AnimationIcon name="trash"/></BuilderActionButton>
+ </div><div class="absolute right-2 top-2 z-30">
+ <BuilderActionButton tooltip="Exit Full Screen" ariaLabel="Exit full screen" label="Exit" onclick={togglePresentation}><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8h5V3M21 8h-5V3M16 21v-5h5M8 21v-5H3"/></svg></BuilderActionButton>
+ </div>{/if}
 
 			<div
 				data-tutorial="play-management"
@@ -6922,7 +7040,7 @@
 				</div>
 				{#if editingPlayId !== null}
 					<div
-						bind:this={playMenuElement}
+						bind:this={playMenuElement} use:draggablePopover
 						class="absolute bottom-12 w-44 border-2 border-stone-900 bg-stone-50 p-2 text-stone-800 shadow-xl"
 						style:left={`${playMenuLeft}px`}
 					>
@@ -7032,20 +7150,7 @@
 					</BuilderActionButton>
 
 
-					<BuilderActionButton
-						tooltip="Default Setup"
-						shortcutKeys={[primaryModifierKey, 'Shift', 'S']}
-						ariaLabel="Set up default play"
-						label="Setup"
-						tutorial="setup-button"
-						disabled={Boolean(animation && animationPreview)} onclick={setupDefaultScenario}
-					>
-						<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-							<path d="M4 5h16v14H4zM8 5v14M13 5v14M18 5v14" fill="none" stroke="currentColor" stroke-width="1.6" />
-							<circle cx="10.5" cy="12" r="1.5" fill="currentColor" />
-							<path d="M10.5 12h4" stroke="currentColor" stroke-width="1.6" stroke-dasharray="1.5 1" />
-						</svg>
-					</BuilderActionButton>
+<SetupDropdown modifier={primaryModifierKey} disabled={actionInProgress!==null||Boolean(animation&&animationPreview)} onsetup={setupDefaultScenario} onvariant={setupScenario}/>
 					<BuilderActionButton
 						tooltip="Field Settings"
 						shortcutKeys={[primaryModifierKey, alternateModifierKey, 'S']}
@@ -7107,7 +7212,8 @@
 				</div>
 			</div>
 			{:else}
- <div class="bottom-action-toolbar absolute right-2 z-20 flex items-end gap-1.5" style="bottom: calc(50% - 23.8cqw);" aria-label="Shared playback controls">
+ <div class="bottom-action-toolbar absolute right-2 z-20 flex items-end gap-1.5" class:hidden={presentation&&animationOpen} style="bottom: calc(50% - 23.8cqw);" aria-label="Shared playback controls">
+ {#if presentation}<div class="mr-2"><BuilderActionButton tooltip="Open Animation Editor" shortcutKeys={['Alt','A']} ariaLabel="Open presentation timeline" label="Animate" disabled={!animation} pressed={animationOpen} onclick={()=>animationOpen=!animationOpen}><AnimationIcon name="play"/></BuilderActionButton></div>{/if}
   <BuilderActionButton tooltip="Go to Start" shortcutKeys={['HOME']} ariaLabel="Go to animation start" label="Start" disabled={!ownershipResolved || !animation || animationTime <= 0} onclick={() => selectAnimationStep(0)}><AnimationIcon name="start" /></BuilderActionButton>
   <BuilderActionButton tooltip={animationPlaying ? 'Pause' : animationDuration(animation) > 0 && animationTime >= animationDuration(animation) ? 'Restart' : 'Play'} shortcutKeys={['K / Space']} ariaLabel={animationPlaying ? 'Pause animation' : animationDuration(animation) > 0 && animationTime >= animationDuration(animation) ? 'Restart animation' : 'Play animation'} label={animationPlaying ? 'Pause' : animationDuration(animation) > 0 && animationTime >= animationDuration(animation) ? 'Restart' : 'Play'} disabled={!ownershipResolved || !animationDuration(animation)} onclick={toggleAnimationPlayback}><AnimationIcon name={animationPlaying ? 'pause' : animationDuration(animation) > 0 && animationTime >= animationDuration(animation) ? 'reset' : 'play'} /></BuilderActionButton>
   <BuilderActionButton tooltip="Playback Speed" shortcutKeys={['Alt', '↑ / ↓']} ariaLabel="Cycle playback speed" label="Speed" disabled={!ownershipResolved || !animationDuration(animation)} onclick={cycleViewerSpeed}><span class="text-xs font-black leading-4">{animationRate.toFixed(animationRate % .5 === 0 ? 1 : 2)}×</span></BuilderActionButton>
@@ -7137,16 +7243,19 @@
 						class:erasing-cursor={tool === 'free-draw' && freeDrawMode === 'erase'}
 						class:!cursor-grabbing={dragTarget?.moved}
 						style="touch-action: none;"
-						style:pointer-events={viewOnly ? 'none' : undefined}
+						style:pointer-events={viewOnly&&!presentation ? 'none' : undefined}
 						role="application"
 						aria-label="Blank horizontal NIRSA flag football field drawing area"
 						aria-disabled={viewOnly}
-						on:pointerdown|capture={(event) => { if (viewOnly) { event.preventDefault(); event.stopImmediatePropagation(); } else beginStylusEraser(event); }}
+						on:pointerup|capture={event=>{if(presentation){event.stopImmediatePropagation();if(tool==='laser'){finishLaserDrawing();if(svg.hasPointerCapture(event.pointerId))svg.releasePointerCapture(event.pointerId);}}}}
+      on:pointercancel|capture={()=>{if(presentation)releaseLaserDrawings();}}
+						on:pointerdown|capture={(event) => { if(presentation){event.preventDefault();event.stopImmediatePropagation();if(tool==='laser'){pointerOnField=true;beginLaserDrawing(event,canvasPointFromEvent(event));}}else if (viewOnly) { event.preventDefault(); event.stopImmediatePropagation(); } else beginStylusEraser(event); }}
       on:click|capture={(event) => { if (viewOnly) { event.preventDefault(); event.stopImmediatePropagation(); } }}
       on:keydown|capture={(event) => { if (viewOnly) { event.preventDefault(); event.stopImmediatePropagation(); } }}
       on:dblclick|capture={(event) => { if (viewOnly) { event.preventDefault(); event.stopImmediatePropagation(); } }}
 						on:pointerdown={beginOnField}
 						on:pointermove={(event) => {
+       if(presentation){if(tool==='laser'){pointerOnField=true;const point=canvasPointFromEvent(event);updateLaserPointer(point);continueLaserDrawing(event,point);}return;}
        placementIgnoreSnap=ignoresSnapping(event);
        if(ignoresSnapping(event))clearPlacementSnap();
        if (viewOnly) return;
@@ -7401,7 +7510,7 @@
 								{/each}
 							{/if}
 
-							<rect x={fieldLeft} y={fieldTop} width={fieldWidth} height={fieldHeight} fill={fieldPalette.field} />
+							<rect data-popover-field-bounds x={fieldLeft} y={fieldTop} width={fieldWidth} height={fieldHeight} fill={fieldPalette.field} />
 							<rect x={fieldLeft} y={fieldTop} width={fieldWidth} height={fieldHeight} fill="url(#builder-grass-stripe)" />
 							<rect
 								x={fieldLeft}
@@ -7946,8 +8055,8 @@
 						{#each paths as path}
 							{@const start = pathStart(path)}
 							{@const renderedPathPoints = pathPoints(path, start)}
-							<g data-layer-type="path" data-layer-id={path.id} data-tutorial-kind={path.kind}>
-								{#if path.kind === 'pass' || path.kind === 'kick'}
+							<g data-layer-type="path" data-layer-id={path.id} data-tutorial-kind={path.kind} opacity={path.animationOpacity ?? 1} transform={path.animationScale===undefined?undefined:`translate(${path.start.x} ${path.start.y}) scale(${path.animationScale}) translate(${-path.start.x} ${-path.start.y})`}>
+								{#if path.animationReveal!==undefined && path.animationReveal<1}<DrawnArrow {path} {fieldTop}/>{:else if path.kind === 'pass' || path.kind === 'kick'}
 									<path
 										data-field-element
 										data-field-type="path"
@@ -7978,12 +8087,12 @@
 											filter="url(#builder-air-shadow)"
 										/>
 										{#each airborneSegments(path.kind, start, path.end, path.style) as segment}
-											<path d={segment.d} fill="none" stroke={guideColor(path.color)} stroke-width={segment.width} stroke-linecap={segment.linecap} />
+											<path d={segment.d} fill="none" stroke={(path.animationColor ?? guideColor(path.color))} stroke-width={segment.width} stroke-linecap={segment.linecap} />
 										{/each}
 										<path
 											d={pathData(path.kind, start, path.end)}
 											fill="none"
-											stroke={guideColor(path.color)}
+											stroke={(path.animationColor ?? guideColor(path.color))}
 											stroke-width="0.01"
 											marker-end={pathMarker(path.kind)}
 										/>
@@ -8012,7 +8121,7 @@
 									<path
 										d={runPathData(start, path.end, renderedPathPoints)}
 										fill="none"
-										stroke={guideColor(path.color)}
+										stroke={(path.animationColor ?? guideColor(path.color))}
 										stroke-width={pathStrokeWidth}
 										stroke-linecap={path.style === 'dotted' ? 'round' : 'square'}
 										stroke-dasharray={guideDash(path.style)}
@@ -8047,7 +8156,7 @@
 										y1={start.y}
 										x2={path.end.x}
 										y2={path.end.y}
-										stroke={guideColor(path.color)}
+										stroke={(path.animationColor ?? guideColor(path.color))}
 										stroke-width={path.kind === 'line' ? plainLineStrokeWidth : pathStrokeWidth}
 										stroke-linecap={path.style === 'dotted' ? 'round' : 'square'}
 										stroke-dasharray={guideDash(path.style)}
@@ -8286,7 +8395,7 @@
 										pointer-events="all"
 									/>
 								{/if}
-								<g id={`animation-marker-art-${marker.id}`}><MarkerArtwork {marker} /></g>
+								<g id={`animation-marker-art-${marker.id}`}>{#if marker.kind==='ball'&&marker.animationShadow}<ellipse data-ball-shadow cx={marker.animationShadow.x} cy={marker.animationShadow.y} rx={12*(marker.animationShadow.scale??1)} ry={3.5*(marker.animationShadow.scale??1)} fill="#10291b" opacity=".3" pointer-events="none"/>{/if}<MarkerArtwork {marker} /></g>
 							</g>
 						{/each}
 
@@ -8349,8 +8458,8 @@
        {#each applyAnimationStep(animationBaseScene,animation.steps[animationStep-1]).freeStrokes as previous (previous.id)}
         {@const current=freeStrokes.find(item=>item.id===previous.id)}
         {#if !current || current.points[0].x!==previous.points[0].x || current.points[0].y!==previous.points[0].y}
-         {#if current}<path role="button" tabindex="0" aria-label="Drawing movement route" on:keydown={event=>{if(event.key==='Enter'){const rect=event.currentTarget.getBoundingClientRect();openDrawingOptions(previous.id,new MouseEvent('dblclick',{clientX:rect.x,clientY:rect.y}));}}} data-drawing-motion-route={previous.id} data-export-exclude d={`M ${previous.points[0].x} ${previous.points[0].y} L ${current.points[0].x} ${current.points[0].y}`} fill="none" stroke="white" stroke-width="2" stroke-dasharray="5 4" opacity={selectedDrawingIds.includes(previous.id)?1:.25} pointer-events="stroke" on:dblclick={event=>openDrawingOptions(previous.id,event)} on:contextmenu={event=>openDrawingOptions(previous.id,event)}/>{/if}
-         {#if animationGhosts}<path data-drawing-ghost data-export-exclude d={freehandPath(previous.points)} fill="none" stroke={drawingColor(previous.color)} stroke-width={previous.width??4} stroke-linecap="round" stroke-linejoin="round" opacity="0.25"/>{/if}
+         {#if current&&!selectedDrawingIds.includes(previous.id)}<path role="button" tabindex="0" aria-label="Drawing movement route" on:keydown={event=>{if(event.key==='Enter'){const rect=event.currentTarget.getBoundingClientRect();openDrawingOptions(previous.id,new MouseEvent('dblclick',{clientX:rect.x,clientY:rect.y}));}}} data-drawing-motion-route={previous.id} data-export-exclude d={`M ${previous.points[0].x} ${previous.points[0].y} L ${current.points[0].x} ${current.points[0].y}`} fill="none" stroke="white" stroke-width="2" stroke-dasharray="5 4" opacity={selectedDrawingIds.includes(previous.id)?1:.25} pointer-events="stroke" on:dblclick={event=>openDrawingOptions(previous.id,event)} on:contextmenu={event=>openDrawingOptions(previous.id,event)}/>{/if}
+         {#if animationGhosts&&!selectedDrawingIds.includes(previous.id)}<path data-drawing-ghost data-export-exclude d={freehandPath(previous.points)} fill="none" stroke={drawingColor(previous.color)} stroke-width={previous.width??4} stroke-linecap="round" stroke-linejoin="round" opacity="0.25"/>{/if}
         {/if}
        {/each}
       {/if}
@@ -8709,7 +8818,7 @@
 										filter="url(#builder-neon-glow)"
 									/>
 								{/if}
-								{#if !viewOnly && tool === 'laser' && laserPointer && pointerOnField}
+								{#if (!viewOnly||presentation) && tool === 'laser' && laserPointer && pointerOnField}
 									<circle
 										cx={laserPointer.x}
 										cy={laserPointer.y}
@@ -8728,28 +8837,51 @@
 							</g>
 						{/if}
 						</g>
-{#if animation && animationOpen && !viewOnly && !animationPreview}
-							<AnimationOverlay
+{#if passBallId!==null}
+ <g data-pass-receiver-picker data-export-exclude transition:fade={{duration:180}}>
+ <rect x="0" y="0" width="1000" height="484" fill="black" opacity=".34" pointer-events="none"/>
+ {#each markers.filter(marker=>marker.id!==passBallId&&marker.kind!=='event') as receiver (receiver.id)}
+ <g data-pass-receiver={receiver.id} data-field-kind={receiver.kind} data-layer-id={receiver.id} role="button" tabindex="0" aria-label={`Pass to ${receiver.name??receiver.label??receiver.kind}`} style="cursor:pointer" on:pointerdown|preventDefault|stopPropagation={()=>finishPass(receiver)} on:keydown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();finishPass(receiver);}}}>
+ <MarkerArtwork marker={receiver}/><circle cx={receiver.x} cy={receiver.y} r={isOfficialMarker(receiver)?officialSize/2:20} fill="transparent" pointer-events="all"/>
+ </g>
+ {/each}
+ </g>
+ {/if}
+{#if animation && animationOpen && !viewOnly && !animationPreview && passBallId===null}
+							<AnimationOverlay bind:this={animationOverlay}
 								animation={animationContent.animation!}
 								scene={animationContent.scene}
 								stepIndex={animationStep}
-								selection={selectedTargets.filter((target): target is AnimationTarget => target.type !== 'path')}
+								selection={selectedTargets}
 								ghosts={animationGhosts}
                                 interactive={tool==='select'}
 								drawingRoute={animationDrawingRoute}
-        otherEditorOpen={drawingOptions !== null || drawingColorOptions !== null}
-        onopen={() => { drawingOptions = null; drawingColorOptions = null; selectedDrawingIds = []; }}
+        otherEditorOpen={drawingOptions !== null || drawingColorOptions !== null || editingMarkerId!==null || editingGuideId!==null || editingPathId!==null || editingDownGuideId!==null}
+        canedit={target=>target.type!=='marker'||markers.some(marker=>marker.id===target.id&&isEditableMarker(marker))}
+        onedit={openElementProperties}
+        onopen={() => { editingMarkerId=null;editingGuideId=null;editingPathId=null;editingDownGuideId=null;drawingOptions = null; drawingColorOptions = null; selectedDrawingIds = []; }}
 								onchange={updateAnimationMotion}
  ondraw={(active) => (animationDrawingRoute = active)}
  onselect={selectAnimationObject}
 							/>
 						{/if}
+                        <g data-animation-selected-overlay data-export-exclude>
+ {#if animation&&animationOpen&&animationStep>0&&!animationPreview&&passBallId===null}
+ {#each applyAnimationStep(animationBaseScene,animation.steps[animationStep-1]).freeStrokes.filter(stroke=>selectedDrawingIds.includes(stroke.id)) as previous (previous.id)}
+ {@const current=freeStrokes.find(stroke=>stroke.id===previous.id)}
+ {#if !current||current.points[0].x!==previous.points[0].x||current.points[0].y!==previous.points[0].y}
+ {#if current}<path data-drawing-motion-route={previous.id} aria-label="Drawing movement route" role="button" tabindex="0" on:keydown={event=>{if(event.key==='Enter'){const rect=event.currentTarget.getBoundingClientRect();openDrawingOptions(previous.id,new MouseEvent('dblclick',{clientX:rect.x,clientY:rect.y}));}}} d={`M ${previous.points[0].x} ${previous.points[0].y} L ${current.points[0].x} ${current.points[0].y}`} fill="none" stroke="white" stroke-width="2" stroke-dasharray="5 4" pointer-events={tool==='select'&&!animationDrawingRoute?'stroke':'none'} on:dblclick={event=>openDrawingOptions(previous.id,event)} on:contextmenu={event=>openDrawingOptions(previous.id,event)}/>{/if}
+ {#if animationGhosts}<path data-drawing-ghost d={freehandPath(previous.points)} fill="none" stroke={drawingColor(previous.color)} stroke-width={previous.width??4} stroke-linecap="round" stroke-linejoin="round" opacity=".25" pointer-events="none"/>{/if}
+ {/if}
+ {/each}
+ {/if}
+ </g>
 					</svg>
 				</HoverTooltip>
 
 				{#if editingDownGuide}
 					<div
-						bind:this={editorElement}
+						bind:this={editorElement} use:draggablePopover
 						class="absolute z-20 flex -translate-x-1/2 items-stretch gap-2"
 						style:left={`${inlineGuideEditorPinnedLeft ?? editingDownGuide.x / 10}%`}
 						style:top={`${((fieldTop + 14) / 484) * 100}%`}
@@ -8757,7 +8889,7 @@
 						role="group"
 						aria-label="Select down"
 					>
-						<div class="flex gap-px bg-stone-900 p-px shadow-xl ring-2 ring-stone-950">
+                        <div class="flex gap-px bg-stone-900 p-px shadow-xl ring-2 ring-stone-950">
 							{#each downMarkerOptions as option}
 								<HoverTooltip
 									text={option.id === 'pat' ? 'Set to P.A.T.' : `Set to ${option.label} Down`}
@@ -8813,7 +8945,7 @@
 
 				{#if editingTeamBoxY !== null && tool !== 'laser' && tool !== 'free-draw'}
 					<form
-						bind:this={editorElement}
+						bind:this={editorElement} use:draggablePopover
 						class="absolute z-10 w-64 -translate-x-1/2 -translate-y-1/2 bg-white p-1 shadow-xl ring-2 ring-stone-900"
 						style:left="50%"
 						style:top={`${((editingTeamBoxY + 10) / 484) * 100}%`}
@@ -8833,7 +8965,7 @@
 
 				{#if editingMarker}
 					<form
-						bind:this={editorElement}
+						bind:this={editorElement} use:draggablePopover
 						data-tutorial="marker-editor"
 						class="absolute z-10 -translate-x-1/2 -translate-y-1/2 bg-white p-1 shadow-xl ring-2 ring-stone-900"
 						class:w-52={editingMarker.kind === 'deflag'}
@@ -8843,7 +8975,7 @@
 						style:top={`${editorTop(editingMarker)}%`}
 						on:submit|preventDefault={commitMarkerEditor}
 					>
-						<label for="marker-label" class="sr-only"
+                        <label for="marker-label" class="sr-only"
 							>{isTeamMarker(editingMarker)
 								? 'Player name'
 								: editingMarker.kind === 'event'
@@ -8887,6 +9019,7 @@
 									>Move to L.O.S.</button
 								>
 							</div>
+                            {#if animationOpen&&!animationPreview}<button type="button" disabled={animationStep===0} class="mx-auto mt-1 block h-7 w-40 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer bg-stone-100 px-1 text-[10px] font-black text-stone-800 hover:bg-stone-200" on:click={()=>{passBallId=passBallId===editingMarker!.id?null:editingMarker!.id;tool='select';}}>{passBallId===editingMarker.id?'Click Receiver of the Pass':'Click to Pass Ball'}</button>{/if}
 						{/if}
 						{#if editingMarker.kind === 'deflag'}
 							<ColorSwatchPalette
@@ -8922,7 +9055,7 @@
 
 				{#if editingGuideFromLosMarker && editingGuide?.kind === 'line-of-scrimmage'}
 					<div
-						bind:this={editorElement}
+						bind:this={editorElement} use:draggablePopover
 						class="absolute z-20 flex -translate-x-1/2 items-center gap-2"
 						style:left={`${inlineGuideEditorPinnedLeft ?? editingGuide.x / 10}%`}
 						style:top={`${((fieldBottom - 43) / 484) * 100}%`}
@@ -8957,7 +9090,7 @@
 									setEditingGuideSide(editingGuideSide === 'a' ? 'b' : 'a');
 								}}
 							/>
-							<YardageInput
+                        <YardageInput
 								bind:element={guideYardageInput}
 								value={losYardageValue}
 								label="Line of Scrimmage yard line"
@@ -8979,7 +9112,7 @@
 
 				{#if (editingGuide || editingPath) && lineEditorPoint && !editingGuideFromLosMarker}
 					<form
-						bind:this={editorElement}
+						bind:this={editorElement} use:draggablePopover
 						data-tutorial="line-editor"
 						data-line-format-editor
 						class="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 bg-white p-2 shadow-xl ring-2 ring-stone-900"
@@ -9016,7 +9149,8 @@
 								onEscape={commitGuideEditor}
 							/>
 						{/if}
-						<LineFormatControls
+                        {#if animationOpen&&animationStep>0&&editingPath&&editingPath.kind!=='line'&&animationContent.animation&&!animationTargetChanged(animationContent.animation,animationStep,{type:'path',id:editingPath.id})}<button type="button" class="h-7 cursor-pointer bg-stone-100 px-2 text-xs font-bold hover:bg-stone-200" on:click={async event=>{const target={type:'path' as const,id:editingPath!.id};updateAnimationMotion({...defaultMotion(target),path:'draw'});editingPathId=null;await tick();animationOverlay?.openPicker(event,target);}}>Draw</button>{/if}
+                        <LineFormatControls
 							colorOptions={guideColors}
 							selectedColor={guideEditColor}
 							styleOptions={guideStyles}
@@ -9073,16 +9207,18 @@
  <DrawingStylePicker x={drawingColorOptions.x} y={drawingColorOptions.y} colors={freeDrawColors} selected={freeStrokes.find(stroke=>stroke.id===selectedDrawingIds[0])?.color??'red'} onchange={changeDrawingColor} onclose={()=>drawingColorOptions=null}/>
  {/if}
  {#if drawingOptions && drawingMotion && animation && animationStep>0 && !videoController}
- <DrawingAnimationPicker existingDrawing={animation.steps[animationStep-1].strokeIds?.includes(selectedDrawingIds[0])??true} value={drawingMotion} duration={animation.transitions[animationStep-1].duration} x={drawingOptions.x} y={drawingOptions.y} count={selectedDrawingIds.length} onchange={updateDrawingAnimation} onclose={()=>drawingOptions=null}/>
+ <DrawingAnimationPicker stationary={selectedDrawingIds.every(id=>{const before=animation!.steps[animationStep-1].strokeOffsets?.find(item=>item.id===id),after=animationContent.animation!.steps[animationStep].strokeOffsets?.find(item=>item.id===id);return (before?.x??0)===(after?.x??0)&&(before?.y??0)===(after?.y??0);})} existingDrawing={animation.steps[animationStep-1].strokeIds?.includes(selectedDrawingIds[0])??true} value={drawingMotion} duration={animation.transitions[animationStep-1].duration} x={drawingOptions.x} y={drawingOptions.y} count={selectedDrawingIds.length} onedit={event=>{rememberPopoverAnchor(event,document.querySelector(`[data-drawing-id="${selectedDrawingIds[0]}"]`));drawingOptions=null;drawingColorOptions={x:event.clientX,y:event.clientY};}} onchange={updateDrawingAnimation} onclose={()=>drawingOptions=null}/>
  {/if}
-	{#if animation && animationOpen && !viewOnly}
-		<div use:animationPortal class="animation-dock" class:invisible={videoController !== null || showSetupConfirm || showSettings || showExportSettings || showFeedback || showHelp || tutorialActive && !animationTutorialActive} style:left={`${animationDockLeft}px`} style:width={`${animationDockWidth}px`}>
-			<AnimationPanel
+	{#if animation && animationOpen && (!viewOnly||presentation)}
+		<div use:animationPortal={presentation} class="animation-dock" class:invisible={videoController !== null || showSetupConfirm || showSettings || showExportSettings || showFeedback || showHelp || tutorialActive && !animationTutorialActive} style:left={`${animationDockLeft}px`} style:width={`${animationDockWidth}px`}>
+			<fieldset class="contents" disabled={actionInProgress==='save'}>
+   <AnimationPanel
 				animation={animationContent.animation!}
 				scene={animationContent.scene}
 				stepIndex={animationStep}
-				selection={selectedTargets.filter((target): target is AnimationTarget => target.type !== 'path')}
+				selection={selectedTargets}
 				readOnly={viewOnly}
+                fixedDock={presentation}
  minimumStepCount={animationTutorialActive ? 3 : 1}
  shortcutsEnabled={!((tutorialActive && !animationTutorialActive) || actionInProgress!==null || showSetupConfirm || showDraftRestore || showNewPrompt || showShare || showExportSettings || showSettings || showHelp || showFeedback || editingPlayId!==null)}
 				playing={animationPlaying}
@@ -9104,10 +9240,12 @@
  canCreatePlay={playEntries.length < PLAY_BUILDER_MAX_PLAYS}
 				onerror={showActionMessage}
 			/>
+   </fieldset>
 		</div>
 	{/if}
 
 </section>
+</fieldset>
 
 {#snippet exportColorSpectrum(picker: 'background' | 'border', color: string)}
 	{@const selection = hexToHueLightness(color)}
@@ -9452,7 +9590,7 @@
 						{/each}
 					</div>
 					{#if exportColorPicker === 'background'}
-						<div role="dialog" aria-label="Background color picker" class="mt-1 border border-stone-500 bg-white p-2 shadow-lg">
+						<div use:draggablePopover role="dialog" aria-label="Background color picker" class="mt-1 border border-stone-500 bg-white p-2 shadow-lg">
 							{@render exportColorSpectrum('background', exportBackgroundColor)}
 							<label class="mt-2 block text-[10px] font-black tracking-wide uppercase">
 								<span class="flex justify-between"><span>Opacity</span><span>{Math.round(exportBackgroundOpacity * 100)}%</span></span>
@@ -9488,7 +9626,7 @@
 						</button>
 					</div>
 					{#if exportColorPicker === 'border'}
-						<div role="dialog" aria-label="Border color picker" class="mt-1 border border-stone-500 bg-white p-2 shadow-lg">
+						<div use:draggablePopover role="dialog" aria-label="Border color picker" class="mt-1 border border-stone-500 bg-white p-2 shadow-lg">
 							{@render exportColorSpectrum('border', exportFieldBorderColor)}
 							<label class="mt-2 block text-[10px] font-black tracking-wide uppercase">
 								<span class="flex justify-between"><span>Opacity</span><span>{Math.round(exportFieldBorderOpacity * 100)}%</span></span>
@@ -9983,6 +10121,16 @@
 {/if}
 
 <style>
+ .presentation-mode{width:100vw;height:100dvh;border:0;box-shadow:none;outline:none;--builder-action-scale:1;}
+ .presentation-mode [data-tutorial='draw-workspace']{height:100%;width:100%;padding:8px;gap:0;}
+ .presentation-mode .tool-column,.presentation-mode .top-action-toolbar{display:none!important;}
+ .presentation-mode .play-builder-interaction{width:100%;height:100%;justify-content:center;}
+ .presentation-mode .field-canvas{width:min(100%,calc((100dvh - 96px)*1000/484));flex-shrink:1;}
+ .presentation-mode .bottom-action-toolbar,.presentation-mode .play-management-toolbar{bottom:8px!important;}
+ .presentation-mode .play-management-toolbar{right:60%!important;}
+ .presentation-mode.view-only .field-canvas,.presentation-mode.view-only .field-canvas :global(*){pointer-events:auto!important;cursor:default!important;}
+ .presentation-mode.laser-active .field-canvas,.presentation-mode.laser-active .field-canvas :global(*){cursor:none!important;}
+
  .video-exporting {pointer-events:none;}
  .video-exporting :global([aria-label="Cancel export"]) {pointer-events:auto;}
  :global(.animation-tutorial-active [data-tutorial="interaction-area"]), :global(.animation-tutorial-active [data-tutorial="interaction-area"] *),

@@ -1,4 +1,4 @@
-import type { GuideColor, GuideStyle, Point } from '$lib/play-builder-scene';
+import type { FieldPath, FieldMarker, GuideColor, GuideStyle, Point } from '$lib/play-builder-scene';
 
 export const PLAY_BUILDER_GUIDE_COLORS: Record<GuideColor, string> = {
 	red: '#ef4444',
@@ -149,3 +149,26 @@ export const playBuilderAirborneSegments = (
 	}
 	return segments;
 };
+
+/** Blend the contrasting player ink along with its fill during color changes. */
+export const playBuilderPlayerInk = (marker: FieldMarker, color: GuideColor) => {
+ const ink=(value:GuideColor)=>['white','yellow','green'].includes(value)?[28,25,23]:[255,255,255];
+ const to=ink(color);
+ if(marker.colorFrom===undefined||marker.colorMix===undefined)return `rgb(${to.join(', ')})`;
+ const from=ink(marker.colorFrom);
+ return `rgb(${to.map((channel,index)=>Math.round(from[index]+(channel-from[index])*marker.colorMix!)).join(', ')})`;
+};
+
+/** Shared, distance-based reveal geometry for browser and exported arrows. */
+export function playBuilderDrawArrow(path:FieldPath,fieldTop:number){
+ const airborne=path.kind==='pass'||path.kind==='kick';
+ let samples:Point[]=[];
+ if(airborne)samples=Array.from({length:65},(_,i)=>playBuilderAirbornePoint(path.kind as 'pass'|'kick',path.start,path.end,i/64,fieldTop));
+ else {
+  const points=playBuilderSmoothPathPoints(path.points&&path.points.length>1?path.points:[path.start,path.end]);samples=[points[0]];
+  for(let i=0;i<points.length-1;i++){const a=points[i],b=points[i+1],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+2)];const c={x:a.x+(b.x-prev.x)/6,y:a.y+(b.y-prev.y)/6},d={x:b.x-(next.x-a.x)/6,y:b.y-(next.y-a.y)/6};for(let j=1;j<=8;j++){const t=j/8,u=1-t;samples.push({x:u*u*u*a.x+3*u*u*t*c.x+3*u*t*t*d.x+t*t*t*b.x,y:u*u*u*a.y+3*u*u*t*c.y+3*u*t*t*d.y+t*t*t*b.y});}}
+ }
+ const lengths=samples.slice(1).map((point,i)=>Math.hypot(point.x-samples[i].x,point.y-samples[i].y));let remaining=lengths.reduce((a,b)=>a+b,0)*Math.max(0,Math.min(1,path.animationReveal??1));const points=[samples[0]],segments:{d:string;width:number;linecap:'round'|'butt'}[]=[];
+ for(let i=0;i<lengths.length&&remaining>0;i++){const a=samples[i],b=samples[i+1],fraction=Math.min(1,remaining/(lengths[i]||1)),end={x:a.x+(b.x-a.x)*fraction,y:a.y+(b.y-a.y)*fraction};points.push(end);if(airborne&&(path.style==='solid'||path.style==='dashed'&&(i%5<3||i>=62)||path.style==='dotted'&&(i%4===0||i===63)))segments.push({d:`M ${a.x} ${a.y} L ${end.x} ${end.y}`,width:3.4+5*(path.kind==='kick'?1:.45)*Math.sin(Math.PI*(i+.5)/64),linecap:path.style==='dashed'?'butt':'round'});remaining-=lengths[i];}
+ return {points,segments,airborne};
+}

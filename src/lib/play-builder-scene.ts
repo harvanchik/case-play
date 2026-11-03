@@ -36,8 +36,9 @@ export type PlayBuilderFieldSettings = {
 	fieldColor: PlayBuilderFieldColor;
 };
 export type Point = { x: number; y: number };
-export type FieldMarker = Point & { animationScale?: number; animationOpacity?: number; setupDefault?: boolean; name?: string; id: number; kind: MarkerKind; label?: string; sequence?: number; color?: GuideColor };
+export type FieldMarker = Point & { animationShadow?:Point & {scale?:number}; animationLabelOpacity?:number; animationColor?: string; colorFrom?: GuideColor; colorMix?: number; animationScale?: number; animationOpacity?: number; setupDefault?: boolean; name?: string; id: number; kind: MarkerKind; label?: string; sequence?: number; color?: GuideColor };
 export type FieldPath = {
+ animationReveal?:number; animationColor?:string; animationOpacity?:number; animationScale?:number;
 	id: number;
 	kind: PathKind;
 	start: Point;
@@ -48,7 +49,7 @@ export type FieldPath = {
 	/** Optional sampled points for a free-drawn Run arrow. Straight paths omit this. */
 	points?: Point[];
 };
-export type FieldGuide = { animationScale?: number; animationOpacity?: number; setupDefault?: boolean; name?: string; id: number; kind: GuideKind; x: number; color: GuideColor; style: GuideStyle; down?: DownMarkerValue };
+export type FieldGuide = { animationColor?: string; colorFrom?: GuideColor; colorMix?: number; animationScale?: number; animationOpacity?: number; setupDefault?: boolean; name?: string; id: number; kind: GuideKind; x: number; color: GuideColor; style: GuideStyle; down?: DownMarkerValue };
 export type FreeStroke = { animationColor?: string; animationOpacity?: number; id: number; color: GuideColor; points: Point[]; width?: number };
 export type LayerType = 'guide' | 'path' | 'marker';
 export type LayerRef = { type: LayerType; id: number };

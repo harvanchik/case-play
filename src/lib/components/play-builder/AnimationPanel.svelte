@@ -67,7 +67,7 @@
 	let markerDrag: { original: PlayAnimation; index: number; x: number; width: number; total: number; moved: boolean } | null = null;
 	let suppressMarkerClick = false;
 	function beginMarker(event: PointerEvent, index: number) {
-		if (!index || index === animation.steps.length - 1 || event.button !== 0) return;
+		if (readOnly || !index || index === animation.steps.length - 1 || event.button !== 0) return;
 		event.preventDefault();
 		event.stopPropagation();
 		markerDrag = { original: cloneAnimation(animation), index, x: event.clientX,
@@ -179,6 +179,7 @@
 	export let stepIndex = 0;
 	export let selection: AnimationTarget[] = [];
 	export let readOnly = false;
+ export let fixedDock = false;
  export let minimumStepCount = 1;
 	export let shortcutsEnabled = true;
 	export let playing = false;
@@ -242,7 +243,7 @@
         stepScrolling = rail.scrollWidth - rail.clientWidth > 2;
 		void scrollSelectedStep(animation.steps[stepIndex]?.id);
 	}
-	$: panelWidth = Math.min(preferredWidth, viewportWidth - 16, manuallyResized ? Infinity : viewportWidth * 0.75);
+	$: panelWidth = fixedDock ? Math.min(560, viewportWidth - 32) : Math.min(preferredWidth, viewportWidth - 16, manuallyResized ? Infinity : viewportWidth * 0.75);
 	const speeds = [0.25, 0.5, 1, 1.25, 1.5, 1.75, 2];
 	function adjustPlaybackSpeed(direction: number) {
 		const index = speeds.indexOf(rate);
@@ -254,6 +255,7 @@
 	async function fitDock() {
 		await tick();
 		if (!panel) return;
+  if(fixedDock){dockX=viewportWidth-panelWidth-16;dockY=viewportHeight-panel.offsetHeight-16;return;}
 		const combinedWidth = panelWidth + 0;
 		const combinedHeight = panel.offsetHeight;
 		dockX = Math.max(8, Math.min(dockX ?? (viewportWidth - panelWidth) / 2, viewportWidth - combinedWidth - 8));
@@ -296,7 +298,7 @@
 	let suppressStepClick = false;
 	$: orderedSteps = order ? order.map((id) => animation.steps.find((step) => step.id === id)!).filter(Boolean) : animation.steps;
 	function beginDock(event: PointerEvent) {
-		if ((event.target as Element).closest('button, input, select, label, [data-animation-popup]') || event.button !== 0) return;
+		if (fixedDock || (event.target as Element).closest('button, input, select, label, [data-animation-popup]') || event.button !== 0) return;
 		const bounds = panel.getBoundingClientRect();
 		dockDrag = { x: event.clientX, y: event.clientY, left: bounds.left, top: bounds.top };
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -775,7 +777,7 @@
 			style:top={dockY === null ? undefined : `${dockY}px`}
 			aria-label="Play animation controls"
 		>
-			{#each ['left', 'right'] as side}
+			{#each fixedDock ? [] : ['left', 'right'] as side}
 				<button
 					type="button"
 					class="dock-resize"

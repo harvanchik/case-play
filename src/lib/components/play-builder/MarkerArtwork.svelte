@@ -1,6 +1,6 @@
 <script lang="ts">
  import type { FieldMarker, PlayerKind, OfficialKind, GuideColor } from '$lib/play-builder-scene';
- import { playBuilderGuideColor as guideColor } from '$lib/play-builder-rendering';
+ import { playBuilderPlayerInk, playBuilderGuideColor as guideColor } from '$lib/play-builder-rendering';
  import { playBuilderEventTagLines as eventTagLines, playBuilderEventTagLayout, PLAY_BUILDER_EVENT_TAG_LINE_HEIGHT as eventTagLineHeight } from '$lib/play-builder-event-tag';
  export let marker: FieldMarker;
  const playerRadius = 14.025, playerStrokeWidth = 2.55, officialSize = playerRadius * 3.3;
@@ -9,7 +9,6 @@
  const isOfficialMarker = (m: FieldMarker): m is FieldMarker & {kind: OfficialKind} => m.kind.startsWith('official-');
  const officialImages = { 'official-r': '/images/official-referee.webp', 'official-l': '/images/official-line-judge.webp', 'official-b': '/images/official-back-judge.webp', 'official-f': '/images/official-field-judge.webp' };
  const playerMarkerColor = (m: FieldMarker & {kind: PlayerKind}): GuideColor => m.color ?? (m.kind === 'team-a' || m.kind === 'team-k' ? 'black' : 'white');
- const playerTextColor = (c: GuideColor) => ['white', 'yellow', 'green'].includes(c) ? '#1c1917' : '#fff';
  const deflagImage = (c?: GuideColor) => c && !['red', 'white', 'gray', 'black'].includes(c) ? `/images/flag-belt-${c}.webp` : '/images/flag-belt.webp';
  const beanBagImage = (c?: GuideColor) => `/images/bean-bag-${c && ['white', 'black', 'pink'].includes(c) ? c : 'blue'}.webp`;
  const eventWidth = (label = 'EVENT') => playBuilderEventTagLayout(label).width;
@@ -53,21 +52,24 @@
 
 </script>
 
-{#if isTeamMarker(marker)}
+{#if marker.colorFrom && marker.colorMix!==undefined && (marker.kind==='deflag'||marker.kind==='bean-bag')}
+ <g><svelte:self marker={{...marker,color:marker.colorFrom,colorFrom:undefined,colorMix:undefined}}/></g>
+ <g opacity={marker.colorMix}><svelte:self marker={{...marker,colorFrom:undefined,colorMix:undefined}}/></g>
+{:else if isTeamMarker(marker)}
 									{@const markerColor = playerMarkerColor(marker)}
 									<circle
 										cx={marker.x}
 										cy={marker.y}
 										r={playerRadius}
-										fill={guideColor(markerColor)}
-										stroke={playerTextColor(markerColor)}
+										fill={marker.animationColor ?? guideColor(markerColor)}
+										stroke={playBuilderPlayerInk(marker,markerColor)}
 										stroke-width={playerStrokeWidth}
 									/>
-									<text
+									<text opacity={marker.animationLabelOpacity ?? 1}
 										x={marker.x}
 										y={marker.y + 3.4}
 										text-anchor="middle"
-										fill={playerTextColor(markerColor)}
+										fill={playBuilderPlayerInk(marker,markerColor)}
 										font-size={marker.label && marker.label.length >= 4 ? 7.65 : 8.925}
 										font-weight="900"
 										pointer-events="none">{marker.label}</text
@@ -139,7 +141,7 @@
 								{/if}
 								{#if marker.label && (isOfficialMarker(marker) || ['ball', 'flag', 'bean-bag', 'deflag'].includes(marker.kind))}
 									{@const labelLines = penaltyLabelLines(marker.label)}
-									<text
+									<text opacity={marker.animationLabelOpacity ?? 1}
 										x={marker.x}
 										y={markerDescriptionY(marker)}
 										text-anchor="middle"

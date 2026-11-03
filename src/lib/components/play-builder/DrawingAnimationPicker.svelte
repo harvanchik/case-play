@@ -1,4 +1,6 @@
 <script lang="ts">
+ import { draggablePopover } from '$lib/play-builder-popover';
+ import ElementEditorModes from './ElementEditorModes.svelte';
  import DropdownChevron from './DropdownChevron.svelte';
 	import AnimationTiming from './AnimationTiming.svelte';
  import TransitionDuration from './TransitionDuration.svelte';
@@ -11,17 +13,15 @@
 	export let y: number;
 	export let count = 1;
  export let existingDrawing = false;
+ export let stationary = false;
  $: activeMode=existingDrawing?(value.mode==='jump'||value.mode==='instant'?'jump':'linear'):value.mode;
 	export let onchange: (value: DrawingAnimation) => void;
+	export let onedit:((event:MouseEvent)=>void)|undefined=undefined;
 	export let onclose: () => void;
 	let easingOpen = false;
 	let root: HTMLDivElement;
 	let motion: Motion;
 	$: motion = { ...defaultMotion({ type: 'marker', id: value.id }), start: value.start, end: value.end, easing: value.easing, speed: value.speed, path:activeMode==='jump'?'jump':'straight',jumpEffect:value.jumpEffect??'cut' };
-	function portal(node: HTMLElement) {
-		document.body.appendChild(node);
-		return { destroy: () => node.remove() };
-	}
 	function outside(event: PointerEvent) {
 		const target = event.target as Element;
 		if (!root?.contains(target) && !target.closest('[data-drawing-id],.driver-popover')) onclose();
@@ -36,7 +36,7 @@
 />
 <div
 	bind:this={root}
-	use:portal
+	use:draggablePopover
 	data-drawing-animation-picker
 	data-animation-ui
 	role="dialog"
@@ -47,14 +47,16 @@
 	style:top={`${Math.max(8, Math.min(y, window.innerHeight - 240))}px`}
 	on:pointerdown|stopPropagation
 >
+	{#if onedit}<div class="mb-1"><ElementEditorModes active="animation" onchange={(mode,event)=>{if(mode==='element')onedit?.(event);}}/></div>{/if}
 	<div class="types">
 		{#each (existingDrawing?['linear','jump']:['draw','instant']) as mode}<HoverTooltip
-				text={mode==='linear'?'Move and Blend Colors':mode==='jump'?'Change Position Instantly':mode === 'draw' ? 'Draw Along Stroke' : 'Appear All Together'}
+				text={mode==='linear'&&stationary?'Move Element to Enable':mode==='linear'?'Move and Blend Colors':mode==='jump'?'Change Position Instantly':mode === 'draw' ? 'Draw Along Stroke' : 'Appear All Together'}
 				minWidthPx={0}
 				wrapperClass="flex flex-1"
 				><button
-					class:active={activeMode === mode}
-					aria-pressed={activeMode === mode}
+					disabled={mode==='linear'&&stationary}
+                    class:active={activeMode === mode && !(stationary&&mode==='linear')}
+					aria-pressed={activeMode === mode && !(stationary&&mode==='linear')}
 					on:click={() => onchange({ ...value, mode: mode as DrawingAnimation['mode'] })}>{mode==='linear'?'Linear':mode==='jump'?'Jump':mode === 'draw' ? 'Draw' : 'Instant'}</button
 				></HoverTooltip
 			>{/each}
@@ -92,6 +94,7 @@
 </div>
 
 <style>
+ button:disabled{opacity:.4;cursor:default;}
 	.drawing-picker {
 		position: fixed;
 		z-index: 1000000001;

@@ -17,6 +17,8 @@ import {
 } from '$lib/play-builder-scene';
 import {
 	PLAY_BUILDER_GUIDE_COLORS,
+ playBuilderDrawArrow,
+ playBuilderPlayerInk,
 	playBuilderAirborneLift,
 	playBuilderAirborneSegments,
 	playBuilderGuideDash,
@@ -258,21 +260,22 @@ const freehandPath = (points: Point[]) => {
 	return `${data} L ${last.x} ${last.y}`;
 };
 
-const renderMarker = (marker: FieldMarker) => {
+const renderMarker = (marker: FieldMarker): string => {
+	if(marker.colorFrom&&marker.colorMix!==undefined&&(marker.kind==='deflag'||marker.kind==='bean-bag'))return `<g opacity="1">${renderMarker({...marker,color:marker.colorFrom,colorFrom:undefined,colorMix:undefined})}</g><g opacity="${marker.colorMix}">${renderMarker({...marker,colorFrom:undefined,colorMix:undefined})}</g>`;
 	const label = escapeXml(marker.label ?? '');
 	const renderImageMarker = (asset: string, size: number) =>
-		`<g><image href="${asset}" x="${marker.x - size / 2}" y="${marker.y - size / 2}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid meet"/>${label ? `<text x="${marker.x}" y="${marker.y + size / 2 + 9}" text-anchor="middle" fill="#fff" stroke="#111827" stroke-width="2" paint-order="stroke" font-size="8" font-weight="900">${label}</text>` : ''}</g>`;
+		`<g><image href="${asset}" x="${marker.x - size / 2}" y="${marker.y - size / 2}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid meet"/>${label ? `<text opacity="${marker.animationLabelOpacity??1}" x="${marker.x}" y="${marker.y + size / 2 + 9}" text-anchor="middle" fill="#fff" stroke="#111827" stroke-width="2" paint-order="stroke" font-size="8" font-weight="900">${label}</text>` : ''}</g>`;
 	if (marker.kind === 'team-a' || marker.kind === 'team-k' || marker.kind === 'team-b' || marker.kind === 'team-r') {
 		const color = marker.color ?? (marker.kind === 'team-a' || marker.kind === 'team-k' ? 'black' : 'white');
-		const fill = color === 'white' ? '#ffffff' : color === 'black' ? '#1c1917' : PLAY_BUILDER_GUIDE_COLORS[color];
-		const text = color === 'white' || color === 'yellow' || color === 'green' ? '#1c1917' : '#ffffff';
-		return `<g><circle cx="${marker.x}" cy="${marker.y}" r="14" fill="${fill}" stroke="${text}" stroke-width="2.6"/><text x="${marker.x}" y="${marker.y + 4}" text-anchor="middle" fill="${text}" font-size="9" font-weight="900">${label}</text></g>`;
+		const fill = marker.animationColor ?? (color === 'white' ? '#ffffff' : color === 'black' ? '#1c1917' : PLAY_BUILDER_GUIDE_COLORS[color]);
+		const text = playBuilderPlayerInk(marker,color);
+		return `<g><circle cx="${marker.x}" cy="${marker.y}" r="14" fill="${fill}" stroke="${text}" stroke-width="2.6"/><text opacity="${marker.animationLabelOpacity??1}" x="${marker.x}" y="${marker.y + 4}" text-anchor="middle" fill="${text}" font-size="9" font-weight="900">${label}</text></g>`;
 	}
 	if (marker.kind.startsWith('official-')) {
 		return renderImageMarker(officialMarkerImages[marker.kind as keyof typeof officialMarkerImages], 46.28);
 	}
 	if (marker.kind === 'ball') {
-		return renderImageMarker(footballImage, 30);
+		return `${marker.animationShadow?`<ellipse cx="${marker.animationShadow.x}" cy="${marker.animationShadow.y}" rx="${12*(marker.animationShadow.scale??1)}" ry="${3.5*(marker.animationShadow.scale??1)}" fill="#10291b" opacity=".3"/>`:''}${renderImageMarker(footballImage,30)}`;
 	}
 	if (marker.kind === 'event') {
 		const layout = playBuilderEventTagLayout(marker.label);
@@ -282,7 +285,7 @@ const renderMarker = (marker: FieldMarker) => {
 					`<tspan x="${marker.x}" y="${marker.y - ((layout.lines.length - 1) * PLAY_BUILDER_EVENT_TAG_LINE_HEIGHT) / 2 + 3.5 + index * PLAY_BUILDER_EVENT_TAG_LINE_HEIGHT}">${escapeXml(line)}</tspan>`
 			)
 			.join('');
-		return `<g><rect x="${marker.x - layout.width / 2}" y="${marker.y - layout.height / 2}" width="${layout.width}" height="${layout.height}" fill="#fff" stroke="#1c1917" stroke-width="2"/><text x="${marker.x}" text-anchor="middle" fill="#1c1917" font-size="8.5" font-weight="900">${text}</text></g>`;
+		return `<g><rect x="${marker.x - layout.width / 2}" y="${marker.y - layout.height / 2}" width="${layout.width}" height="${layout.height}" fill="#fff" stroke="#1c1917" stroke-width="2"/><text opacity="${marker.animationLabelOpacity??1}" x="${marker.x}" text-anchor="middle" fill="#1c1917" font-size="8.5" font-weight="900">${text}</text></g>`;
 	}
 	if (marker.kind === 'flag') {
 		return renderImageMarker(penaltyFlagImage, 31.5);
@@ -296,7 +299,15 @@ const renderMarker = (marker: FieldMarker) => {
 const renderPath = (path: FieldPath, scene: PlayBuilderScene, fieldTop: number, fieldBottom: number) => {
 	const attached = path.startMarkerId === undefined ? undefined : scene.markers.find((marker) => marker.id === path.startMarkerId);
 	const start = attached ? { x: attached.x, y: attached.y } : path.start;
-	const color = colors[path.color];
+	const color = path.animationColor ?? colors[path.color];
+ const arrowId = `animated-arrow-${path.id}`;
+ const arrowMarker = `<defs><marker id="${arrowId}" viewBox="0 0 10 10" refX="0" refY="5" markerUnits="userSpaceOnUse" markerWidth="22.5" markerHeight="22.5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="${color}"/></marker></defs>`;
+ if(path.animationReveal!==undefined&&path.animationReveal<1){
+  const drawing=playBuilderDrawArrow(path,fieldTop);if(drawing.points.length<2)return '';
+  const data=drawing.points.map((p,i)=>`${i?'L':'M'} ${p.x} ${p.y}`).join(' '),tip=drawing.points.slice(-2).map((p,i)=>`${i?'L':'M'} ${p.x} ${p.y}`).join(' ');
+  const ink=drawing.airborne?drawing.segments.map(segment=>`<path d="${segment.d}" stroke="${color}" stroke-width="${segment.width}" stroke-linecap="${segment.linecap}" fill="none"/>`).join(''):`<path d="${data}" stroke="${color}" stroke-width="5" fill="none"${dashAttribute(path.style)}/>`;
+  return `${arrowMarker}${ink}<path d="${tip}" stroke="${color}" stroke-width=".01" fill="none" marker-end="url(#${arrowId})"/>`;
+ }
 	if (path.kind === 'line') {
 		return `<line x1="${start.x}" y1="${start.y}" x2="${path.end.x}" y2="${path.end.y}" stroke="${color}" stroke-width="7.5" stroke-linecap="${path.style === 'dotted' ? 'round' : 'square'}"${dashAttribute(path.style)}/>`;
 	}
@@ -309,7 +320,7 @@ const renderPath = (path: FieldPath, scene: PlayBuilderScene, fieldTop: number, 
 				? path.points.map((point, index) => (index === 0 ? { ...start } : { x: point.x + offsetX, y: point.y + offsetY }))
 				: undefined;
 		const data = points ? playBuilderSmoothedPath(points) : `M ${start.x} ${start.y} L ${path.end.x} ${path.end.y}`;
-		return `<path d="${data}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="${path.style === 'dotted' ? 'round' : 'square'}"${dashAttribute(path.style)} marker-end="url(#arrow-${path.color})"/>`;
+		return `${arrowMarker}<path d="${data}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="${path.style === 'dotted' ? 'round' : 'square'}"${dashAttribute(path.style)} marker-end="url(#${arrowId})"/>`;
 	}
 	const controlY = (start.y + path.end.y) / 2 - playBuilderAirborneLift(path.kind, start, path.end, fieldTop) * 2;
 	const shadowStartY = Math.min(fieldBottom - 5, start.y + 9);
@@ -318,7 +329,7 @@ const renderPath = (path: FieldPath, scene: PlayBuilderScene, fieldTop: number, 
 	const segments = playBuilderAirborneSegments(path.kind, start, path.end, path.style, fieldTop)
 		.map((segment) => `<path d="${segment.d}" fill="none" stroke="${color}" stroke-width="${segment.width}" stroke-linecap="${segment.linecap}"/>`)
 		.join('');
-	return `<g>${shadow}${segments}<path d="M ${start.x} ${start.y} Q ${(start.x + path.end.x) / 2} ${controlY} ${path.end.x} ${path.end.y}" fill="none" stroke="${color}" stroke-width="0.01" marker-end="url(#arrow-${path.color})"/></g>`;
+	return `<g>${arrowMarker}${shadow}${segments}<path d="M ${start.x} ${start.y} Q ${(start.x + path.end.x) / 2} ${controlY} ${path.end.x} ${path.end.y}" fill="none" stroke="${color}" stroke-width="0.01" marker-end="url(#${arrowId})"/></g>`;
 };
 
 const downMarkerDisplay = (guide: FieldGuide, los: FieldGuide | undefined, yardsToPixels: number) => {
@@ -474,12 +485,12 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 	const guideElements = [...scene.guides].sort((a,b)=>Number(a.kind==='line-of-scrimmage')-Number(b.kind==='line-of-scrimmage'))
 		.map(
 			(guide) =>
-				`<line x1="${guide.x}" y1="${fieldTop + 4}" x2="${guide.x}" y2="${fieldBottom - 4}" stroke="${colors[guide.color]}" stroke-width="5" stroke-linecap="${guide.style === 'dotted' ? 'round' : 'square'}"${dashAttribute(guide.style)}/>`
+				`<line x1="${guide.x}" y1="${fieldTop + 4}" x2="${guide.x}" y2="${fieldBottom - 4}" stroke="${guide.animationColor ?? colors[guide.color]}" stroke-width="5" stroke-linecap="${guide.style === 'dotted' ? 'round' : 'square'}"${dashAttribute(guide.style)}/>`
 		)
 		.join('');
 	const renderLayers = () => {
 		const items = new Map<string, string>();
-		for (const path of scene.paths) items.set(`path:${path.id}`, renderPath(path, scene, fieldTop, fieldBottom));
+		for (const path of scene.paths) items.set(`path:${path.id}`, `<g opacity="${path.animationOpacity??1}" transform="translate(${path.start.x} ${path.start.y}) scale(${path.animationScale??1}) translate(${-path.start.x} ${-path.start.y})">${renderPath(path, scene, fieldTop, fieldBottom)}</g>`);
 		for (const marker of scene.markers) items.set(`marker:${marker.id}`, renderMarker(marker));
 		const ordered: string[] = [];
 		for (const layer of scene.layerOrder) {

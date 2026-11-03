@@ -48,7 +48,7 @@
 	const tooltipId = nextTooltipId++;
 
 	const portal = (node: HTMLElement) => {
-		document.body.appendChild(node);
+		(document.fullscreenElement??document.body).appendChild(node);
 		return { destroy: () => node.remove() };
 	};
 
