@@ -1,4 +1,4 @@
-import { evaluateAnimation } from '../play-builder-animation';
+import { applyAnimationStep } from '../play-builder-animation';
 import {
 	defaultPlayBuilderFieldSettings,
 	formatPlayBuilderGameClock,
@@ -354,7 +354,7 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 		const yards = yardsForX(x);
 		const yardLine = Math.round(Math.min(yards - leftGoalYards, rightGoalYards - yards) * 2) / 2;
 		const atMidfield = Math.abs(yards - (leftGoalYards + rightGoalYards) / 2) < 0.01;
-		const side = yards <= (leftGoalYards + rightGoalYards) / 2 ? 'A' : 'B';
+		const side = (settings.playerLetters ?? 'ABKR')[yards <= (leftGoalYards + rightGoalYards) / 2 ? 0 : 1];
 		const half = !Number.isInteger(yardLine);
 		const wholeYards = Math.floor(yardLine);
 		const base = atMidfield ? String(yardLine) : half && wholeYards === 0 ? `${side}'s` : `${side}'s ${half ? wholeYards : yardLine}`;
@@ -471,7 +471,7 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 					: [])
 			].join('')
 		: '';
-	const guideElements = scene.guides
+	const guideElements = [...scene.guides].sort((a,b)=>Number(a.kind==='line-of-scrimmage')-Number(b.kind==='line-of-scrimmage'))
 		.map(
 			(guide) =>
 				`<line x1="${guide.x}" y1="${fieldTop + 4}" x2="${guide.x}" y2="${fieldBottom - 4}" stroke="${colors[guide.color]}" stroke-width="5" stroke-linecap="${guide.style === 'dotted' ? 'round' : 'square'}"${dashAttribute(guide.style)}/>`
@@ -563,7 +563,7 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 export const renderPlayBuilderSocialSvg = (document: PlayBuilderDocument) => {
 	const activePlayIndex = document.plays[document.activePlayIndex] ? document.activePlayIndex : 0;
 	const active = document.plays[activePlayIndex];
-	const field = renderField(evaluateAnimation(active, 0), active.settings);
+	const field = renderField(active.animation ? applyAnimationStep(active.scene,active.animation.steps[0]) : active.scene, active.settings);
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="Inter, sans-serif">
 		<defs><pattern id="graph" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#e7e5e4" stroke-width="1" opacity=".58"/></pattern></defs>
 		<rect width="1200" height="630" fill="#fafaf9"/><rect width="1200" height="630" fill="url(#graph)"/>
@@ -582,7 +582,7 @@ export const renderPlayBuilderSocialSvg = (document: PlayBuilderDocument) => {
 export const renderPlayBuilderDiagramSvg = (document: PlayBuilderDocument, options: { clockVisible?: boolean } = {}) => {
 	const activePlayIndex = document.plays[document.activePlayIndex] ? document.activePlayIndex : 0;
 	const active = document.plays[activePlayIndex];
-	const field = renderField(evaluateAnimation(active, 0), active.settings, true, options.clockVisible ?? true);
+	const field = renderField(active.animation ? applyAnimationStep(active.scene,active.animation.steps[0]) : active.scene, active.settings, true, options.clockVisible ?? true);
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="484" viewBox="0 0 1000 484" font-family="Inter, sans-serif">
 		${field}
 	</svg>`;

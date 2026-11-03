@@ -295,15 +295,11 @@ test('jump motion teleports at its start time and round-trips', () => {
  const base = scene();
  const animation = insertAnimationStep(createAnimation(base), 0);
  animation.steps[1].poses.find(p => p.type === 'marker' && p.id === 1)!.x = 500;
- animation.transitions[0].motions = [{ ...defaultMotion({ type: 'marker', id: 1 }), path: 'jump', start: .5, end: 1, easing: 'in-out' }];
+ animation.transitions[0].motions = [{ ...defaultMotion({ type: 'marker', id: 1 }), path: 'jump', jumpEffect:'cut', start: .5, end: 1, easing: 'in-out' }];
  const play = { scene: base, animation };
  assert.equal(evaluateAnimation(play, .49).markers.find(m => m.id === 1)!.x, 100);
  assert.equal(evaluateAnimation(play, .5).markers.find(m => m.id === 1)!.x, 500);
  assert.equal(evaluateAnimation(play, .75).markers.find(m => m.id === 1)!.x, 500);
- assert.ok(Math.abs(evaluateAnimation(play,.47).markers.find(m=>m.id===1)!.animationOpacity!-.5)<.001);
- assert.equal(evaluateAnimation(play,.5).markers.find(m=>m.id===1)!.animationOpacity,0);
- assert.ok(Math.abs(evaluateAnimation(play,.53).markers.find(m=>m.id===1)!.animationOpacity!-.5)<.001);
- assert.equal(evaluateAnimation(play,.75).markers.find(m=>m.id===1)!.animationOpacity,1);
  assert.deepEqual(validateAnimation(animation, base), animation);
  const encoded = encodePlayBuilderDocument({ activePlayIndex: 0, plays: [{ name: 'Jump', ...play, settings: defaultPlayBuilderFieldSettings() }] });
  assert.equal(decodePlayBuilderDocument(encoded).plays[0].animation!.transitions[0].motions[0].path, 'jump');

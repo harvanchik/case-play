@@ -14,6 +14,7 @@ export const PLAY_BUILDER_HASH_PYLON_END_LINE_OFFSET = 10;
 export const PLAY_BUILDER_GAME_QUARTERS = ['1st', '2nd', '3rd', '4th', 'OT'] as const;
 export type PlayBuilderGameQuarter = (typeof PLAY_BUILDER_GAME_QUARTERS)[number];
 export type PlayBuilderFieldSettings = {
+	playerLetters?: string;
 	showYardNumbers: boolean;
 	showGoalLetters: boolean;
 	showEndZoneText: boolean;
@@ -35,7 +36,7 @@ export type PlayBuilderFieldSettings = {
 	fieldColor: PlayBuilderFieldColor;
 };
 export type Point = { x: number; y: number };
-export type FieldMarker = Point & { animationOpacity?: number; setupDefault?: boolean; name?: string; id: number; kind: MarkerKind; label?: string; sequence?: number; color?: GuideColor };
+export type FieldMarker = Point & { animationScale?: number; animationOpacity?: number; setupDefault?: boolean; name?: string; id: number; kind: MarkerKind; label?: string; sequence?: number; color?: GuideColor };
 export type FieldPath = {
 	id: number;
 	kind: PathKind;
@@ -47,8 +48,8 @@ export type FieldPath = {
 	/** Optional sampled points for a free-drawn Run arrow. Straight paths omit this. */
 	points?: Point[];
 };
-export type FieldGuide = { animationOpacity?: number; setupDefault?: boolean; name?: string; id: number; kind: GuideKind; x: number; color: GuideColor; style: GuideStyle; down?: DownMarkerValue };
-export type FreeStroke = { id: number; color: GuideColor; points: Point[]; width?: number };
+export type FieldGuide = { animationScale?: number; animationOpacity?: number; setupDefault?: boolean; name?: string; id: number; kind: GuideKind; x: number; color: GuideColor; style: GuideStyle; down?: DownMarkerValue };
+export type FreeStroke = { animationColor?: string; animationOpacity?: number; id: number; color: GuideColor; points: Point[]; width?: number };
 export type LayerType = 'guide' | 'path' | 'marker';
 export type LayerRef = { type: LayerType; id: number };
 export type PlayBuilderScene = {
@@ -108,7 +109,7 @@ type LegacyGuideTuple = [number, number, number, number, number];
 type GuideTuple = [number, number, number, number, number, number | null, string?, boolean?];
 type LegacyStrokeTuple = [number, number, number[]];
 type StrokeTuple = [number, number, number, number[]];
-type FieldSettingsTuple = [number, number, number, string?, string?, number?, number?];
+type FieldSettingsTuple = [number, number, number, string?, string?, number?, number?, string?];
 
 export type SerializedPlayBuilderScene = {
 	v: 1;
@@ -453,8 +454,9 @@ const encodeFieldSettings = (settings: PlayBuilderFieldSettings): FieldSettingsT
 	settings.teamBoxTopLabel,
 	settings.teamBoxBottomLabel,
 	indexOf(PLAY_BUILDER_GAME_QUARTERS, settings.gameQuarter),
-	settings.gameClockSeconds
-];
+	settings.gameClockSeconds,
+	...(settings.playerLetters ? [settings.playerLetters] as const : [] as const)
+] as FieldSettingsTuple;
 
 const decodeFieldSettings = (
 	value: unknown,
@@ -464,7 +466,8 @@ const decodeFieldSettings = (
 ): PlayBuilderFieldSettings => {
 	if (
 		!Array.isArray(value) ||
-		(includesScoreboardSettings ? value.length !== 7 : value.length !== 3 && value.length !== 4 && value.length !== 5) ||
+		(includesScoreboardSettings ? value.length !== 7 && value.length !== 8 : value.length !== 3 && value.length !== 4 && value.length !== 5) ||
+		(value.length === 8 && (typeof value[7] !== 'string' || !/^[A-Z]{4}$/.test(value[7]))) ||
 		!validInteger(value[0]) ||
 		Number(value[0]) < 0 ||
 		Number(value[0]) >= 1 << fieldSettingKeys.length ||
@@ -480,6 +483,7 @@ const decodeFieldSettings = (
 		throw new Error('Invalid field settings.');
 	}
 	const settings = defaultPlayBuilderFieldSettings();
+	if (value.length === 8) settings.playerLetters = String(value[7]);
 	fieldSettingKeys.forEach((key, index) => {
 		if (key === 'showDownMarker' && !includesDownMarkerSetting) return;
 		if (key === 'showLineOfScrimmageMarker' && !includesLineOfScrimmageMarkerSetting) return;

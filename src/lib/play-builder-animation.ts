@@ -1,12 +1,16 @@
-import type { FieldMarker, PlayBuilderScene, Point } from './play-builder-scene';
+import { defaultDrawingAnimation, evaluateDrawings, type DrawingAnimation } from './play-builder-drawing-animation';
+import type { DownMarkerValue, GuideColor, FieldMarker, PlayBuilderScene, Point } from './play-builder-scene';
 
 export const MAX_ANIMATION_SECONDS = 60;
 export const MAX_ANIMATION_STEPS = 61;
 export type AnimationTarget = { type: 'marker' | 'guide'; id: number };
-export type AnimationPose = AnimationTarget & Point & { visible: boolean; animationOpacity?: number; label?: string | null; name?: string | null; carrierId?: number; offset?: Point };
-export type AnimationStep = { id: string; name: string; poses: AnimationPose[] };
+export type AnimationPose = AnimationTarget & Point & { visible: boolean; down?: DownMarkerValue; animationScale?: number; animationOpacity?: number; label?: string | null; name?: string | null; carrierId?: number; offset?: Point };
+export type AnimationStep = { id: string; name: string; poses: AnimationPose[]; strokeIds?: number[]; strokeOffsets?: { id: number; x: number; y: number; color?: GuideColor }[] };
 export type Motion = AnimationTarget & {
 	path: 'straight' | 'curve' | 'custom' | 'jump';
+	speed?: number;
+	jumpEffect?: 'cut' | 'fade' | 'shrink';
+ jumpDuration?: number;
 	/** Geometry is relative to the endpoints: x is progress, y is perpendicular field distance. */
 	points: Point[];
 	smooth: boolean;
@@ -14,9 +18,26 @@ export type Motion = AnimationTarget & {
 	end: number;
 	easing: 'linear' | 'in' | 'out' | 'in-out';
 };
+export const MOTION_SPEEDS = [.25,.5,.75,1,1.25,1.5,1.75,2] as const;
+export const motionArrival = (motion: Motion) => Math.min(1,motion.start+(motion.end-motion.start)/(motion.speed ?? 1));
 export type AnimationTransition = { from: string; to: string; duration: number; motions: Motion[] };
-export type PlayAnimation = { steps: AnimationStep[]; transitions: AnimationTransition[] };
+export type PlayAnimation = { drawings?: DrawingAnimation[]; steps: AnimationStep[]; transitions: AnimationTransition[] };
 export const cloneAnimation = (animation: PlayAnimation): PlayAnimation => structuredClone(animation);
+/** Retime an already-cloned animation, preserving authored seconds for partial windows. */
+export function retimeTransition(animation: PlayAnimation, index: number, duration: number) {
+ const transition = animation.transitions[index];
+ const previous = transition.duration;
+ const retime = (timing: { start: number; end: number; speed?: number; jumpDuration?: number }, jump = false) => {
+  if(timing.jumpDuration!==undefined)timing.jumpDuration=Math.min(duration,timing.jumpDuration);
+  if (timing.start === 0 && timing.end === 1 && (jump || (timing.speed ?? 1) === 1)) return;
+  const minimum = .01 / duration;
+  timing.end = jump ? 1 : Math.max(minimum, Math.min(1, timing.end * previous / duration));
+  timing.start = Math.max(0, Math.min(timing.end - minimum, timing.start * previous / duration));
+ };
+ transition.motions.forEach(motion => retime(motion, motion.path === 'jump'));
+ animation.drawings?.filter(drawing => drawing.stepId === transition.to).forEach(drawing => retime(drawing,drawing.mode==='jump'));
+ transition.duration = duration;
+}
 export const targetKey = (target: { type: string; id: number }) => `${target.type}:${target.id}`;
 export const sameTarget = (a: AnimationTarget, b: AnimationTarget) => a.type === b.type && a.id === b.id;
 export const animationDuration = (animation?: PlayAnimation) => animation?.transitions.reduce((sum, item) => sum + item.duration, 0) ?? 0;
@@ -33,16 +54,18 @@ export const defaultMotion = (target: AnimationTarget): Motion => ({
 });
 export const capturePoses = (scene: PlayBuilderScene): AnimationPose[] => [
 	...scene.markers.map(({ id, x, y, label, name }) => ({ label: label ?? null, name: name ?? null, type: 'marker' as const, id, x, y, visible: true })),
-	...scene.guides.map(({ id, x, name }) => ({ name: name ?? null, type: 'guide' as const, id, x, y: 242, visible: true }))
+	...scene.guides.map(({ id, x, name, down }) => ({ ...(down!==undefined?{down}:{}), name: name ?? null, type: 'guide' as const, id, x, y: 242, visible: true }))
 ];
 const newStepId = () => globalThis.crypto.randomUUID();
 export const createAnimation = (scene: PlayBuilderScene): PlayAnimation => ({
-	steps: [{ id: newStepId(), name: 'Start', poses: capturePoses(scene) }],
+	steps: [{ id: newStepId(), name: 'Start', poses: capturePoses(scene), strokeIds:scene.freeStrokes.map(stroke=>stroke.id) }],
 	transitions: []
 });
 
 /** Keep transition settings only when the same two neighboring steps remain adjacent. */
 export const rebuildTransitions = (animation: PlayAnimation): PlayAnimation => ({
+	...animation,
+	...(animation.drawings?{drawings:animation.drawings.filter(item=>animation.steps.slice(1).some(step=>step.id===item.stepId))}:{}),
 	steps: animation.steps,
 	transitions: animation.steps.slice(1).map(
 		(step, index) =>
@@ -74,10 +97,20 @@ export const captureAnimationEdits = (base: PlayBuilderScene, live: PlayBuilderS
  for (const frame of next.steps) for (const pose of frame.poses) {
   const object = pose.type === 'marker' ? base.markers.find(item => item.id === pose.id) : base.guides.find(item => item.id === pose.id);
   if (pose.name === undefined) pose.name = object?.name ?? null;
+  if(pose.type==='guide' && pose.down===undefined){const down=base.guides.find(item=>item.id===pose.id)?.down;if(down!==undefined)pose.down=down;}
   if (pose.type === 'marker' && pose.label === undefined) pose.label = base.markers.find(item => item.id === pose.id)?.label ?? null;
  }
 	const step = next.steps[index];
 	if (!step) return { scene: structuredClone(base), animation: next };
+ const baseDrawingIds=new Set(base.freeStrokes.map(stroke=>stroke.id));
+ for(const frame of next.steps){frame.strokeIds ??= [...baseDrawingIds];frame.strokeOffsets ??= [];for(const stroke of base.freeStrokes){const offset=frame.strokeOffsets.find(item=>item.id===stroke.id);if(offset)offset.color ??= stroke.color;else frame.strokeOffsets.push({id:stroke.id,x:0,y:0,color:stroke.color});}}
+ step.strokeOffsets=live.freeStrokes.map(stroke=>{const original=base.freeStrokes.find(item=>item.id===stroke.id)?.points[0]??stroke.points[0];return {id:stroke.id,x:stroke.points[0].x-original.x,y:stroke.points[0].y-original.y,color:stroke.color};});
+ const removedDrawings=(step.strokeIds ?? [...baseDrawingIds]).filter(id=>!live.freeStrokes.some(stroke=>stroke.id===id));
+ for(let later=index+1;later<next.steps.length;later++)next.steps[later].strokeIds=next.steps[later].strokeIds!.filter(id=>!removedDrawings.includes(id));
+ step.strokeIds=live.freeStrokes.map(stroke=>stroke.id);
+ if(index>0)for(const stroke of live.freeStrokes)if(!baseDrawingIds.has(stroke.id)){
+  next.drawings ??=[];next.drawings.push(defaultDrawingAnimation(stroke.id,step.id));
+ }
 	const livePoses = capturePoses(live);
 	const liveKeys = new Set(livePoses.map(targetKey));
 	const knownKeys = new Set(capturePoses(base).map(targetKey));
@@ -88,7 +121,7 @@ export const captureAnimationEdits = (base: PlayBuilderScene, live: PlayBuilderS
 	}
 	step.poses = step.poses.map((pose) => {
 		const current = livePoses.find((item) => sameTarget(item, pose));
-		if (current) return { ...pose, x: current.x, y: current.y, name: current.name, ...(pose.type === 'marker' ? { label: current.label } : {}), visible: true };
+		if (current) return { ...pose, x: current.x, y: current.y, name: current.name, ...(pose.type === 'marker' ? { label: current.label } : current.down!==undefined ? {down:current.down} : {}), visible: true };
 		// Previously hidden objects must stay hidden when another object is edited.
 		if (pose.visible && !liveKeys.has(targetKey(pose))) {
 			for (let i = index + 1; i < next.steps.length; i++) {
@@ -116,7 +149,7 @@ export const captureAnimationEdits = (base: PlayBuilderScene, live: PlayBuilderS
 		...old.map((item) => current.find((value) => value.id === item.id) ?? item),
 		...current.filter((item) => !old.some((value) => value.id === item.id))
 	];
-	const scene: PlayBuilderScene = { ...structuredClone(live), markers: merge(base.markers, live.markers), guides: merge(base.guides, live.guides) };
+	const scene: PlayBuilderScene = { ...structuredClone(live), markers: merge(base.markers, live.markers), guides: merge(base.guides, live.guides), freeStrokes:merge(base.freeStrokes,live.freeStrokes).map(stroke=>({...stroke,color:base.freeStrokes.find(item=>item.id===stroke.id)?.color??stroke.color,points:base.freeStrokes.find(item=>item.id===stroke.id)?.points??stroke.points})) };
 	const layerKeys = new Set(scene.layerOrder.map(targetKey));
 	for (const layer of base.layerOrder) if (layer.type !== 'path' && !layerKeys.has(targetKey(layer))) scene.layerOrder.push({ ...layer });
 	const initial = next.steps[0];
@@ -126,7 +159,7 @@ export const captureAnimationEdits = (base: PlayBuilderScene, live: PlayBuilderS
 	});
 	scene.guides = scene.guides.map((guide) => {
 		const pose = initial.poses.find((item) => item.type === 'guide' && item.id === guide.id);
-		return pose ? { ...guide, animationOpacity: pose.animationOpacity, x: pose.x, name: pose.name === undefined ? guide.name : pose.name ?? undefined } : guide;
+		return pose ? { ...guide, down: pose.down ?? guide.down, animationScale: pose.animationScale, animationOpacity: pose.animationOpacity, x: pose.x, name: pose.name === undefined ? guide.name : pose.name ?? undefined } : guide;
 	});
 	return { scene, animation: next };
 };
@@ -138,14 +171,15 @@ export const applyAnimationStep = (scene: PlayBuilderScene, step: AnimationStep)
 		if (!pose?.visible) return null;
 		const carrier = pose.carrierId === undefined ? undefined : poses.get(`marker:${pose.carrierId}`);
 		const position = carrier?.visible ? { x: carrier.x + (pose.offset?.x ?? 12), y: carrier.y + (pose.offset?.y ?? 8) } : pose;
-		return { ...marker, animationOpacity: pose.animationOpacity, x: position.x, y: position.y, label: pose.label === undefined ? marker.label : pose.label ?? undefined, name: pose.name === undefined ? marker.name : pose.name ?? undefined };
+		return { ...marker, animationScale: pose.animationScale, animationOpacity: pose.animationOpacity, x: position.x, y: position.y, label: pose.label === undefined ? marker.label : pose.label ?? undefined, name: pose.name === undefined ? marker.name : pose.name ?? undefined };
 	};
 	return {
 		...scene,
+		freeStrokes: scene.freeStrokes.filter(stroke=>step.strokeIds?.includes(stroke.id)??true).map(stroke=>{const offset=step.strokeOffsets?.find(item=>item.id===stroke.id);return offset?{...stroke,color:offset.color??stroke.color,points:stroke.points.map(point=>({x:point.x+offset.x,y:point.y+offset.y}))}:stroke;}),
 		markers: scene.markers.map(markerAt).filter((item): item is FieldMarker => item !== null),
 		guides: scene.guides.flatMap((guide) => {
 			const pose = poses.get(`guide:${guide.id}`);
-			return pose?.visible ? [{ ...guide, animationOpacity: pose.animationOpacity, x: pose.x, name: pose.name === undefined ? guide.name : pose.name ?? undefined }] : [];
+			return pose?.visible ? [{ ...guide, down: pose.down ?? guide.down, animationScale: pose.animationScale, animationOpacity: pose.animationOpacity, x: pose.x, name: pose.name === undefined ? guide.name : pose.name ?? undefined }] : [];
 		})
 	};
 };
@@ -240,23 +274,23 @@ export const evaluateAnimation = (play: { scene: PlayBuilderScene; animation?: P
 		if (!b.visible) return { ...b };
 		const motion = transition.motions.find((item) => sameTarget(item, target)) ?? defaultMotion(target);
         if (motion.path === 'jump') {
-          // Fade around the jump without interpolating through positions along its route.
-          const jumpTime = motion.start * transition.duration;
-          const seconds = progress * transition.duration;
-          const fadeOut = Math.min(.06, jumpTime);
-          const fadeIn = Math.min(.06, transition.duration - jumpTime);
-          const before = seconds < jumpTime;
-          const opacity = before ? (fadeOut ? clamp((jumpTime-seconds)/fadeOut) : 1) : (fadeIn ? clamp((seconds-jumpTime)/fadeIn) : 1);
-          return { ...resolveAttachment(before ? a : b, progress), label:a.label, name:a.name, animationOpacity:opacity };
+          const start=motion.start*transition.duration;
+          const elapsed=progress*transition.duration-start;
+          const length=Math.min((motion.jumpDuration ?? .25/(motion.speed ?? 1)),transition.duration-start);
+          const effect=motion.jumpEffect ?? 'fade';
+          const fraction=effect==='cut' ? (elapsed>=0?1:0) : clamp(elapsed/length);
+          const atDestination=effect==='cut'?elapsed>=0:fraction>=.5;
+          const visibility=elapsed<0 || effect==='cut'?1:Math.abs(2*fraction-1);
+          return {...resolveAttachment(atDestination?b:a,progress),label:a.label,name:a.name,down:fraction>=1?b.down:a.down,animationOpacity:effect==='fade'?visibility:1,animationScale:effect==='shrink'?visibility:1};
         }
 		const carrierA = attached && a.carrierId !== undefined ? a.carrierId : undefined;
 		const carrierB = attached && b.carrierId !== undefined ? b.carrierId : undefined;
 		if (carrierA !== undefined && carrierA === carrierB) return resolveAttachment(a, progress);
 		if (progress <= motion.start) return resolveAttachment(a, progress);
-		if (progress >= motion.end) return { ...resolveAttachment(b, progress), label: a.label, name: a.name };
+		if (progress >= motionArrival(motion)) return { ...resolveAttachment(b, progress), label: a.label, name: a.name };
 		const start = resolveAttachment(a, motion.start),
-			end = resolveAttachment(b, motion.end);
-		const fraction = ease(clamp((progress - motion.start) / (motion.end - motion.start)), motion.easing);
+			end = resolveAttachment(b, motionArrival(motion));
+		const fraction = ease(clamp((progress - motion.start) / (motionArrival(motion) - motion.start)), motion.easing);
 		const position = distancePoint(motionPoints(motion, start, end), fraction);
 		return { ...a, ...position, carrierId: undefined, offset: undefined };
 	};
@@ -267,7 +301,7 @@ export const evaluateAnimation = (play: { scene: PlayBuilderScene; animation?: P
 		return { ...pose, x: carrier.x + (pose.offset?.x ?? 12), y: carrier.y + (pose.offset?.y ?? 8), carrierId: undefined, offset: undefined };
 	};
 	const poses = from.poses.map((pose) => poseAt(pose, t)).filter((pose): pose is AnimationPose => Boolean(pose));
-	return applyAnimationStep(staticScene, { id: 'preview', name: '', poses });
+	return {...applyAnimationStep(staticScene, { id: 'preview', name: '', poses }),freeStrokes:evaluateDrawings(scene.freeStrokes,animation,index,t)};
 };
 
 export const validateAnimation = (value: unknown, scene: PlayBuilderScene): PlayAnimation => {
@@ -302,6 +336,8 @@ export const validateAnimation = (value: unknown, scene: PlayBuilderScene): Play
 			step.poses.length !== registry.size
 		)
 			return invalid();
+        if(step.strokeOffsets!==undefined && (!Array.isArray(step.strokeOffsets)||step.strokeOffsets.length>scene.freeStrokes.length||new Set(step.strokeOffsets.map(item=>item?.id)).size!==step.strokeOffsets.length||!step.strokeOffsets.every(item=>item&&scene.freeStrokes.some(stroke=>stroke.id===item.id)&&finite(item.x)&&finite(item.y)&&(item.color===undefined||['red','orange','yellow','green','cyan','blue','purple','white','gray','black'].includes(item.color)))))return invalid();
+		if(step.strokeIds!==undefined && (!Array.isArray(step.strokeIds)||step.strokeIds.length>scene.freeStrokes.length||new Set(step.strokeIds).size!==step.strokeIds.length||!step.strokeIds.every(id=>scene.freeStrokes.some(stroke=>stroke.id===id))))return invalid();
 		ids.add(step.id);
 		const poseKeys = new Set<string>();
 		for (const pose of step.poses) {
@@ -316,6 +352,7 @@ export const validateAnimation = (value: unknown, scene: PlayBuilderScene): Play
 			)
 				return invalid();
 			if ([pose.label, pose.name].some(value => value !== undefined && value !== null && (typeof value !== 'string' || value.length > 64))) return invalid();
+			if(pose.down!==undefined && (pose.type!=='guide' || !['1st','2nd','3rd','4th','pat'].includes(pose.down)))return invalid();
 			poseKeys.add(targetKey(pose));
 			if (pose.carrierId !== undefined) {
 				const ball = scene.markers.find((marker) => pose.type === 'marker' && marker.id === pose.id && marker.kind === 'ball');
@@ -344,7 +381,7 @@ export const validateAnimation = (value: unknown, scene: PlayBuilderScene): Play
 				!registry.has(targetKey(motion)) ||
 				keys.has(targetKey(motion)) ||
 				!['straight', 'curve', 'custom', 'jump'].includes(motion.path) ||
-				(motion.type === 'guide' && motion.path !== 'straight') ||
+				(motion.type === 'guide' && !['straight','jump'].includes(motion.path)) ||
 				!Array.isArray(motion.points) ||
 				motion.points.length > 256 ||
 				!motion.points.every((p) => p && finite(p.x) && finite(p.y)) ||
@@ -357,9 +394,20 @@ export const validateAnimation = (value: unknown, scene: PlayBuilderScene): Play
 				motion.start >= motion.end
 			)
 				return invalid();
+			if(motion.speed!==undefined && !MOTION_SPEEDS.includes(motion.speed as typeof MOTION_SPEEDS[number]))return invalid();
+			if(motion.jumpDuration!==undefined && (!finite(motion.jumpDuration)||motion.jumpDuration<.01||motion.jumpDuration>item.duration))return invalid();
+			if(motion.jumpEffect!==undefined && !['cut','fade','shrink'].includes(motion.jumpEffect))return invalid();
 			keys.add(targetKey(motion));
 		}
 	}
+ if(animation.drawings!==undefined){
+  if(!Array.isArray(animation.drawings)||animation.drawings.length>scene.freeStrokes.length*animation.steps.length)return invalid();
+  const keys=new Set<string>();
+  for(const drawing of animation.drawings){
+   if(!drawing||!scene.freeStrokes.some(stroke=>stroke.id===drawing.id)||!animation.steps.slice(1).some(step=>step.id===drawing.stepId)||!['draw','instant','linear','jump'].includes(drawing.mode)||!['linear','in','out','in-out'].includes(drawing.easing)||!finite(drawing.start)||!finite(drawing.end)||drawing.start<0||drawing.end>1||drawing.start>=drawing.end||drawing.speed!==undefined&&!MOTION_SPEEDS.includes(drawing.speed as typeof MOTION_SPEEDS[number])||drawing.jumpEffect!==undefined&&!['cut','fade'].includes(drawing.jumpEffect)||drawing.jumpDuration!==undefined&&(!finite(drawing.jumpDuration)||drawing.jumpDuration<.01||drawing.jumpDuration>(animation.transitions.find(item=>item.to===drawing.stepId)?.duration??0)))return invalid();
+   const key=`${drawing.stepId}:${drawing.id}`;if(keys.has(key))return invalid();keys.add(key);
+  }
+ }
 	if (animationDuration(animation) > MAX_ANIMATION_SECONDS + 0.000001) return invalid();
 	return cloneAnimation(animation);
 };
