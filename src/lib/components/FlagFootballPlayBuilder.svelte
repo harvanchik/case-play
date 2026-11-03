@@ -9029,17 +9029,17 @@
 
     {#if !viewOnly && !animationPreview && selectedDrawingBounds && selectedDrawingIds.length}
      <div data-drawing-actions class="absolute z-20 flex gap-1" style:left={`${selectedDrawingBounds.right/10}%`} style:top={`${Math.max(0,selectedDrawingBounds.top-25)/484*100}%`}>
-      {#if drawingCanRevert}<HoverTooltip text="Revert to Original Position" placement="above" minWidthPx={0}><button aria-label="Revert drawing to original position" class="element-delete-button flex h-7 w-7 items-center justify-center border-2 border-white bg-stone-900 text-white" on:pointerdown|preventDefault|stopPropagation={revertDrawingPosition}><AnimationIcon name="reset"/></button></HoverTooltip>{/if}
-      <HoverTooltip text="Delete Drawing" placement="above" minWidthPx={0}><button aria-label="Delete drawing" class="element-delete-button flex h-7 w-7 items-center justify-center border-2 border-white bg-stone-900 text-white" on:pointerdown|preventDefault|stopPropagation={deleteSelectedDrawings}><AnimationIcon name="trash"/></button></HoverTooltip>
+      {#if drawingCanRevert}<HoverTooltip text="Revert to Original Position" placement="below-left" minWidthPx={0}><button aria-label="Revert drawing to original position" class="element-revert-button element-delete-button flex h-7 w-7 items-center justify-center border-2 border-white bg-stone-900 text-white" on:pointerdown|preventDefault|stopPropagation={revertDrawingPosition}><AnimationIcon name="reset"/></button></HoverTooltip>{/if}
+      <HoverTooltip text="Delete Drawing" placement="below-left" minWidthPx={0}><button aria-label="Delete drawing" class="element-delete-button flex h-7 w-7 items-center justify-center border-2 border-white bg-stone-900 text-white" on:pointerdown|preventDefault|stopPropagation={deleteSelectedDrawings}><AnimationIcon name="trash"/></button></HoverTooltip>
      </div>
     {/if}
 				{#if !viewOnly && !animationPreview && selectedTargets.length > 0 && deleteTarget && deletePosition}
 					<div data-element-actions class="absolute z-20 -translate-y-1/2" style:left={`${deletePosition.x / 10}%`} style:top={`${(deletePosition.y / 484) * 100}%`}>
  {#if canRevertPosition}
   <div class="absolute right-full mr-1">
-   <HoverTooltip text="Revert to Original Position" placement="above" minWidthPx={0} wrapperClass="flex h-7 w-7 shrink-0">
+   <HoverTooltip text="Revert to Original Position" placement="below-left" minWidthPx={0} wrapperClass="flex h-7 w-7 shrink-0">
     <button type="button" aria-label="Revert to original position" on:pointerdown|preventDefault|stopPropagation={revertElementPosition}
-     class="element-delete-button flex h-7 w-7 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white">
+     class="element-revert-button element-delete-button flex h-7 w-7 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white">
      <svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6" fill="none" stroke="currentColor" stroke-width="2" /></svg>
     </button>
    </HoverTooltip>
@@ -9048,7 +9048,7 @@
 
 						<HoverTooltip
 							text={selectedTargets.length > 1 ? 'Delete Selected Elements' : 'Delete Element'}
-							placement="above"
+							placement="below-left"
 							minWidthPx={0}
 							wrapperClass="flex h-7 w-7 shrink-0"
 						>
@@ -10171,6 +10171,7 @@
 	.element-delete-button:focus-visible {
 		background-color: #dc2626 !important;
 	}
+ .element-revert-button:hover {background-color:#ffffff !important;color:#000000 !important;border-color:#000000 !important;}
 	.scroll-modal > header {
 		top: -1px;
 		box-shadow: 0 -4px 0 #1c1917;

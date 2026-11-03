@@ -536,3 +536,13 @@ test('focus borders are keyboard-only, Shift placement is free, lasers clear on 
  await page.keyboard.press('v');await page.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height/2);await page.mouse.down();await page.mouse.move(bounds.x+bounds.width/2+80,bounds.y+bounds.height/2+40,{steps:10});await page.mouse.up();
  await page.locator(`[data-animation-route="${id}"] path[pointer-events="stroke"]`).dispatchEvent('dblclick',{clientX:650,clientY:300});const picker=page.locator('[data-animation-path-picker]');await picker.getByRole('button',{name:'Jump',exact:true}).click();const time=picker.getByRole('textbox',{name:'Transition time seconds',exact:true});await time.fill('.3');await time.press('Enter');await expect(time).toHaveValue('0.30s');await time.fill('.5');await time.press('Enter');await expect(time).toHaveValue('0.50s');
 });
+
+test('Revert and Delete tooltips open below-left and Revert inverts on hover',async({page})=>{
+ await ready(page,'1');const marker=page.locator('[data-layer-type="marker"][data-field-kind="team-a"]').first();const b=(await marker.boundingBox())!;
+ await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width/2+80,b.y+b.height/2+40,{steps:10});await page.mouse.up();
+ for(const name of ['Revert to original position','Delete element']){
+  const button=page.getByRole('button',{name,exact:true});await button.hover();const box=(await button.boundingBox())!,tip=(await page.getByRole('tooltip').boundingBox())!;
+  expect(tip.x+tip.width).toBeLessThan(box.x+box.width/2);expect(tip.y).toBeGreaterThan(box.y+box.height/2);
+  if(name.startsWith('Revert'))await expect.poll(()=>button.evaluate(node=>{const s=getComputedStyle(node);return [s.backgroundColor,s.color,s.borderTopColor];})).toEqual(['rgb(255, 255, 255)','rgb(0, 0, 0)','rgb(0, 0, 0)']);
+ }
+});

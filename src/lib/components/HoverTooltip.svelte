@@ -31,7 +31,7 @@
 		cursorOffsetYPx?: number;
 		paddingPx?: number;
 		minWidthPx?: number;
-		placement?: 'right' | 'above';
+		placement?: 'right' | 'above' | 'below-left';
 		panelClass?: string;
 		maxWidthClass?: string;
 		wrapperClass?: string;
@@ -63,6 +63,8 @@
 						left: Math.max(paddingPx, Math.min(anchorX - panel.offsetWidth / 2, window.innerWidth - panel.offsetWidth - paddingPx)),
 						top: Math.max(paddingPx, Math.min(anchorY - panel.offsetHeight - cursorOffsetYPx, window.innerHeight - panel.offsetHeight - paddingPx))
 					}
+                : placement==='below-left'
+                 ? {left:Math.max(paddingPx,Math.min(anchorX-panel.offsetWidth-cursorOffsetXPx,window.innerWidth-panel.offsetWidth-paddingPx)),top:Math.max(paddingPx,Math.min(anchorY+cursorOffsetYPx,window.innerHeight-panel.offsetHeight-paddingPx))}
 				: cursorFloatingPosition({
 						cursorX: anchorX,
 						cursorY: anchorY,
