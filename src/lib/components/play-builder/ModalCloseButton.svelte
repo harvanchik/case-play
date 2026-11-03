@@ -1,4 +1,5 @@
 <script lang="ts">
+ import HoverTooltip from '../HoverTooltip.svelte';
 	let {
 		element = $bindable(),
 		ariaLabel,
@@ -12,9 +13,10 @@
 	} = $props();
 </script>
 
-<button
+<HoverTooltip text={ariaLabel} minWidthPx={0} wrapperClass="contents"><button
 	bind:this={element}
 	type="button"
+ data-square-button
 	aria-label={ariaLabel}
 	{disabled}
 	onclick={onClose}
@@ -23,4 +25,4 @@
 	<svg viewBox="0 0 24 24" class="block h-4 w-4" aria-hidden="true">
 		<path d="M6 6 18 18M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" />
 	</svg>
-</button>
+</button></HoverTooltip>

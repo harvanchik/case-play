@@ -258,3 +258,14 @@
 		@apply text-pink-600;
 	}
 }
+
+/* Focus should not add outlines or rings to app controls or field elements. */
+*:focus, *:focus-visible { outline: none !important; box-shadow: none !important; }
+
+/* Inset square focus borders for toolbar and white square actions. */
+button[data-builder-tool]:focus-visible, button[data-square-button]:focus-visible, button.h-9.w-10:focus-visible { border-radius: 0 !important; box-shadow: inset 0 0 0 2px #1e90ff !important; outline: none !important; }
+
+button:is(.bg-white,.bg-stone-100):is(.h-7.w-7,.h-8.w-8,.h-9.w-9,.h-10.w-10,.aspect-square):focus-visible { border-radius: 0 !important; box-shadow: inset 0 0 0 2px #1e90ff !important; outline: none !important; }
+
+button[data-focus-button]:focus-visible { border-radius:0 !important; box-shadow:inset 0 0 0 2px #1e90ff !important; outline:none !important; }
+button[data-builder-tool]:focus-visible [data-player-tool-letter] { box-shadow:inset 0 0 0 2px #1e90ff !important; }

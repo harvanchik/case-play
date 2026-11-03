@@ -46,6 +46,7 @@
 <HoverTooltip text={tooltip} {shortcutKeys} minWidthPx={0} {wrapperClass}>
 	<button
 		type="button"
+        data-square-button
 		data-tutorial={tutorial}
 		aria-label={ariaLabel}
 		aria-keyshortcuts={ariaKeyshortcuts}

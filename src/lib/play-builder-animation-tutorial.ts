@@ -1,12 +1,14 @@
 import { driver, type Driver, type DriveStep } from 'driver.js';
 
-type Lesson = { side?: 'top' | 'left' | 'right' | 'bottom'; highlights?: string[]; keys?: 'playback' | 'steps'; target: string; title: string; description: string; wait?: () => boolean; skip?: () => void; prepare?: () => void | Promise<void> };
+type Lesson = { required?: boolean; side?: 'top' | 'left' | 'right' | 'bottom'; highlights?: string[]; keys?: 'playback' | 'steps'; target: string; title: string; description: string; wait?: () => boolean; skip?: () => void | Promise<void>; prepare?: () => void | Promise<void> };
 export function startAnimationTutorial(hooks: {
  ghosts: () => void; beginNextMovement: () => void; nextMovementReady: () => boolean; nextMovement: () => void;
  added: () => boolean; moved: () => boolean; add: () => void; move: () => void;
  lesson: (mode: 'none' | 'playback' | 'steps') => void;
  boundaries: () => void; endStep: () => void; pathOpen: () => boolean; prepareRoute: () => Promise<void>;
  editStep: () => void; openPath: () => Promise<void>; closePath: () => void;
+ laserLesson:()=>void; laserDrawn:()=>boolean; laserCleared:()=>boolean;
+ drawingLesson: () => void | Promise<void>; drawingMade:()=>boolean; drawingMovement:()=>void; drawingMoved:()=>boolean; drawingConfigured:()=>boolean;
  finish: () => void; register: (tour: Driver) => void;
 }) {
  const dock = '[aria-label="Play animation controls"]';
@@ -27,14 +29,19 @@ export function startAnimationTutorial(hooks: {
   {target:'[aria-label="Animation steps"]',title:'Manage Steps',side:'left',description:'Press 1–9 to jump to a step. Drag step buttons to reorder them. Right-click or double-click a step for duplicate, delete, or Create Play from Step.',prepare:hooks.editStep,keys:'steps'},
   {target:'[aria-label="Animation playhead"]',title:'Drag a Step to Adjust Duration',description:'Drag a step marker to give one step more time and the next step less.',prepare:hooks.boundaries},
   {target:field,title:'Add, Remove, and Rename',description:'Place new elements, delete ones you no longer need, or double-click an element to rename it. These changes apply from this step onward.',prepare:hooks.endStep},
-  {target:field,title:'Choose a Movement Path',description:'Double-click or right-click a dashed route or its ghost to open the movement options.',prepare:hooks.prepareRoute,wait:hooks.pathOpen,skip:()=>void hooks.openPath()},
+  {target:field,title:'Choose a Movement Path',description:'Double-click or right-click a dashed route or its ghost to open the movement options.',prepare:hooks.prepareRoute,wait:hooks.pathOpen,skip:hooks.openPath},
   {target:'[data-animation-path-picker]',title:'Movement Paths',description:'Linear goes straight to the destination. Curved gives you a bend handle to drag.',prepare:hooks.openPath},
   {target:field,title:'Draw a Custom Route',prepare:hooks.openPath,description:'Choose Custom, then drag a route on the field and release to finish. Use Redraw to try again.'},
-  {target:'[data-animation-path-picker]',title:'Departure and Arrival',prepare:hooks.openPath,description:'Drag the left handle to leave later or the right handle to arrive earlier. Hold Shift for finer adjustments.'},
-  {target:'[data-animation-path-picker]',title:'Easing and Jump Cuts',prepare:hooks.openPath,description:'Choose easing to speed up or slow down along a route. Jump skips the movement and appears at the destination at the departure time.'},
+  {target:'[data-animation-path-picker]',title:'Departure and Arrival',prepare:hooks.openPath,description:'Drag the handles to choose when movement starts and ends. Click the middle to change its speed. Hold Shift for finer timing.'},
+  {target:'[data-animation-path-picker]',title:'Easing and Jump Cuts',prepare:hooks.openPath,description:'Easing changes how movement accelerates. Jump changes position with a hard cut, fade, or shrink. Use the seconds beside Fade or Shrink to set the transition time.'},
   {target:'[aria-label="Clear animation"]',highlights:['[aria-label="Clear animation"]','[aria-label="Undo"]','[aria-label="Redo"]'],title:'Clear, Undo, and Redo',description:'Clear Animation removes the later steps and keeps Start. Undo brings an edit back; Redo applies it again.',prepare:hooks.closePath},
   {target:dock,title:'Move and Resize the Animation Doc',description:'Drag empty space to move the Animation Doc. Drag the handles on either edge to resize it.'},
-  {target:dock,title:"You're All Set",description:'You’re ready to bring your plays to life. Try an idea, make it move, and create something great!'}
+  {target:field,title:'Try the Laser Pointer',prepare:hooks.laserLesson,required:true,wait:hooks.laserDrawn,description:'Click and drag on the field to make a laser mark. Laser marks are temporary and are not part of the animation.'},
+  {target:field,title:'Clear Your Laser Marks',required:true,wait:hooks.laserCleared,description:'Press C to clear your laser marks.'},
+  {target:field,title:'Make a Drawing',prepare:hooks.drawingLesson,required:true,wait:hooks.drawingMade,description:'Draw a line on the field. Unlike laser marks, drawings stay with the play and can animate.'},
+  {target:field,title:'Move Your Drawing',prepare:hooks.drawingMovement,required:true,wait:hooks.drawingMoved,description:'This new step keeps your drawing. Drag it to a different spot to give it movement.'},
+  {target:field,title:'Animate Your Drawing',required:true,wait:hooks.drawingConfigured,description:'Double-click or right-click the drawing to open its animation settings. Choose Linear for smooth movement or Jump for a cut or fade.'},
+  {target:dock,title:"You're All Set",prepare:hooks.closePath,description:'You’re ready to bring your plays to life. Try an idea, make it move, and create something great!'}
  ];
  let tour: Driver;
  let poll: ReturnType<typeof setInterval> | undefined;
@@ -46,20 +53,23 @@ export function startAnimationTutorial(hooks: {
  const finish = () => { if (ended) return; ended = true; clearInterval(poll); if(layoutFrame!==null)cancelAnimationFrame(layoutFrame); resizeObserver?.disconnect(); menuObserver?.disconnect(); document.body.classList.remove('animation-tutorial-resize'); hooks.finish(); };
  const next = async () => {
   if (advancing || ended) return;
+  const current=lessons[tour.getActiveIndex()??0];
+  if(current.required&&!current.wait?.())return;
   advancing = true;
+  clearInterval(poll);if(layoutFrame!==null)cancelAnimationFrame(layoutFrame);resizeObserver?.disconnect();menuObserver?.disconnect();
   try {
    const index = tour.getActiveIndex() ?? 0;
-   lessons[index].skip?.();
+   if(!lessons[index].wait?.())await lessons[index].skip?.();
    if (index === lessons.length - 1) tour.destroy();
    else {
     await lessons[index + 1].prepare?.();
-    if (!ended) tour.moveNext();
+    if (!ended) tour.moveTo(index+1);
    }
   } finally { advancing = false; }
  };
- const steps: DriveStep[] = lessons.map((lesson,index) => ({element:lesson.target,popover:{title:lesson.title,description:lesson.description,side:lesson.side??'top',align:'center',nextBtnText:index===lessons.length-1?'Done':lesson.wait?'Skip':'Next',onNextClick:next}}));
+ const steps: DriveStep[] = lessons.map((lesson,index) => ({element:lesson.target,popover:{title:lesson.title,description:lesson.description,side:lesson.side??'top',align:'center',nextBtnText:index===lessons.length-1?'Done':lesson.wait&&!lesson.required?'Skip':'Next',onNextClick:next}}));
  tour = driver({steps,animate:true,duration:250,overlayColor:'#1c1917',overlayOpacity:.58,allowClose:false,overlayClickBehavior:()=>{},allowKeyboardControl:false,stagePadding:5,stageRadius:0,popoverOffset:10,popoverClass:'caseplay-tutorial-popover',showButtons:['next'],showProgress:true,progressText:'{{current}} / {{total}}',
-  onPopoverRender:(popover)=>{const end=document.createElement('button');end.type='button';end.textContent='End';end.className='caseplay-tutorial-end';end.setAttribute('aria-label','End tutorial');end.addEventListener('click',()=>tour.destroy());popover.footerButtons.appendChild(end);},
+  onPopoverRender:(popover)=>{popover.nextButton.disabled=!!lessons[tour.getActiveIndex()??0]?.required;const end=document.createElement('button');end.type='button';end.textContent='End';end.className='caseplay-tutorial-end';end.setAttribute('aria-label','End tutorial');end.addEventListener('click',()=>tour.destroy());popover.footerButtons.appendChild(end);},
   onHighlightStarted:(_element,_step,options)=>{
    clearInterval(poll); if(layoutFrame!==null)cancelAnimationFrame(layoutFrame); resizeObserver?.disconnect(); menuObserver?.disconnect();
    const index=options.index??0, lesson=lessons[index];
@@ -87,10 +97,10 @@ export function startAnimationTutorial(hooks: {
     };
     layoutFrame=requestAnimationFrame(follow);
    }
-   const picker=document.querySelector('[data-animation-path-picker]');
+   const picker=document.querySelector('[data-animation-path-picker], [data-drawing-animation-picker]');
    if(picker){
-    resizeObserver=new ResizeObserver(()=>{if(!ended) tour.refresh();});resizeObserver.observe(picker);
-    menuObserver=new MutationObserver(()=>{if(!ended) tour.refresh();});menuObserver.observe(picker,{childList:true,subtree:true});
+    resizeObserver=new ResizeObserver(()=>{if(!ended&&!advancing&&tour.getActiveIndex()===index) tour.refresh();});resizeObserver.observe(picker);
+    menuObserver=new MutationObserver(()=>{if(!ended&&!advancing&&tour.getActiveIndex()===index) tour.refresh();});menuObserver.observe(picker,{childList:true,subtree:true});
    }
    if(lesson.wait) poll=setInterval(()=>{if(tour.getActiveIndex()===index&&lesson.wait?.()) void next();},100);
   },

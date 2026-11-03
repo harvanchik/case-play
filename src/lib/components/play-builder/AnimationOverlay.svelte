@@ -4,6 +4,7 @@
  const routeMemory = new Map<string, { routes: Partial<Record<RememberedMotion['path'], RememberedMotion>>; end: number }>();
 </script>
 <script lang="ts">
+ import DropdownChevron from './DropdownChevron.svelte';
 	import {
 		applyAnimationStep,
 		defaultMotion,
@@ -20,25 +21,32 @@
  import { playBuilderGuideColor, playBuilderGuideDash } from '$lib/play-builder-rendering';
 	import AnimationIcon from './AnimationIcon.svelte';
  import AnimationTiming from './AnimationTiming.svelte';
+ import TransitionDuration from './TransitionDuration.svelte';
+ import HoverTooltip from '../HoverTooltip.svelte';
 	import type { PlayBuilderScene, Point } from '$lib/play-builder-scene';
 	export let animation: PlayAnimation;
 	export let scene: PlayBuilderScene;
 	export let stepIndex: number;
 	export let selection: AnimationTarget[];
 	export let ghosts = true;
+ export let interactive=true;
 	export let drawingRoute = false;
+ export let otherEditorOpen = false;
+ export let onopen: () => void = () => {};
 	export let onselect: (target: AnimationTarget) => void;
 	export let onchange: (motion: Motion) => void;
 	export let ondraw: (active: boolean) => void;
 	let easingOpen = false;
+ $: if (otherEditorOpen) picker = null;
  let picker: { target: AnimationTarget; x: number; y: number } | null = null;
 	$: pickerRoute = picker ? routes.find((route) => sameTarget(route.start, picker!.target)) : undefined;
 	function openPicker(event: MouseEvent, target: AnimationTarget) {
 		event.preventDefault();
 		event.stopPropagation();
+		onopen();
 		onselect(target);
   easingOpen = false;
-		picker = { target, x: Math.max(8, Math.min(window.innerWidth - 240, event.clientX)), y: Math.max(8, Math.min(window.innerHeight - 160, event.clientY)) };
+		picker = { target, x: Math.max(8, Math.min(window.innerWidth - 240, event.clientX)), y: Math.max(8, Math.min(window.innerHeight - 240, event.clientY)) };
 	}
 	function pickerPortal(node: HTMLDivElement) {
   document.body.appendChild(node);
@@ -72,7 +80,7 @@
  }
 
 	// Keep route artwork below scene objects while handles and hit targets stay above.
-	function beneathElements(node: SVGPathElement) {
+	function beneathElements(node: SVGElement) {
 		node.ownerSVGElement?.querySelector('[data-animation-route-underlay]')?.appendChild(node);
 		return { destroy: () => node.remove() };
 	}
@@ -215,8 +223,8 @@
 </script>
 
 <svelte:window
-	on:pointerdown={(event) => {
-		if (!(event.target as Element)?.closest('[data-animation-path-picker]')) picker = null;
+	on:pointerdown|capture={(event) => {
+		if (!(event.target as Element)?.closest('[data-animation-path-picker],.driver-popover')) picker = null;
 	}}
 	on:keydown={(event) => {
 		if (event.key === 'Escape') {
@@ -226,7 +234,7 @@
 	}}
 />
 
-<g data-animation-overlay data-export-exclude>
+<g data-animation-overlay data-export-exclude class:noninteractive={!interactive}>
 	<defs>
 		<clipPath id="animation-ghost-hit-clearance"><path d={currentMarkerClip} clip-rule="evenodd" /></clipPath>
 		<clipPath id="animation-route-hit-clearance"><path d={routeMarkerClip} clip-rule="evenodd" /></clipPath>
@@ -273,7 +281,7 @@
 		{/each}
 	{/if}
 	{#each routes as route (route.start.type + route.start.id)}
-		<g data-animation-route={route.start.id} opacity={isSelected(route.start, selection) ? 1 : 0.25}>
+		<g use:beneathElements class:noninteractive={!interactive} data-animation-route={route.start.id} opacity={isSelected(route.start, selection) ? 1 : 0.25}>
 			<path
 				use:beneathElements
 				data-animation-route-line
@@ -388,23 +396,23 @@
 				class="path-picker"
 				on:pointerdown|stopPropagation
 			>
-				{#if pickerRoute.start.type === 'marker'}<div class="path-types">
-						{#each [['straight', 'Linear'], ['curve', 'Curved'], ['custom', 'Custom'], ['jump', 'Jump']] as [value, label]}
-							<button aria-pressed={pickerRoute.motion.path === value} class:active={pickerRoute.motion.path === value} on:click={() => choosePath(value as Motion['path'])}>{value === 'custom' && pickerRoute.motion.path === 'custom' ? 'Redraw' : label}</button>
+				<div class="path-types">
+						{#each (pickerRoute.start.type==='guide'?[['straight','Shift'],['jump','Jump']]:[['straight', 'Linear'], ['curve', 'Curved'], ['custom', 'Custom'], ['jump', 'Jump']]) as [value, label]}
+							<HoverTooltip text={value==='straight'?(pickerRoute.start.type==='guide'?'Slide the Line':'A Straight Line'):value==='curve'?'A Bending Line':value==='custom'?'Draw Your Route':'Change Position Instantly'} minWidthPx={0} wrapperClass="flex flex-1"><button style="width:100%" aria-pressed={pickerRoute.motion.path === value} class:active={pickerRoute.motion.path === value} on:click={() => choosePath(value as Motion['path'])}>{value === 'custom' && pickerRoute.motion.path === 'custom' ? 'Redraw' : label}</button></HoverTooltip>
 						{/each}
 					</div>
-				{/if}
 				<div class="picker-timing">
      <AnimationTiming motion={pickerRoute.motion} duration={transition.duration} label={targetName(pickerRoute.start)} showLabel={false} {onchange} />
     </div>
     <div class="picker-row">
 					<div class="easing-select">
- <button class="easing-trigger" disabled={pickerRoute.motion.path === 'jump'} aria-label="Path easing" aria-haspopup="listbox" aria-expanded={easingOpen} on:click={() => easingOpen = !easingOpen}>{ { linear: 'Steady', in: 'Ease In', out: 'Ease Out', 'in-out': 'Ease In/Out' }[pickerRoute.motion.easing]}<span>⌄</span></button>
+ <button class="easing-trigger" aria-label="Path easing" aria-haspopup="listbox" aria-expanded={easingOpen} on:click={() => easingOpen = !easingOpen}>{pickerRoute.motion.path==='jump'?({cut:'Hard Cut',fade:'Fade',shrink:'Shrink'}[pickerRoute.motion.jumpEffect??'fade']):{ linear: 'Steady', in: 'Ease In', out: 'Ease Out', 'in-out': 'Ease In/Out' }[pickerRoute.motion.easing]}<DropdownChevron open={easingOpen}/></button>
  {#if easingOpen}<div class="easing-menu" role="listbox" aria-label="Path easing">
- {#each [['linear', 'Steady'], ['in', 'Ease In'], ['out', 'Ease Out'], ['in-out', 'Ease In/Out']] as [value, label]}
- <button role="option" aria-selected={pickerRoute.motion.easing === value} on:click={() => { if (pickerRoute) onchange({ ...pickerRoute.motion, easing: value as Motion['easing'] }); easingOpen = false; }}>{label}</button>
+ {#each (pickerRoute.motion.path==='jump'?(pickerRoute.start.type==='guide'?[['cut','Hard Cut'],['fade','Fade']]:[['cut','Hard Cut'],['fade','Fade'],['shrink','Shrink']]):[['linear', 'Steady'], ['in', 'Ease In'], ['out', 'Ease Out'], ['in-out', 'Ease In/Out']]) as [value, label]}
+ <button role="option" aria-selected={(pickerRoute.motion.path==='jump'?(pickerRoute.motion.jumpEffect??'fade'):pickerRoute.motion.easing) === value} on:click={() => { if (pickerRoute) onchange({ ...pickerRoute.motion, ...(pickerRoute.motion.path==='jump'?{jumpEffect:value as Motion['jumpEffect']}:{easing:value as Motion['easing']}) }); easingOpen = false; }}>{label}</button>
  {/each}</div>{/if}
  </div>
+ {#if pickerRoute.motion.path==='jump'&&(pickerRoute.motion.jumpEffect??'fade')!=='cut'}<TransitionDuration value={Math.min(pickerRoute.motion.jumpDuration??.25,transition.duration)} maximum={transition.duration} onchange={value=>{if(pickerRoute)onchange({...pickerRoute.motion,jumpDuration:value});}}/>{/if}
 
 				</div>
 			</div>
@@ -413,6 +421,7 @@
 </g>
 
 <style>
+ .noninteractive :global(*) {pointer-events:none !important;}
  .path-picker {
   position: fixed;
   z-index: 1001;

@@ -1,9 +1,11 @@
 <script lang="ts">
+ import DropdownChevron from './DropdownChevron.svelte';
 	import { onMount } from 'svelte';
 	import HoverTooltip from '../HoverTooltip.svelte';
 	import BuilderActionButton from './BuilderActionButton.svelte';
 	export let formats: string[];
 	export let video = false;
+	export let badge=false;
 	export let progress: number | null = null;
 	export let oncancel: () => void = () => {};
 	export let multiple = false;
@@ -38,9 +40,22 @@
 </script>
 
 <svelte:window
-	on:keydown={(e) => {
-		if (e.key === 'Escape') open = false;
-	}}
+ on:keydown|capture={(event)=>{
+  if(!open)return;
+  const toggleButton=anchor?.querySelector<HTMLButtonElement>('button[aria-expanded]');
+  const options=Array.from(menu?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')??[]);
+  if(event.key==='Escape'){open=false;if(menu?.contains(document.activeElement))toggleButton?.focus();return;}
+  if(event.key==='Tab'){
+   const index=options.indexOf(document.activeElement as HTMLButtonElement);
+   if(anchor?.contains(document.activeElement)&&!event.shiftKey){event.preventDefault();options[0]?.focus();}
+   else if(index>=0){
+    event.preventDefault();const next=index+(event.shiftKey?-1:1);
+    if(next<0)toggleButton?.focus();
+    else if(next<options.length)options[next].focus();
+    else {const outside=Array.from(document.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),[tabindex="0"]')).filter(node=>!menu.contains(node)&&node.getClientRects().length);const position=outside.indexOf(toggleButton!);open=false;outside[position+1]?.focus();}
+   }
+  }
+ }}
 	on:resize={() => (open = false)}
 	on:scroll={() => (open = false)}
 />
@@ -48,7 +63,8 @@
 	<HoverTooltip text={`Export All Plays as ${format.toUpperCase()}`} minWidthPx={0} wrapperClass="flex">
 		<button
 			type="button"
-			class="sliver all"
+			data-focus-button
+            class="sliver all"
 			disabled={allDisabled ?? disabled}
 			aria-label={`Export All Plays as ${format.toUpperCase()}`}
 			on:click={() => {
@@ -67,7 +83,8 @@
 			/>{/if}
 	</svg>
 {/snippet}
-<div bind:this={anchor} class="split">
+<div bind:this={anchor} class="split primary">
+ {#if badge}<span class="new-badge">NEW</span>{/if}
  {#if progress !== null}
  <HoverTooltip text="Cancel Export" minWidthPx={0} wrapperClass="flex h-9 w-10 shrink-0"><button type="button" class="cancel-export" aria-label="Cancel export" on:click={oncancel} style:background={`linear-gradient(to right, #f5f5f4 ${progress}%, rgba(245,245,244,.4) ${progress}%)`}><span>{progress}%</span><span>Cancel</span></button></HoverTooltip>
  {:else}
@@ -82,9 +99,11 @@
 		}}>{@render icon()}</BuilderActionButton
 	>
  {/if}
+ <HoverTooltip text={open&&multiple?`Export All Plays as ${formats[0].toUpperCase()}`:video?'More Video Formats':'More Image Formats'} minWidthPx={0} wrapperClass="contents">
 	<button
 		type="button"
-		class="sliver"
+		data-focus-button
+        class="sliver"
 		disabled={open && multiple && (allDisabled ?? disabled)}
 		aria-label={open && multiple ? `Export All Plays as ${formats[0].toUpperCase()}` : video ? 'More video formats' : 'More image formats'}
 		aria-expanded={open}
@@ -94,12 +113,9 @@
 				onall(formats[0]);
 			} else toggle();
 		}}
-		>{#if open && multiple}<HoverTooltip text={`Export All Plays as ${formats[0].toUpperCase()}`} minWidthPx={0}
-				><span class="all">A<br />L<br />L</span></HoverTooltip
-			>{:else}<svg viewBox="0 0 12 12" width="9" height="9" aria-hidden="true"
-				><path d="m2 4 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" /></svg
-			>{/if}</button
+		>{#if open && multiple}<span class="all">A<br />L<br />L</span>{:else}<DropdownChevron {open} size={9}/>{/if}</button
 	>
+ </HoverTooltip>
 </div>
 {#if open}<div
 		bind:this={menu}
@@ -126,6 +142,7 @@
 
 <style>
 	.cancel-export {pointer-events:auto;width:40px;height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#292524;cursor:pointer;font-size:8px;font-weight:600;}
+	.primary{position:relative}.new-badge{position:absolute;bottom:100%;left:20px;transform:translateX(-50%);background:#dc2626;color:white;padding:0 4px;font-size:8px;line-height:12px;font-weight:900}
 	.split {
 		display: flex;
 		gap: 1px;

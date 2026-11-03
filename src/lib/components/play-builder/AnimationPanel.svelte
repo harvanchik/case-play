@@ -1,6 +1,7 @@
 <script lang="ts">
 	import {
 		animationDuration,
+        retimeTransition,
 		appendAnimationStep,
 		cloneAnimation,
 		defaultMotion,
@@ -84,8 +85,8 @@
 		const increment = event.shiftKey ? 0.01 : 0.05;
         const delta = Math.round(((event.clientX - drag.x) / drag.width * drag.total) / increment) * increment;
 		const adjusted = Math.max(0.1, Math.min(before.duration + delta, before.duration + (after ? after.duration - 0.1 : 0)));
-		if (after) after.duration = Math.round((after.duration + before.duration - adjusted) * 100) / 100;
-		before.duration = Math.round(adjusted * 100) / 100;
+		if (after) retimeTransition(next, drag.index, Math.round((after.duration + before.duration - adjusted) * 100) / 100);
+		retimeTransition(next, drag.index - 1, Math.round(adjusted * 100) / 100);
 		animation = next;
 	}
 	function endMarker(cancel = false) {
@@ -247,8 +248,8 @@
 		const index = speeds.indexOf(rate);
 		rate = speeds[Math.max(0, Math.min(speeds.length - 1, index + direction))];
 	}
-	function cycleSpeed() {
-		rate = speeds[(speeds.indexOf(rate) + 1) % speeds.length];
+	function cycleSpeed(event?: MouseEvent) {
+		rate = speeds[(speeds.indexOf(rate) + (event?.shiftKey ? -1 : 1) + speeds.length) % speeds.length];
 	}
 	async function fitDock() {
 		await tick();
@@ -470,7 +471,7 @@
 	function adjustSeconds(event: KeyboardEvent, update: (value: number) => void) {
 		if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
 		event.preventDefault();
-		update(Number((event.currentTarget as HTMLInputElement).value) + (event.key === 'ArrowUp' ? 0.25 : -0.25));
+		update(Number((event.currentTarget as HTMLInputElement).value) + (event.key === 'ArrowUp' ? 1 : -1)*(event.shiftKey?0.01:0.25));
 	}
  function durationKeydown(event: KeyboardEvent) {
   if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.length === 1 && !/[0-9.]/.test(event.key)) event.preventDefault();
@@ -490,7 +491,7 @@
 	function duration(value: number) {
 		if (!transition || !Number.isFinite(value)) return;
 		const next = cloneAnimation(animation);
-		next.transitions[transitionIndex].duration = Math.round(Math.max(0.1, Math.min(value, 60 - total + transition.duration)) * 100) / 100;
+		retimeTransition(next, transitionIndex, Math.round(Math.max(0.1, Math.min(value, 60 - total + transition.duration)) * 100) / 100);
 		onchange(next);
 	}
  let stepMenuId: string | null = null;
@@ -933,7 +934,7 @@
 				{#if !readOnly}<button class="icon toggle" class:enabled={ghosts} aria-label="Show ghosts" aria-pressed={ghosts} data-animation-tooltip="Show Ghosts" on:click={() => ghosts = !ghosts}><AnimationIcon name="ghost" /></button><label class="step-duration" class:disabled={preview || !transition} on:pointerdown={(event) => { if (event.target !== durationInput && !preview && transition) { event.preventDefault(); durationInput?.focus(); durationInput?.select(); } }}>
  <AnimationIcon name="clock" /><span class="duration-label">Step Duration</span>
  <div class="duration-control">
- <input bind:this={durationInput} class="duration-number" aria-label="Step duration seconds" aria-keyshortcuts="Alt+T" type="number" min="0.1" max="60" step="0.25" disabled={preview || !transition} value={transition?.duration ?? 0} on:change={(event) => duration(Number(event.currentTarget.value))} on:keydown={durationKeydown} on:paste={durationPaste} on:input={durationInputChange} />
+ <input bind:this={durationInput} class="duration-number" aria-label="Step duration seconds" aria-keyshortcuts="Alt+T" type="number" min="0.1" max="60" step="0.25" disabled={preview || !transition} value={(transition?.duration ?? 0).toFixed(2)} on:change={(event) => duration(Number(event.currentTarget.value))} on:keydown={durationKeydown} on:paste={durationPaste} on:input={durationInputChange} />
  <span aria-hidden="true">s</span>
  </div>
  </label>

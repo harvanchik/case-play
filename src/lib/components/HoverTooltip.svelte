@@ -1,5 +1,7 @@
 <script module lang="ts">
 	let nextTooltipId = 1;
+ let keyboardNavigating = false;
+ let lastPointerX=-1,lastPointerY=-1;
 </script>
 
 <script lang="ts">
@@ -37,6 +39,7 @@
 	} = $props();
 
 	let isOpen = $state(false);
+ let anchorMode = $state<'pointer'|'focus'>('pointer');
 	let panel = $state<HTMLDivElement>();
 	let cursorX = $state(0);
 	let cursorY = $state(0);
@@ -52,8 +55,8 @@
 	const positionPanel = async () => {
 		await tick();
 		if (!panel) return;
-		const anchorX = pointerPosition?.x ?? cursorX;
-		const anchorY = pointerPosition?.y ?? cursorY;
+		const anchorX = anchorMode==='pointer' ? pointerPosition?.x ?? cursorX : cursorX;
+		const anchorY = anchorMode==='pointer' ? pointerPosition?.y ?? cursorY : cursorY;
 		const position =
 			placement === 'above'
 				? {
@@ -81,6 +84,8 @@
 	});
 
 	const openAtPointer = (event: PointerEvent) => {
+        if(keyboardNavigating)return;
+        anchorMode='pointer';
 		window.dispatchEvent(new CustomEvent('case-play-tooltip-open', { detail: tooltipId }));
 		cursorX = event.clientX;
 		cursorY = event.clientY;
@@ -88,8 +93,11 @@
 		positionPanel();
 	};
 	const followPointer = (event: PointerEvent) => {
+        if(keyboardNavigating && !event.movementX && !event.movementY)return;
+        keyboardNavigating=false;
+        anchorMode='pointer';
 		if (!isOpen) {
-			if (reopenOnPointerMove && text) openAtPointer(event);
+			if (text && !keyboardNavigating) openAtPointer(event);
 			return;
 		}
 		cursorX = event.clientX;
@@ -97,10 +105,7 @@
 		positionPanel();
 	};
 	const openAtFocus = (event: FocusEvent) => {
-		// Pointer-triggered tooltips already have the precise cursor position. Clicking
-		// a wrapped control can also emit focusin, but that must not replace those
-		// coordinates with the wrapper's focus position.
-		if (isOpen) return;
+        anchorMode='focus';
 		window.dispatchEvent(new CustomEvent('case-play-tooltip-open', { detail: tooltipId }));
 		const focusTarget = event.target instanceof Element ? event.target : (event.currentTarget as Element);
 		const rect = focusTarget.getBoundingClientRect();
@@ -114,18 +119,24 @@
 		const closeForAnotherTooltip = (event: Event) => {
 			if ((event as CustomEvent<number>).detail !== tooltipId) isOpen = false;
 		};
-		window.addEventListener('case-play-tooltip-open', closeForAnotherTooltip);
-		return () => window.removeEventListener('case-play-tooltip-open', closeForAnotherTooltip);
+		const resetForTab = (event: KeyboardEvent) => { if(event.key==='Tab'){keyboardNavigating=true;if(anchorMode==='pointer')isOpen=false;} };
+        const pointerInput = () => {keyboardNavigating=false;};
+        const pointerMoved = (event:PointerEvent) => {if(event.clientX!==lastPointerX||event.clientY!==lastPointerY)keyboardNavigating=false;lastPointerX=event.clientX;lastPointerY=event.clientY;};
+        window.addEventListener('keydown',resetForTab,true);
+        window.addEventListener('pointerdown',pointerInput,true);window.addEventListener('pointermove',pointerMoved,true);
+        window.addEventListener('case-play-tooltip-open', closeForAnotherTooltip);
+		return () => { window.removeEventListener('keydown',resetForTab,true);window.removeEventListener('pointerdown',pointerInput,true);window.removeEventListener('pointermove',pointerMoved,true); window.removeEventListener('case-play-tooltip-open', closeForAnotherTooltip); };
 	});
 </script>
 
 <span
 	class={wrapperClass}
+    data-tooltip-owner={tooltipId}
 	role="group"
 	onpointerenter={openAtPointer}
 	onpointerover={reopenOnPointerMove ? openAtPointer : undefined}
 	onpointermove={followPointer}
-	onpointerleave={() => (isOpen = false)}
+	onpointerleave={(event) => { if (!(event.currentTarget as Element).contains(document.activeElement)) isOpen = false; }}
 	onfocusin={openAtFocus}
 	onfocusout={() => (isOpen = false)}
 >

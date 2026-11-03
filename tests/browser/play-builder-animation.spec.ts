@@ -245,7 +245,7 @@ test('successful autosave returns to disabled Saved after its minimum Saving dis
 
 
 
-test('Jump locks arrival and easing and remembers previous route and timing', async ({ page }) => {
+test('Jump keeps arrival locked, offers effects, and remembers previous route and timing', async ({ page }) => {
  await ready(page);
  await page.getByRole('button', { name: 'Set up default play', exact: true }).click();
  await page.getByRole('button', { name: 'Penalty Flag', exact: true }).click();
@@ -261,15 +261,15 @@ test('Jump locks arrival and easing and remembers previous route and timing', as
  const arrival = picker.getByRole('button', { name: / arrival time$/ });
  await arrival.press('ArrowLeft');
  await arrival.press('ArrowLeft');
- await expect(picker).toContainText('0.00–0.90s');
+ await expect(picker.locator('.timing-start')).toHaveValue('0.00s');await expect(picker.locator('.timing-end')).toHaveValue('0.90s');
  await picker.getByRole('button', { name: 'Jump', exact: true }).click();
  await expect(arrival).toBeDisabled();
- await expect(picker.getByRole('button', { name: 'Path easing', exact: true })).toBeDisabled();
- await expect(picker).toContainText('0.00–1.00s');
+ await expect(picker.getByRole('button', { name: 'Path easing', exact: true })).toBeEnabled();
+ await expect(picker.locator('.timing-start')).toHaveValue('0.00s');await expect(picker.locator('.timing-end')).toHaveValue('1.00s');
  await picker.getByRole('button', { name: / start time$/ }).press('ArrowRight');
  await picker.getByRole('button', { name: 'Curved', exact: true }).click();
  await expect(arrival).toBeEnabled();
- await expect(picker).toContainText('0.05–0.90s');
+ await expect(picker.locator('.timing-start')).toHaveValue('0.05s');await expect(picker.locator('.timing-end')).toHaveValue('0.90s');
  await expect(page.getByRole('button', { name: 'Bend movement path', exact: true })).toBeVisible();
  await picker.getByRole('button', { name: 'Custom', exact: true }).click();
  const surface = page.getByRole('application', { name: 'Draw movement route', exact: true });
@@ -287,7 +287,7 @@ test('Jump locks arrival and easing and remembers previous route and timing', as
  await picker.getByRole('button', { name: 'Custom', exact: true }).click();
  await expect(surface).toHaveCount(0);
  await expect(line).toHaveAttribute('d', custom!);
- await expect(picker).toContainText('0.05–0.90s');
+ await expect(picker.locator('.timing-start')).toHaveValue('0.05s');await expect(picker.locator('.timing-end')).toHaveValue('0.90s');
 });
 
 
@@ -560,7 +560,7 @@ test('animation tutorial uses a temporary default play, teaches adding and movin
  const tutorialId=Number(await page.locator('[data-field-kind="official-r"]').first().getAttribute('data-layer-id'));
  await dragMarker(page,tutorialId,90,-30);
  await expect(title).toHaveText('Origins and Routes');
- for(let i=0;i<25&&await title.count();i++) {
+ for(let i=0;i<35&&await title.count();i++) {
   if(await title.textContent()==='Choose a Movement Path') {
    await page.locator('[data-animation-route] path[pointer-events="stroke"]').first().dispatchEvent('dblclick',{clientX:700,clientY:350});
    await expect(title).toHaveText('Movement Paths');
@@ -616,7 +616,7 @@ test('animation tutorial uses a temporary default play, teaches adding and movin
    await expect(picker.getByRole('button',{name:'Custom',exact:true})).toHaveCount(0);
    const handle=picker.getByRole('button',{name:/ start time$/});
    await handle.press('Shift+ArrowRight');
-   await expect(picker).toContainText('0.01–');
+   await expect(picker.locator('.timing-start')).toHaveValue('0.01s');
   }
   if(await title.textContent()==='Easing and Jump Cuts') {
    const picker=page.locator('[data-animation-path-picker]');
@@ -633,9 +633,26 @@ test('animation tutorial uses a temporary default play, teaches adding and movin
    await expect(page.getByRole('button',{name:'Redo',exact:true})).toBeEnabled();
    await page.getByRole('button',{name:'Redo',exact:true}).click();
   }
+  if(['Try the Laser Pointer','Make a Drawing'].includes((await title.textContent())!)) {
+   const laserLesson=(await title.textContent())==='Try the Laser Pointer';
+   await expect(page.locator('.driver-popover-next-btn')).toBeDisabled();
+   const field=(await page.locator('svg[role="application"]').boundingBox())!;
+   await page.mouse.move(field.x+field.width*.4,field.y+field.height*.45);await page.mouse.down();await page.mouse.move(field.x+field.width*.6,field.y+field.height*.5,{steps:10});await page.mouse.up();
+   await expect(title).toHaveText(laserLesson?'Clear Your Laser Marks':'Move Your Drawing');
+   continue;
+  }
+  if(await title.textContent()==='Clear Your Laser Marks'){await page.keyboard.press('c');await expect(title).toHaveText('Make a Drawing');continue;}
+  if(await title.textContent()==='Move Your Drawing'){
+   const drawing=page.locator('[data-drawing-hit]').last();await expect(drawing).not.toHaveCSS('pointer-events','none');const box=(await drawing.boundingBox())!;
+   await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+70,box.y+box.height/2+20,{steps:10});await page.mouse.up();
+   await expect(title).toHaveText('Animate Your Drawing');continue;
+  }
+  if(await title.textContent()==='Animate Your Drawing'){
+   await page.locator('[data-drawing-hit]').last().dblclick();await page.locator('[data-drawing-animation-picker]').getByRole('button',{name:'Linear',exact:true}).click();await expect(title).toHaveText("You're All Set");continue;
+  }
   if(await title.textContent()==='Set the Step Duration') {
    const input=page.getByRole('spinbutton',{name:'Step duration seconds',exact:true});
-   await input.fill('2');await input.press('Tab');await expect(input).toHaveValue('2');
+   await input.fill('2');await input.press('Tab');await expect(input).toHaveValue('2.00');
   }
   if(await title.textContent()==='Move and Resize the Animation Doc') {
    const panel=page.getByRole('toolbar',{name:'Play animation controls',exact:true});
@@ -727,9 +744,9 @@ test('Shift dragging departure and arrival uses hundredth-second increments', as
   await page.keyboard.up('Shift');
  };
  await drag(/ start time$/,.13);
- await expect(picker).toContainText(/0\.1[234]–1\.00s/);
+ await expect(picker.locator('.timing-start')).toHaveValue(/0\.1[234]s/);await expect(picker.locator('.timing-end')).toHaveValue('1.00s');
  await drag(/ arrival time$/,-.17);
- await expect(picker).toContainText(/0\.1[234]–0\.8[234]s/);
+ await expect(picker.locator('.timing-start')).toHaveValue(/0\.1[234]s/);await expect(picker.locator('.timing-end')).toHaveValue(/0\.8[234]s/);
 });
 
 
@@ -802,15 +819,15 @@ test('Animate NEW bounce and animation tutorial pulse stop after first use in th
  await expect(launch.locator('[data-animation-new]')).toHaveText('NEW');
  await launch.click();
  await expect(group).not.toHaveClass(/tutorial-launch-bouncing/);
- await expect(launch.locator('[data-animation-new]')).toHaveCount(0);
+ await expect(launch.locator('[data-animation-new]')).toHaveCount(1);
  const tutorial=page.getByRole('button',{name:'Start animation tutorial',exact:true});
  await expect(tutorial).toHaveClass(/pulse-tutorial/);
  await page.reload();
  await page.waitForLoadState('networkidle');
  await expect(group).not.toHaveClass(/tutorial-launch-bouncing/);
- await expect(launch.locator('[data-animation-new]')).toHaveCount(0);
+ await expect(launch.locator('[data-animation-new]')).toHaveCount(1);
  await launch.click();
- await expect(tutorial).toHaveClass(/pulse-tutorial/);
+ await expect(tutorial).not.toHaveClass(/pulse-tutorial/);
  await tutorial.click();
  await page.getByRole('button',{name:'End tutorial',exact:true}).click();
  await expect(tutorial).not.toHaveClass(/pulse-tutorial/);
