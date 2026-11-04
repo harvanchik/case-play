@@ -5,6 +5,8 @@
  import DrawingAnimationPicker from './play-builder/DrawingAnimationPicker.svelte';
  import {defaultDrawingAnimation,type DrawingAnimation} from '$lib/play-builder-drawing-animation';
 	import { fade } from 'svelte/transition';
+ import { flip } from 'svelte/animate';
+ import {guardPlayBuilderWatermark} from '$lib/play-builder-watermark-guard';
 	import SetupDropdown from './play-builder/SetupDropdown.svelte';
  import {setupYardPositions,type SetupVariant} from '$lib/play-builder-setups';
 	import { onMount, tick } from 'svelte';
@@ -277,6 +279,7 @@
 		nextPlayEntryId: number;
 		nextPlayNumber: number;
 		laserDrawings: LaserDrawing[];
+  spotlightStrokes:SpotlightStroke[];
 		selectedTargets: SelectedTarget[];
 		animationStep: number;
 	};
@@ -455,6 +458,21 @@
 	let guidePlacementColors: Record<'line-of-scrimmage' | 'line-to-gain', GuideColor> = { 'line-of-scrimmage': 'white', 'line-to-gain': 'yellow' };
 	let guidePlacementStyles: Record<'line-of-scrimmage' | 'line-to-gain', GuideStyle> = { 'line-of-scrimmage': 'dashed', 'line-to-gain': 'solid' };
 	let laserColor: LaserColor = 'red';
+ let spotlightEnabled=false;
+ let spotlightRadius=80;
+ type SpotlightStroke={points:Point[];radius:number;releasedAt:number|null};
+ let spotlightStrokes:SpotlightStroke[]=[];
+ let presentationSpotlightPast:SpotlightStroke[][]=[],presentationSpotlightFuture:SpotlightStroke[][]=[];
+ const cloneSpotlights=(strokes=spotlightStrokes)=>strokes.filter(stroke=>stroke.releasedAt===null).map(stroke=>({...stroke,points:stroke.points.map(point=>({...point}))}));
+ const saveSpotlightHistory=()=>{if(presentation){presentationSpotlightPast=[...presentationSpotlightPast.slice(-29),cloneSpotlights()];presentationSpotlightFuture=[];}else saveHistory();};
+ let activeSpotlightStroke:SpotlightStroke|null=null;
+ const resizeSpotlight=(event:WheelEvent)=>{
+  if(!spotlightEnabled||tool!=='laser'||!event.shiftKey||!event.deltaY)return;
+  event.preventDefault();event.stopPropagation();
+  const delta=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?200:1);
+  spotlightRadius=Math.max(20,Math.min(220,spotlightRadius-delta*.15));
+  if(activeSpotlightStroke)activeSpotlightStroke={...activeSpotlightStroke,radius:spotlightRadius};
+ };
 	let rainbowLaserEnabled = false;
 	let laserToolbarClickTimes: number[] = [];
 	let suppressLaserPresetOpenUntil = 0;
@@ -1164,14 +1182,16 @@
 		laserDrawings = laserDrawings
 			.filter((drawing) => drawing.releasedAt === null || now - drawing.releasedAt < laserFadeDuration)
 			.map((drawing) => (drawing.appearedAt != null && now - drawing.appearedAt >= laserFadeDuration ? { ...drawing, appearedAt: null } : drawing));
-		const hasAnimatingDrawing = laserDrawings.some((drawing) => drawing.releasedAt !== null || drawing.appearedAt != null);
-		laserTrailFrame = laserTrail.length || hasAnimatingDrawing ? requestAnimationFrame(refreshLaserTrail) : null;
+		spotlightStrokes=spotlightStrokes.filter(stroke=>stroke.releasedAt===null||now-stroke.releasedAt<laserFadeDuration);
+  const hasAnimatingSpotlight=spotlightStrokes.some(stroke=>stroke.releasedAt!==null);
+  const hasAnimatingDrawing = laserDrawings.some((drawing) => drawing.releasedAt !== null || drawing.appearedAt != null);
+		laserTrailFrame = laserTrail.length || hasAnimatingDrawing || hasAnimatingSpotlight ? requestAnimationFrame(refreshLaserTrail) : null;
 	};
 	const updateLaserPointer = (point: Point) => {
 		const now = performance.now();
 		const lastPoint = laserTrail.at(-1);
 		laserPointer = point;
-		if (!lastPoint || Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) >= 1.25) {
+		if (!spotlightEnabled && (!lastPoint || Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) >= 1.25)) {
 			laserTrail = [...laserTrail.slice(-47), { ...point, createdAt: now }];
 		}
 		laserTrailClock = now;
@@ -1181,17 +1201,24 @@
 	};
 	const beginLaserDrawing = (event: PointerEvent, point: Point) => {
 		updateLaserPointer(point);
+  if(spotlightEnabled){activeSpotlightStroke={points:[point],radius:spotlightRadius,releasedAt:null};laserDrawingPointerId=event.pointerId;svg.setPointerCapture(event.pointerId);return;}
 		activeLaserDrawing = { points: [point], color: rainbowLaserEnabled ? 'rainbow' : laserColor };
 		laserDrawingPointerId = event.pointerId;
 		svg.setPointerCapture(event.pointerId);
 	};
 	const continueLaserDrawing = (event: PointerEvent, point: Point) => {
+  if(laserDrawingPointerId===event.pointerId&&activeSpotlightStroke){
+   const last=activeSpotlightStroke.points.at(-1)!;
+   if(Math.hypot(point.x-last.x,point.y-last.y)>=1.25)activeSpotlightStroke={...activeSpotlightStroke,points:[...activeSpotlightStroke.points,point]};
+   return;
+  }
 		if (laserDrawingPointerId !== event.pointerId || !activeLaserDrawing) return;
 		const lastPoint = activeLaserDrawing.points.at(-1)!;
 		if (Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) < 1.25) return;
 		activeLaserDrawing = { ...activeLaserDrawing, points: [...activeLaserDrawing.points, point] };
 	};
 	const finishLaserDrawing = () => {
+  if(activeSpotlightStroke){saveSpotlightHistory();spotlightStrokes=[...spotlightStrokes,activeSpotlightStroke];activeSpotlightStroke=null;}
 		if (activeLaserDrawing && activeLaserDrawing.points.length > 1) {
 			if(!presentation)saveHistory();
 			laserDrawings = [...laserDrawings, { ...activeLaserDrawing, releasedAt: null, appearedAt: null }];
@@ -1200,6 +1227,9 @@
 		laserDrawingPointerId = null;
 	};
 	const releaseLaserDrawings = () => {
+  const spotlightNow=performance.now();
+  if(activeSpotlightStroke){spotlightStrokes=[...spotlightStrokes,activeSpotlightStroke];activeSpotlightStroke=null;}
+  if(spotlightStrokes.length){spotlightStrokes=spotlightStrokes.map(stroke=>({...stroke,releasedAt:stroke.releasedAt??spotlightNow}));startLaserAnimationFrame();}
 		if (laserDrawingPointerId !== null && svg?.hasPointerCapture(laserDrawingPointerId)) svg.releasePointerCapture(laserDrawingPointerId);
 		const drawings =
 			activeLaserDrawing && activeLaserDrawing.points.length > 1
@@ -1221,9 +1251,10 @@
 		});
 		startLaserAnimationFrame();
 	};
- $: if(tool!=='laser'&&(activeLaserDrawing!==null||laserPointer!==null||laserDrawings.some(item=>item.releasedAt===null)))releaseLaserDrawings();
+ $: if(tool!=='laser'&&(activeSpotlightStroke!==null||spotlightStrokes.some(stroke=>stroke.releasedAt===null)||activeLaserDrawing!==null||laserPointer!==null||laserDrawings.some(item=>item.releasedAt===null)))releaseLaserDrawings();
 	const fadeLaserDrawings = () => {
-		if (laserDrawings.length > 0) saveHistory();
+		if(spotlightStrokes.some(stroke=>stroke.releasedAt===null)||activeSpotlightStroke)saveSpotlightHistory();
+  else if (laserDrawings.length > 0&&!presentation) saveHistory();
 		releaseLaserDrawings();
 	};
 	const laserDrawingPath = (points: Point[]) => points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
@@ -1363,7 +1394,7 @@
   if(document.fullscreenElement===builderRoot){await document.exitFullscreen();return;}
   if(!builderRoot.requestFullscreen){showActionMessage('Full Screen is not supported in this browser.');return;}
   if(hasActiveInlineEditor())commitActiveEditor();pauseAnimation();commitAnimation();storeActivePlayState();
-  presentationRestore={tool,open:animationOpen,step:animationStep};animationOpen=false;clearEditorState();selectedTargets=[];selectedDrawingIds=[];tool='select';presentation=true;
+  presentationRestore={tool,open:animationOpen,step:animationStep};animationOpen=false;clearEditorState();selectedTargets=[];selectedDrawingIds=[];tool=spotlightEnabled?'laser':'select';presentation=true;
   try{await builderRoot.requestFullscreen();builderRoot.focus();}catch{presentation=false;animationOpen=presentationRestore?.open??false;tool=presentationRestore?.tool??'select';presentationRestore=null;showActionMessage('Unable to enter Full Screen.');}
  };
  const syncFullscreen=()=>{
@@ -1566,7 +1597,8 @@
 				appearedAt: null,
 				points: drawing.points.map((point) => ({ ...point }))
 			})),
-		selectedTargets: selectedTargets.map((target) => ({ ...target })),
+		spotlightStrokes:cloneSpotlights(),
+  selectedTargets: selectedTargets.map((target) => ({ ...target })),
 		animationStep
 	});
 	const pushBuilderState = (stack: BuilderState[], state: BuilderState) => [...stack.slice(-29), state];
@@ -1582,6 +1614,7 @@
 		replaceState(`${url.pathname}${url.search}${url.hash}`, {});
 	};
 	const applyBuilderState = (state: BuilderState) => {
+  spotlightStrokes=cloneSpotlights(state.spotlightStrokes);activeSpotlightStroke=null;
 		pauseAnimation();
 		playEntries = state.plays.map((play) => ({
 			...play,
@@ -1669,8 +1702,35 @@
 			playStripElement?.querySelector<HTMLElement>(`[data-play-id="${play.id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 		});
 	};
+ let playOrder:number[]|null=null;
+ let playDrag:{id:number;x:number;moved:boolean}|null=null;
+ let suppressPlayClick=false;
+ $: orderedPlays=playOrder?playOrder.map(id=>playEntries.find(play=>play.id===id)!).filter(Boolean):playEntries;
+ function beginPlayDrag(event:PointerEvent,id:number){
+  if(viewOnly||tutorialActive||actionInProgress||event.button!==0||editingPlayId!==null)return;
+  playDrag={id,x:event.clientX,moved:false};
+ }
+ function movePlayDrag(event:PointerEvent){
+  if(!playDrag||(!playDrag.moved&&Math.abs(event.clientX-playDrag.x)<5))return;
+  if(!playDrag.moved)playStripElement?.setPointerCapture(event.pointerId);
+  playDrag.moved=true;
+  const rail=playStripElement;if(!rail)return;const bounds=rail.getBoundingClientRect();
+  if(event.clientX<bounds.left+20)rail.scrollLeft-=12;
+  if(event.clientX>bounds.right-20)rail.scrollLeft+=12;
+  const hovered=[...rail.querySelectorAll<HTMLElement>('[data-play-id]')].find(button=>{const r=button.getBoundingClientRect();return event.clientX>=r.left&&event.clientX<=r.right;});
+  const target=Number(hovered?.dataset.playId);if(!hovered||target===playDrag.id)return;
+  const ids=playOrder??playEntries.map(play=>play.id),index=ids.indexOf(target);
+  const next=ids.filter(id=>id!==playDrag!.id);next.splice(index,0,playDrag.id);playOrder=next;
+ }
+ function endPlayDrag(cancel=false){
+  if(playDrag?.moved){
+   suppressPlayClick=true;setTimeout(()=>suppressPlayClick=false,0);
+   if(!cancel&&playOrder){saveHistory();const activeId=playEntries[activePlayIndex].id;storeActivePlayState();playEntries=playOrder.map(id=>playEntries.find(play=>play.id===id)!);activePlayIndex=playEntries.findIndex(play=>play.id===activeId);syncActivePlayUrl();}
+  }
+  playDrag=null;playOrder=null;
+ }
 	const switchPlay = (playId: number) => {
-		if (dismissEditorForAction() || suppressNextClick) return;
+		if (suppressPlayClick || dismissEditorForAction() || suppressNextClick) return;
 		const nextIndex = playEntries.findIndex((play) => play.id === playId);
 		if (nextIndex < 0 || nextIndex === activePlayIndex) return;
 		if (editingPlayId !== null) renamePlay();
@@ -3847,6 +3907,7 @@
 			return;
 		}
 		if (toolbarEditorTool === 'laser') {
+   spotlightEnabled=false;
 			if (laserColors.some((option) => option.id === color)) {
 				laserColor = color as LaserColor;
 				rainbowLaserEnabled = false;
@@ -4028,9 +4089,52 @@
   if (!event.repeat || ['ArrowLeft', 'ArrowRight'].includes(event.key)) action();
   return true;
  };
-	const handleGlobalKeydown = (event: KeyboardEvent) => {
+	const heldToolKeys=new Set<string>();
+ let pendingPlaybackToolKey:string|null=null;
+ const releaseToolShortcut=(event:KeyboardEvent)=>{
+  heldToolKeys.delete(event.code);
+  if(pendingPlaybackToolKey!==event.code)return;
+  pendingPlaybackToolKey=null;
+  if(event.ctrlKey||event.metaKey||event.altKey||event.shiftKey||actionInProgress||tutorialActive||!animation)return;
+  if(event.code==='KeyK')toggleAnimationPlayback();
+  else{const index=animation.steps.findIndex((_,i)=>stepTime(animation!,i)>animationTime+.000001);if(index>=0)selectAnimationStep(index);}
+ };
+ const toolColorOptions=(id:Tool)=>id==='laser'?laserColors:id==='deflag'?deflagColors:id==='bean-bag'?beanBagColors:playerKinds.includes(id as PlayerKind)?playerColors:id==='free-draw'?freeDrawColors:isArrowKind(id)||id==='line-of-scrimmage'||id==='line-to-gain'?guideColors:[];
+ const toolColorShortcutKeys=(id:Tool,index:number)=>{const definition=tools.find(item=>item.id===id);return definition?[...displayedToolShortcutKeys(definition),String(index===9?0:index+1)]:[];};
+ const applyToolColorShortcut=(event:KeyboardEvent)=>{
+  const digit=/^(?:Digit|Numpad)([0-9])$/.exec(event.code)?.[1];if(!digit||event.ctrlKey||event.metaKey)return false;
+  const candidate=tools.find(item=>{const keys=item.shortcut.split('+'),letter=keys.at(-1)!;return heldToolKeys.has(`Key${letter.toUpperCase()}`)&&keys.includes('shift')===event.shiftKey&&keys.includes('alt')===event.altKey&&toolColorOptions(item.id).length>0;});
+  if(!candidate||viewOnly&&!(presentation&&candidate.id==='laser')||animationPreview&&!['laser','free-draw'].includes(candidate.id))return false;
+  pendingPlaybackToolKey=null;
+  const index=digit==='0'?9:Number(digit)-1,color=toolColorOptions(candidate.id)[index];
+  if(!color){event.preventDefault();event.stopImmediatePropagation();return true;}
+  event.preventDefault();event.stopImmediatePropagation();
+  if(candidate.id==='free-draw'){selectTool('free-draw');freeDrawColor=color.id;freeDrawMode='draw';}
+  else{selectTool(candidate.id);toolbarEditorTool=candidate.id as ToolbarPresetTool;updateToolbarPresetColor(color.id);toolbarEditorTool=null;}
+  return true;
+ };
+ const handleGlobalKeydown = (event: KeyboardEvent) => {
+  if(event.code.startsWith('Key'))heldToolKeys.add(event.code);
+  if(event.key==='F11'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!event.shiftKey){
+   event.preventDefault();event.stopImmediatePropagation();
+   if(!event.repeat&&!tutorialActive&&actionInProgress===null)void togglePresentation();
+   return;
+  }
   if(actionInProgress==='save'){if(event.key!=='Tab')event.preventDefault();event.stopImmediatePropagation();return;}
   const editingText=(event.target as Element)?.closest('input:not([type="range"]),textarea,select,[contenteditable="true"]');
+  if(!editingText&&!event.isComposing&&!tutorialActive&&actionInProgress===null&&!showShare&&!showSettings&&!showExportSettings&&!showHelp&&!showFeedback&&!showDraftRestore&&!showNewPrompt&&applyToolColorShortcut(event))return;
+  if(animation&&(animationOpen||viewOnly)&&!editingText&&!event.isComposing&&!tutorialActive&&actionInProgress===null&&!showShare&&!showSettings&&!showExportSettings&&!showHelp&&!showFeedback&&!showDraftRestore&&!showNewPrompt&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!event.shiftKey&&['KeyK','KeyL'].includes(event.code)){
+   event.preventDefault();event.stopImmediatePropagation();if(!event.repeat)pendingPlaybackToolKey=event.code;return;
+  }
+  if(presentation&&!editingText&&(event.ctrlKey||event.metaKey)&&!event.altKey&&['z','y'].includes(event.key.toLowerCase())){
+   event.preventDefault();event.stopImmediatePropagation();if(event.repeat)return;
+   const redo=event.key.toLowerCase()==='y'||event.shiftKey;
+   const stack=redo?presentationSpotlightFuture:presentationSpotlightPast;
+   if(stack.length){const current=cloneSpotlights();spotlightStrokes=cloneSpotlights(stack.at(-1)!);activeSpotlightStroke=null;
+    if(redo){presentationSpotlightFuture=stack.slice(0,-1);presentationSpotlightPast=[...presentationSpotlightPast,current];}
+    else{presentationSpotlightPast=stack.slice(0,-1);presentationSpotlightFuture=[...presentationSpotlightFuture,current];}
+   }return;
+  }
   const inBuilder=builderRoot?.contains(event.target as Node)||(event.target as Element)?.closest('[data-animation-ui],[data-draggable-popover]');
   if(!viewOnly&&!animationPreview&&!videoController&&!tutorialActive&&actionInProgress===null&&inBuilder&&!editingText&&(event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&['a','c','x','v'].includes(event.key.toLowerCase())){
    const key=event.key.toLowerCase();if(key==='c'&&window.getSelection()?.toString())return;
@@ -4042,6 +4146,7 @@
    return;
   }
 
+  if((event.ctrlKey||event.metaKey)&&event.shiftKey&&!event.altKey&&event.key.toLowerCase()==='l'&&!editingText&&!tutorialActive&&actionInProgress===null&&(!viewOnly||presentation)){event.preventDefault();event.stopImmediatePropagation();if(!event.repeat)toggleSpotlight();return;}
   if(presentation&&!(event.target as Element)?.closest('input:not([type="range"]),textarea,select,[contenteditable="true"]')){
    if(event.altKey&&!event.ctrlKey&&!event.metaKey&&event.key.toLowerCase()==='a'){event.preventDefault();animationOpen=animation?!animationOpen:false;return;}
    if(!event.altKey&&!event.ctrlKey&&!event.metaKey&&event.key.toLowerCase()==='c'){event.preventDefault();fadeLaserDrawings();return;}
@@ -4055,10 +4160,26 @@
   }
   if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'c' && (window.getSelection()?.toString() || (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) && event.target.selectionStart !== event.target.selectionEnd)) { event.stopImmediatePropagation(); return; }
   if (animationTutorialActive && animationTutorialKeys !== 'playback' && !(event.target as Element)?.closest('input,textarea,select,[contenteditable="true"],[data-timing-rail]')) {
-   const navigation = ['ArrowLeft','ArrowRight','Home','End','Space','KeyJ','KeyK','KeyL'].includes(event.code) || event.altKey && ['ArrowUp','ArrowDown'].includes(event.key);
+   const navigation = ['ArrowLeft','ArrowRight','Home','End','Space','KeyJ','KeyK','KeyL','Comma','Period'].includes(event.code) || event.altKey && ['ArrowUp','ArrowDown'].includes(event.key);
    if (navigation) { event.preventDefault(); event.stopImmediatePropagation(); return; }
   }
   if(animationTutorialActive && event.key==='Escape' && !document.querySelector('[data-animation-path-picker]') && !animationDrawingRoute) { event.preventDefault(); tutorialDriver?.destroy(); return; }
+  if(animation&&(animationOpen||viewOnly)&&!editingText&&!event.isComposing&&!event.altKey&&!event.shiftKey&&!tutorialActive&&actionInProgress===null&&!showShare&&!showExportSettings&&!showSettings&&!showHelp&&!showFeedback&&!showDraftRestore&&!showNewPrompt){
+   const command=event.ctrlKey||event.metaKey;
+   if(!command&&(event.key===','||event.key==='.')){
+    event.preventDefault();event.stopImmediatePropagation();
+    seekAnimation(Math.max(0,Math.min(animationDuration(animation),Math.round((animationTime+(event.key===','?-.01:.01))*100)/100)));
+    return;
+   }
+   if(command&&(event.key==='ArrowLeft'||event.key==='ArrowRight')){
+    event.preventDefault();event.stopImmediatePropagation();
+    if(!event.repeat){
+     if(event.key==='ArrowLeft'){for(let i=animation.steps.length-1;i>=0;i--)if(stepTime(animation,i)<animationTime-.000001){selectAnimationStep(i);break;}}
+     else{const next=animation.steps.findIndex((_,i)=>stepTime(animation!,i)>animationTime+.000001);if(next>=0)selectAnimationStep(next);}
+    }
+    return;
+   }
+  }
   if (handleViewerPlaybackKey(event)) return;
   if (animationOpen && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 's') {
    event.preventDefault();
@@ -4986,7 +5107,9 @@
    }
   });
  };
-	const selectTool = (nextTool: ActiveTool) => {
+	const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawings();if(spotlightEnabled)tool='laser';toolbarEditorTool=null;};
+ const selectTool = (nextTool: ActiveTool) => {
+  if(nextTool!=='laser')spotlightEnabled=false;
 		if (animationPreview && !['laser','select'].includes(nextTool)) return;
 		if (suppressNextClick) return;
 		if (tool === 'laser' && nextTool !== 'laser') releaseLaserDrawings();
@@ -6440,7 +6563,7 @@
 </script>
 
 <svelte:document on:fullscreenchange={syncFullscreen}/>
-<svelte:window on:keyup={(event) => {placementIgnoreSnap=event.ctrlKey||event.metaKey;viewerScrubber.keyup(event);}} on:keydown|capture={(event)=>{placementIgnoreSnap=event.ctrlKey||event.metaKey;if(placementIgnoreSnap)clearPlacementSnap();}} on:blur={() => {placementIgnoreSnap=false;clearPlacementSnap();viewerScrubber.stop();}} on:keydown|capture={handleGlobalKeydown} on:beforeunload={handleBeforeUnload} />
+<svelte:window on:pointermove={movePlayDrag} on:pointerup={()=>endPlayDrag()} on:pointercancel={()=>endPlayDrag(true)} on:keyup={(event) => {releaseToolShortcut(event);placementIgnoreSnap=event.ctrlKey||event.metaKey;viewerScrubber.keyup(event);}} on:keydown|capture={(event)=>{placementIgnoreSnap=event.ctrlKey||event.metaKey;if(placementIgnoreSnap)clearPlacementSnap();}} on:blur={() => {heldToolKeys.clear();pendingPlaybackToolKey=null;endPlayDrag(true);placementIgnoreSnap=false;clearPlacementSnap();viewerScrubber.stop();}} on:keydown|capture={handleGlobalKeydown} on:beforeunload={handleBeforeUnload} />
 
 <fieldset class="contents" disabled={actionInProgress==='save'}>
 <section
@@ -6681,6 +6804,7 @@
 										: guideColors}
 						selectedColor={toolbarPresetColor}
 						colorLabel="Preset color"
+      colorShortcutKeys={(index)=>toolColorShortcutKeys(toolbarEditorTool!,index)}
 						styleOptions={guideStyles}
 						selectedStyle={toolbarPresetStyle}
 						styleLabel="Preset line type"
@@ -6688,7 +6812,15 @@
 						onColor={updateToolbarPresetColor}
 						onStyle={updateToolbarPresetStyle}
 						onReset={resetToolbarLineFormat}
-					/>
+     >
+     {#snippet colorExtra()}{#if toolbarEditorTool==='laser'}
+      <HoverTooltip text="Spotlight · Shift + Scroll to Resize" shortcutKeys={[primaryModifierKey,'Shift','L']} placement="above" minWidthPx={0} wrapperClass="flex h-5 w-5 shrink-0">
+       <button type="button" aria-label="Toggle spotlight" aria-pressed={spotlightEnabled} on:click={toggleSpotlight} class="flex h-5 w-5 cursor-pointer items-center justify-center border-2 border-white bg-stone-100 text-stone-900 shadow-sm ring-1 ring-stone-400 hover:bg-stone-200" class:!ring-2={spotlightEnabled} class:!ring-stone-950={spotlightEnabled}>
+        <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m4 4 8 3-5 6-5-7zM11 10l10 1-5 10-6-7M5 13l-2 7h10"/></svg>
+       </button>
+      </HoverTooltip>
+     {/if}{/snippet}
+     </LineFormatControls>
 				</div>
 			{/if}
 
@@ -6766,7 +6898,7 @@
 						{#each freeDrawColors as option, colorIndex}
 							<HoverTooltip
 								text={option.label}
-								shortcutKeys={[String(colorIndex === 9 ? 0 : colorIndex + 1)]}
+								shortcutKeys={toolColorShortcutKeys('free-draw',colorIndex)}
 								minWidthPx={0}
 								wrapperClass="flex aspect-square min-h-0 min-w-0"
 							>
@@ -6979,14 +7111,14 @@
 						<path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" fill="none" stroke="currentColor" stroke-width="2" />
 					</svg>
 				</BuilderActionButton>
-			<BuilderActionButton tooltip="Enter Full Screen" ariaLabel="Enter full screen" label="Go Full" buttonClass="relative" disabled={tutorialActive||actionInProgress!==null} onclick={togglePresentation}><span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-600 px-1 text-[8px] leading-3 font-black text-white">NEW</span><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/></svg></BuilderActionButton>
+			<BuilderActionButton tooltip="Enter Full Screen" shortcutKeys={['F11']} ariaKeyshortcuts="F11" ariaLabel="Enter full screen" label="Go Full" buttonClass="relative" disabled={tutorialActive||actionInProgress!==null} onclick={togglePresentation}><span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-600 px-1 text-[8px] leading-3 font-black text-white">NEW</span><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/></svg></BuilderActionButton>
 </div>
 {/if}
 {#if presentation}<div class="presentation-actions absolute left-2 top-2 z-30 flex gap-1.5" aria-label="Presentation controls">
  <BuilderActionButton tooltip="Laser Pointer" shortcutKeys={['Shift','L']} ariaLabel="Toggle presentation laser pointer" label="Laser" pressed={tool==='laser'} onclick={clickPresentationLaser}><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 20 8-8M10 4l1 3M20 14l-3-1M17 3l-2 4M21 7l-4 2"/></svg></BuilderActionButton>
  <BuilderActionButton tooltip="Clear Laser Drawings" shortcutKeys={['C']} ariaLabel="Clear presentation laser drawings" label="Clear" onclick={fadeLaserDrawings}><AnimationIcon name="trash"/></BuilderActionButton>
  </div><div class="absolute right-2 top-2 z-30">
- <BuilderActionButton tooltip="Exit Full Screen" ariaLabel="Exit full screen" label="Exit Full" onclick={togglePresentation}><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8h5V3M21 8h-5V3M16 21v-5h5M8 21v-5H3"/></svg></BuilderActionButton>
+ <BuilderActionButton tooltip="Exit Full Screen" shortcutKeys={['F11']} ariaKeyshortcuts="F11" ariaLabel="Exit full screen" label="Exit Full" onclick={togglePresentation}><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8h5V3M21 8h-5V3M16 21v-5h5M8 21v-5H3"/></svg></BuilderActionButton>
  </div>{/if}
 
 			<div
@@ -6999,7 +7131,8 @@
 			>
 				<div bind:this={playStripElement} class="play-tabs-scroll absolute right-0 bottom-0 left-0 overflow-x-auto overflow-y-hidden">
 					<div class="flex w-max items-stretch gap-1">
-						{#each playEntries as play, index (play.id)}
+						{#each orderedPlays as play (play.id)}
+       <div animate:flip={{duration:150}} class="shrink-0" class:opacity-60={playDrag?.moved&&playDrag.id===play.id}>
 							<HoverTooltip
 								text={viewOnly || editingPlayId === play.id ? '' : 'Double Click for Options'}
 								minWidthPx={0}
@@ -7010,8 +7143,12 @@
                                     data-play-id={play.id}
 									type="button"
 									aria-label={`${viewOnly ? "View" : "Open"} ${play.name}`}
-									aria-pressed={index === activePlayIndex}
-									on:click={() => switchPlay(play.id)}
+									aria-pressed={play.id === playEntries[activePlayIndex]?.id}
+									on:pointerdown={(event)=>beginPlayDrag(event,play.id)}
+
+
+         style:touch-action={viewOnly?undefined:'pan-y'}
+         on:click={() => switchPlay(play.id)}
 									on:dblclick={(event) => { if (!viewOnly) openPlayMenu(event, play.id); }}
 									on:contextmenu|preventDefault|stopPropagation={(event) => { if (!viewOnly) openPlayMenu(event, play.id); }}
 									class="flex h-9 min-w-20 shrink-0 cursor-pointer items-center justify-center border-2 border-stone-950 bg-white px-3 text-xs font-normal whitespace-nowrap text-stone-950 hover:bg-stone-100 aria-pressed:bg-stone-200 aria-pressed:font-black aria-pressed:hover:bg-stone-300 max-lg:h-7 max-lg:min-w-14 max-lg:px-2 max-lg:text-[10px]"
@@ -7019,7 +7156,8 @@
 									{play.name}
 								</button>
 							</HoverTooltip>
-						{/each}
+						</div>
+      {/each}
 						{#if !viewOnly}<HoverTooltip
 							text={playEntries.length >= PLAY_BUILDER_MAX_PLAYS ? 'Play Limit Reached' : 'Add Play'}
 							shortcutKeys={[alternateModifierKey, 'N']}
@@ -7246,6 +7384,7 @@
 						style:pointer-events={viewOnly&&!presentation ? 'none' : undefined}
 						role="application"
 						aria-label="Blank horizontal NIRSA flag football field drawing area"
+      on:wheel|nonpassive={resizeSpotlight}
 						aria-disabled={viewOnly}
 						on:pointerup|capture={event=>{if(presentation){event.stopImmediatePropagation();if(tool==='laser'){finishLaserDrawing();if(svg.hasPointerCapture(event.pointerId))svg.releasePointerCapture(event.pointerId);}}}}
       on:pointercancel|capture={()=>{if(presentation)releaseLaserDrawings();}}
@@ -7742,7 +7881,7 @@
 								{/each}
 							{/if}
 
-							<g data-field-watermark aria-hidden="true" pointer-events="none">
+							<g use:guardPlayBuilderWatermark={fieldWatermark} data-field-watermark aria-hidden="true" pointer-events="none">
 								<text
 									x={fieldWatermark.centerX}
 									y={fieldWatermark.centerY}
@@ -8712,8 +8851,25 @@
 							/>
 						{/if}
 
-						{#if tool === 'laser' || laserTrail.length > 0 || laserDrawings.length > 0 || (activeLaserDrawing?.points.length ?? 0) > 1}
-							<g data-laser-pointer-layer pointer-events="none">
+						{#if tool === 'laser' || spotlightStrokes.length>0 || laserTrail.length > 0 || laserDrawings.length > 0 || (activeLaserDrawing?.points.length ?? 0) > 1}
+							<g data-laser-pointer-layer data-export-exclude pointer-events="none">
+         {#if spotlightStrokes.length||activeSpotlightStroke||spotlightEnabled&&tool==='laser'}
+          <defs>
+           <radialGradient id="builder-spotlight-edge"><stop offset="75%" stop-color="black"/><stop offset="100%" stop-color="black" stop-opacity="0"/></radialGradient>
+           <filter id="builder-spotlight-soft-edge" filterUnits="userSpaceOnUse" x="-300" y="-300" width="1600" height="1100" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="5"/></filter>
+           <mask id="builder-spotlight-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="484">
+            <rect width="1000" height="484" fill="white"/>
+            {#each [...spotlightStrokes,...(activeSpotlightStroke?[activeSpotlightStroke]:[])] as stroke}
+             <g data-spotlight-stroke opacity={stroke.releasedAt===null?1:Math.max(0,1-(laserTrailClock-stroke.releasedAt)/laserFadeDuration)} filter="url(#builder-spotlight-soft-edge)">
+              {#if stroke.points.length===1}<circle cx={stroke.points[0].x} cy={stroke.points[0].y} r={stroke.radius*.875} fill="black"/>
+              {:else}<path d={laserDrawingPath(stroke.points)} fill="none" stroke="black" stroke-width={stroke.radius*1.75} stroke-linecap="round" stroke-linejoin="round"/>{/if}
+             </g>
+            {/each}
+            {#if spotlightEnabled&&tool==='laser'&&laserPointer&&pointerOnField}<circle data-spotlight-cursor cx={laserPointer.x} cy={laserPointer.y} r={spotlightRadius} fill="url(#builder-spotlight-edge)"/>{/if}
+           </mask>
+          </defs>
+          <rect data-spotlight width="1000" height="484" fill="black" opacity=".65" mask="url(#builder-spotlight-mask)"/>
+         {/if}
 								<defs>
 									<linearGradient
 										id="builder-rainbow-laser-gradient"
@@ -8818,7 +8974,7 @@
 										filter="url(#builder-neon-glow)"
 									/>
 								{/if}
-								{#if (!viewOnly||presentation) && tool === 'laser' && laserPointer && pointerOnField}
+								{#if !spotlightEnabled && (!viewOnly||presentation) && tool === 'laser' && laserPointer && pointerOnField}
 									<circle
 										cx={laserPointer.x}
 										cy={laserPointer.y}

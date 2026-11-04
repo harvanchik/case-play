@@ -1,3 +1,4 @@
+import {restorePlayBuilderWatermark} from './play-builder-watermark-guard';
 const blobToDataUrl = (blob: Blob) =>
 	new Promise<string>((resolve, reject) => {
 		const reader = new FileReader();
@@ -216,7 +217,8 @@ export const renderPlayBuilderCanvas = async (
 		assetCache?: Map<string, Promise<string>>;
 	} = {}
 ) => {
-	const bounds = exportBounds(source, pdfOutlines, padding);
+	restorePlayBuilderWatermark(source);
+ const bounds = exportBounds(source, pdfOutlines, padding);
 	const outputScale = 2;
 	const outputWidth = Math.ceil(bounds.width * outputScale);
 	const outputHeight = Math.ceil(bounds.height * outputScale);

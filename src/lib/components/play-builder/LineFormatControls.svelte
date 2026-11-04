@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { GuideColor, GuideStyle } from '$lib/play-builder-scene';
+	import type { Snippet } from 'svelte';
+ import type { GuideColor, GuideStyle } from '$lib/play-builder-scene';
 	import HoverTooltip from '../HoverTooltip.svelte';
 
 	let {
@@ -12,7 +13,9 @@
 		showReset = false,
 		onColor,
 		onStyle,
-		onReset
+		onReset,
+  colorExtra,
+  colorShortcutKeys
 	}: {
 		colorOptions: readonly { id: GuideColor; label: string; value: string }[];
 		selectedColor: GuideColor;
@@ -24,12 +27,14 @@
 		onColor: (color: GuideColor) => void;
 		onStyle?: (style: GuideStyle) => void;
 		onReset?: () => void;
+  colorExtra?:Snippet;
+  colorShortcutKeys?:(index:number)=>string[];
 	} = $props();
 </script>
 
 <div class="flex gap-1" aria-label={colorLabel}>
-	{#each colorOptions as option}
-		<HoverTooltip text={option.label} placement="above" minWidthPx={0} wrapperClass="flex h-5 w-5 shrink-0">
+	{#each colorOptions as option,index}
+		<HoverTooltip text={option.label} shortcutKeys={colorShortcutKeys?.(index)??[]} placement="above" minWidthPx={0} wrapperClass="flex h-5 w-5 shrink-0">
 			<button
 				type="button"
 				aria-label={option.label}
@@ -42,6 +47,7 @@
 			></button>
 		</HoverTooltip>
 	{/each}
+ {#if colorExtra}{@render colorExtra()}{/if}
 </div>
 
 {#if selectedStyle && onStyle}
