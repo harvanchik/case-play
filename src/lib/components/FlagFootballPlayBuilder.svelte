@@ -6979,14 +6979,14 @@
 						<path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" fill="none" stroke="currentColor" stroke-width="2" />
 					</svg>
 				</BuilderActionButton>
-			<BuilderActionButton tooltip="Enter Full Screen" ariaLabel="Enter full screen" label="Full Screen" disabled={tutorialActive||actionInProgress!==null} onclick={togglePresentation}><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/></svg></BuilderActionButton>
+			<BuilderActionButton tooltip="Enter Full Screen" ariaLabel="Enter full screen" label="Go Full" buttonClass="relative" disabled={tutorialActive||actionInProgress!==null} onclick={togglePresentation}><span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-600 px-1 text-[8px] leading-3 font-black text-white">NEW</span><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/></svg></BuilderActionButton>
 </div>
 {/if}
 {#if presentation}<div class="presentation-actions absolute left-2 top-2 z-30 flex gap-1.5" aria-label="Presentation controls">
  <BuilderActionButton tooltip="Laser Pointer" shortcutKeys={['Shift','L']} ariaLabel="Toggle presentation laser pointer" label="Laser" pressed={tool==='laser'} onclick={clickPresentationLaser}><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 20 8-8M10 4l1 3M20 14l-3-1M17 3l-2 4M21 7l-4 2"/></svg></BuilderActionButton>
  <BuilderActionButton tooltip="Clear Laser Drawings" shortcutKeys={['C']} ariaLabel="Clear presentation laser drawings" label="Clear" onclick={fadeLaserDrawings}><AnimationIcon name="trash"/></BuilderActionButton>
  </div><div class="absolute right-2 top-2 z-30">
- <BuilderActionButton tooltip="Exit Full Screen" ariaLabel="Exit full screen" label="Exit" onclick={togglePresentation}><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8h5V3M21 8h-5V3M16 21v-5h5M8 21v-5H3"/></svg></BuilderActionButton>
+ <BuilderActionButton tooltip="Exit Full Screen" ariaLabel="Exit full screen" label="Exit Full" onclick={togglePresentation}><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8h5V3M21 8h-5V3M16 21v-5h5M8 21v-5H3"/></svg></BuilderActionButton>
  </div>{/if}
 
 			<div
