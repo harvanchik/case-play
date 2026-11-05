@@ -49,7 +49,9 @@
  let picker: { target: AnimationTarget; x: number; y: number } | null = null;
 	$: rawPickerRoute = picker ? routes.find((route) => sameTarget(route.start, picker!.target)) ?? (()=>{const start=from?.poses.find(item=>sameTarget(item,picker!.target)),end=to?.poses.find(item=>sameTarget(item,picker!.target));return start&&end?{start,end,motion:transition.motions.find(item=>sameTarget(item,picker!.target))??defaultMotion(start)}:undefined;})() : undefined;
  $: deleted=Boolean(rawPickerRoute?.start.visible&&!rawPickerRoute?.end.visible);
- $: effectivePickerRoute=deleted&&rawPickerRoute?{...rawPickerRoute,motion:{...rawPickerRoute.motion,path:'jump' as const,jumpEffect:rawPickerRoute.motion.path==='jump'?(rawPickerRoute.motion.jumpEffect??'cut'):'cut' as const}}:rawPickerRoute;
+ $: added=Boolean(rawPickerRoute&&!rawPickerRoute.start.visible&&rawPickerRoute.end.visible);
+ $: restrictedAdded=added&&rawPickerRoute?.start.type!=='path';
+ $: effectivePickerRoute=(deleted||restrictedAdded)&&rawPickerRoute?{...rawPickerRoute,motion:{...rawPickerRoute.motion,path:'jump' as const,jumpEffect:rawPickerRoute.motion.path==='jump'?(rawPickerRoute.motion.jumpEffect??'cut'):'cut' as const}}:rawPickerRoute;
  $: pickerRoute=effectivePickerRoute?.start.type==='path'&&effectivePickerRoute.motion.path!=='jump'&&effectivePickerRoute.motion.path!=='draw'?{...effectivePickerRoute,motion:{...effectivePickerRoute.motion,path:'straight' as const,points:[]}}:effectivePickerRoute;
  $: activePath=pickerRoute&&Math.hypot(pickerRoute.end.x-pickerRoute.start.x,pickerRoute.end.y-pickerRoute.start.y)<.001&&!(pickerRoute.start.type==='path'&&JSON.stringify([pickerRoute.start.end,pickerRoute.start.points])!==JSON.stringify([pickerRoute.end.end,pickerRoute.end.points]))&&['straight','curve'].includes(pickerRoute.motion.path)?null:pickerRoute?.motion.path;
 	export function openPicker(event: MouseEvent, target: AnimationTarget) {
@@ -95,12 +97,15 @@
 
  function artworkLayer(node:SVGElement,value:{selected:boolean;ghost?:boolean}){
   const home=document.createComment('animation artwork');node.before(home);
-  const svg=node.ownerSVGElement!;
+  let disposed=false;
   const update=(value:{selected:boolean;ghost?:boolean})=>{
+   if(disposed)return;
+   const svg=node.ownerSVGElement??home.parentElement?.closest('svg');
+   if(!svg)return;
    const destination=value.selected?svg.querySelector('[data-animation-selected-overlay]'):value.ghost?home.parentNode:svg.querySelector('[data-animation-route-underlay]');
    if(destination===home.parentNode&&value.ghost&&!value.selected)destination?.insertBefore(node,home);else destination?.appendChild(node);
   };
-  update(value);return {update,destroy(){node.remove();home.remove();}};
+  update(value);queueMicrotask(()=>update(value));return {update,destroy(){disposed=true;node.remove();home.remove();}};
  }
 
 	let dragging: { index: number; motion: Motion; points: Point[] } | null = null;
@@ -421,7 +426,7 @@
 				{#if picker && canedit(picker.target)}<div class="mode-row"><ElementEditorModes active="animation" onchange={(mode,event)=>{if(mode==='element'&&picker){const target=picker.target;picker=null;onedit(target,event);}}}/></div>{/if}
                 <div class="path-types">
 						{#each (pickerRoute.start.type==='path'?(scene.paths.find(path=>path.id===pickerRoute.start.id)?.kind==='line'?[['straight','Morph'],['jump','Jump']]:[['draw','Draw'],['straight','Morph'],['jump','Jump']]):pickerRoute.start.type==='guide'?[['straight','Shift'],['jump','Jump']]:[['straight', 'Linear'], ['curve', 'Curved'], ['custom', 'Custom'], ['jump', 'Jump']]) as [value, label]}
-							<HoverTooltip text={deleted&&value!=='jump'?'Not Available for Deleted Element':(label==='Linear'||label==='Curved')&&Math.hypot(pickerRoute.end.x-pickerRoute.start.x,pickerRoute.end.y-pickerRoute.start.y)<.001?'Move Element to Enable':value==='draw'?'Draw Along Arrow':value==='straight'?(pickerRoute.start.type==='path'?'Blend Arrow Shapes':pickerRoute.start.type==='guide'?'Slide the Line':'A Straight Line'):value==='curve'?'A Bending Line':value==='custom'?'Draw Your Route':'Change Position Instantly'} minWidthPx={0} wrapperClass="flex flex-1"><button style="width:100%" disabled={deleted&&value!=='jump'||(label==='Linear'||label==='Curved')&&Math.hypot(pickerRoute.end.x-pickerRoute.start.x,pickerRoute.end.y-pickerRoute.start.y)<.001} aria-pressed={activePath === value} class:active={activePath === value} on:click={() => choosePath(value as Motion['path'])}>{value === 'custom' && pickerRoute.motion.path === 'custom' ? 'Redraw' : label}</button></HoverTooltip>
+							<HoverTooltip text={restrictedAdded&&value!=='jump'?'Not Available for Added Element':deleted&&value!=='jump'?'Not Available for Deleted Element':(label==='Linear'||label==='Curved')&&Math.hypot(pickerRoute.end.x-pickerRoute.start.x,pickerRoute.end.y-pickerRoute.start.y)<.001?'Move Element to Enable':value==='draw'?'Draw Along Arrow':value==='straight'?(pickerRoute.start.type==='path'?'Blend Arrow Shapes':pickerRoute.start.type==='guide'?'Slide the Line':'A Straight Line'):value==='curve'?'A Bending Line':value==='custom'?'Draw Your Route':'Change Position Instantly'} minWidthPx={0} wrapperClass="flex flex-1"><button style="width:100%" disabled={(deleted||restrictedAdded)&&value!=='jump'||(label==='Linear'||label==='Curved')&&Math.hypot(pickerRoute.end.x-pickerRoute.start.x,pickerRoute.end.y-pickerRoute.start.y)<.001} aria-pressed={activePath === value} class:active={activePath === value} on:click={() => choosePath(value as Motion['path'])}>{value === 'custom' && pickerRoute.motion.path === 'custom' ? 'Redraw' : label}</button></HoverTooltip>
 						{/each}
 					</div>
 				<div class="picker-timing">

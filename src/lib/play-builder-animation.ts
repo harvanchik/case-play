@@ -316,7 +316,16 @@ export const evaluateAnimation = (play: { scene: PlayBuilderScene; animation?: P
 			b = to.poses.find((pose) => sameTarget(pose, target));
 		if (!a || !b) return undefined;
 		if (progress >= 1) return resolveAttachment(b, 1);
-		if (!a.visible && !(target.type==='path'&&transition.motions.some(item=>sameTarget(item,target)&&item.path==='draw'))) return b.visible ? resolveAttachment(b, progress) : { ...a };
+		if (!a.visible && !(target.type==='path'&&transition.motions.some(item=>sameTarget(item,target)&&item.path==='draw'))) {
+   if(!b.visible)return {...a};
+   const appearance=transition.motions.find(item=>sameTarget(item,target));
+   const start=appearance?.start??0;
+   const elapsed=(progress-start)*transition.duration;
+   const effect=appearance?.path==='jump'?(appearance.jumpEffect??'cut'):'cut';
+   const length=Math.min(appearance?.jumpDuration??.25,(1-start)*transition.duration);
+   const fraction=effect==='cut'?(elapsed>=0?1:0):clamp(elapsed/Math.max(.000001,length));
+   return {...resolveAttachment(b,progress),visible:elapsed>=0,animationOpacity:effect==='fade'?fraction:1,animationScale:effect==='shrink'?fraction:1};
+  }
 		if (!b.visible) {
    const removal=transition.motions.find(item=>sameTarget(item,target));
    if(removal?.path!=='jump')return {...b};

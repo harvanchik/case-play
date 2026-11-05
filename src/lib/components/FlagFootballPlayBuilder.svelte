@@ -1,6 +1,6 @@
 <script lang="ts">
  import ElementNameInput from './play-builder/ElementNameInput.svelte';
- import { createDrawingController } from '$lib/play-builder-drawing-controller';
+ import { createDrawingController, crayonCursor } from '$lib/play-builder-drawing-controller';
  import BuilderDrawingTools from '$lib/components/play-builder/BuilderDrawingTools.svelte';
  import { createPresentationController } from '$lib/play-builder-presentation-controller';
  import BuilderPlaybackControls from '$lib/components/play-builder/BuilderPlaybackControls.svelte';
@@ -28,7 +28,7 @@
 	import { onMount, tick } from 'svelte';
  import { provideElementEditors, useElementEditor } from '$lib/play-builder-element-editor';
  import ElementActionButton from './play-builder/ElementActionButton.svelte';
- const elementEditors=provideElementEditors();
+ provideElementEditors();
  const elementEditor=useElementEditor();
 	import { driver, type DriveStep, type Driver } from 'driver.js';
 	import 'driver.js/dist/driver.css';
@@ -124,7 +124,7 @@
 		animationTargetChanged,
 		sameTarget as sameAnimationTarget,
 		stepTime,
-		type AnimationTarget,
+		type AnimationTarget, type AnimationPose,
 		type Motion,
 		type PlayAnimation
 	} from '$lib/play-builder-animation';
@@ -559,6 +559,7 @@
 	let pointerOnField = false;
 	let pointerInsideSelectedGroup = false;
 	let laserPointer: Point | null = null;
+ let lastAnnotationPoint:Point|null=null;
 	let laserTrail: (Point & { createdAt: number })[] = [];
 	let laserDrawings: LaserDrawing[] = [];
 	let activeLaserDrawing: ActiveLaserDrawing | null = null;
@@ -1184,7 +1185,7 @@
  clock:{now:()=>performance.now(),request:callback=>requestAnimationFrame(callback),cancel:id=>cancelAnimationFrame(id)}
  });
  const startLaserAnimationFrame=annotationController.startLaserAnimationFrame;
- const updateLaserPointer=annotationController.updateLaserPointer;
+ const updateLaserPointer=(point:Point)=>{lastAnnotationPoint=point;annotationController.updateLaserPointer(point);};
  const beginLaserDrawing=annotationController.beginLaserDrawing;
  const continueLaserDrawing=annotationController.continueLaserDrawing;
  const finishLaserDrawing=annotationController.finishLaserDrawing;
@@ -1303,7 +1304,7 @@
  });
  const togglePresentation=presentationController.toggle;
  const syncFullscreen=presentationController.sync;
- const togglePresentationLaser=()=>{if(tool==='laser'){releaseLaserDrawings();tool='select';}else tool='laser';};
+ const togglePresentationLaser=()=>{if(tool==='laser'){releaseLaserDrawings();tool='select';}else{tool='laser';showAnnotationPointer();}};
  const clickPresentationLaser=()=>{const wasRainbow=rainbowLaserEnabled;registerLaserToolbarClick('laser');togglePresentationLaser();if(!wasRainbow&&rainbowLaserEnabled)tool='laser';};
 
  const openAnimation=()=>{if(presentation){if(animation)animationOpen=true;return;}animationController.open();};
@@ -2615,7 +2616,7 @@
 		const drawingLayer = svg.querySelector<SVGGElement>('[data-free-drawing-layer]');
 		if (drawingLayer) sceneLayers.appendChild(drawingLayer);
 		const laserLayer = svg.querySelector<SVGGElement>('[data-laser-pointer-layer]');
-		if (laserLayer) sceneLayers.appendChild(laserLayer);
+		if (laserLayer) svg.appendChild(laserLayer);
 	};
 	const raiseLayer = (type: LayerType, id: number) => {
 		layerOrder = [...layerOrder.filter((layer) => layer.type !== type || layer.id !== id), { type, id }];
@@ -2912,8 +2913,8 @@
  $: selectedDrawingBounds=selectedDrawingIds.length?drawingBounds(selectedDrawingIds[0]):null;
  $: drawingCanRevert=!!(animation&&animationStep>0&&selectedDrawingIds.some(id=>{if(animationContent.animation?.steps[animationStep-1].strokeIds && !animationContent.animation.steps[animationStep-1].strokeIds!.includes(id))return false;const current=animationContent.animation?.steps[animationStep].strokeOffsets?.find(item=>item.id===id);const previous=animationContent.animation?.steps[animationStep-1].strokeOffsets?.find(item=>item.id===id);return Math.abs((current?.x??0)-(previous?.x??0))>.001||Math.abs((current?.y??0)-(previous?.y??0))>.001;}));
  const changeDrawingColor=(color:GuideColor)=>{saveHistory();freeStrokes=freeStrokes.map(stroke=>selectedDrawingIds.includes(stroke.id)?{...stroke,color}:stroke);if(animation)commitAnimation();};
- const deleteSelectedDrawings=()=>{saveHistory();freeStrokes=freeStrokes.filter(stroke=>!selectedDrawingIds.includes(stroke.id));if(animation)commitAnimation();selectedDrawingIds=[];drawingColorOptions=null;drawingOptions=null;};
- const revertDrawingPosition=()=>{if(!animation||animationStep<=0)return;saveHistory();const previous=applyAnimationStep(animationBaseScene,animation.steps[animationStep-1]);freeStrokes=freeStrokes.map(stroke=>selectedDrawingIds.includes(stroke.id)?{...stroke,points:previous.freeStrokes.find(item=>item.id===stroke.id)?.points??stroke.points}:stroke);commitAnimation();};
+ const deleteSelectedDrawings=()=>deleteSelection();
+ const revertDrawingPosition=()=>revertSelectedPositions();
  const beginDrawingDrag=(id:number,event:PointerEvent)=>{
   if(viewOnly||tool!=='select'||animationPreview||event.button!==0)return;
   if(selectedDrawingIds.includes(id)&&selectedTargets.length){event.preventDefault();event.stopPropagation();beginGroupDrag(event);svg.setPointerCapture(event.pointerId);return;}
@@ -3072,34 +3073,54 @@
 		},event.pointerId);
 	};
  $: revertOriginScene = animation && animationStep > 0 ? applyAnimationStep(animationBaseScene, animation.steps[animationStep - 1]) : null;
- $: revertSelection = animationOpen && !animationPreview && selectedTargets.length === 1 ? selectedTargets[0] : null;
- $: revertOriginPose = revertSelection && animationStep>0 ? animation?.steps[animationStep-1].poses.find(item=>sameAnimationTarget(item,revertSelection!)) : undefined;
- $: revertOriginMarker = revertSelection?.type==='marker' ? revertOriginScene?.markers.find(item=>item.id===revertSelection!.id) : undefined;
- $: revertOrigin = revertOriginPose && revertOriginMarker ? {...revertOriginPose,x:revertOriginMarker.x,y:revertOriginMarker.y} : revertOriginPose;
- $: revertCurrent = revertSelection ? animationContent.animation?.steps[animationStep].poses.find(item=>sameAnimationTarget(item,revertSelection!)) : undefined;
- $: canRevertPosition = !!(revertOrigin?.visible && (!revertCurrent?.visible || JSON.stringify([revertOrigin.x,revertOrigin.y,revertOrigin.end,revertOrigin.points])!==JSON.stringify([revertCurrent.x,revertCurrent.y,revertCurrent.end,revertCurrent.points])));
- const revertElementPosition = () => {
-  if(viewOnly||!animation||!revertSelection||!revertOrigin||!canRevertPosition)return;
+ const posePosition=(pose:AnimationPose|undefined)=>pose?[pose.visible,pose.x,pose.y,pose.end,pose.points]:null;
+ $: canRevertPosition=!!(animationOpen&&!animationPreview&&animation&&animationStep>0&&selectedTargets.some(target=>{const before=animation!.steps[animationStep-1].poses.find(pose=>sameAnimationTarget(pose,target));const after=animationContent.animation?.steps[animationStep].poses.find(pose=>sameAnimationTarget(pose,target));return before?.visible&&JSON.stringify(posePosition(before))!==JSON.stringify(posePosition(after));}));
+ $: selectionHasFuture=!!(animationOpen&&!animationPreview&&animation&&animation.steps.slice(animationStep+1).some(step=>selectedTargets.some(target=>step.poses.some(pose=>sameAnimationTarget(pose,target)&&pose.visible))||selectedDrawingIds.some(id=>step.strokeIds?.includes(id))));
+ const revertSelectedPositions=(future=false)=>{
+  if(viewOnly||animationPreview||!animation||animationStep<1)return;
   const next=currentAnimationContent().animation!;
-  const pose=next.steps[animationStep].poses.find(item=>sameAnimationTarget(item,revertSelection!));
-  if(!pose)return;
-  Object.assign(pose,{visible:true,x:revertOrigin.x,y:revertOrigin.y,end:structuredClone(revertOrigin.end),points:structuredClone(revertOrigin.points)});
-  delete pose.carrierId;delete pose.offset;
-  next.transitions[animationStep-1].motions=next.transitions[animationStep-1].motions.filter(item=>!sameAnimationTarget(item,revertSelection!));
-  changeAnimation(next);
+  const before=next.steps[animationStep-1];
+  let changed=false;
+  for(const target of selectedTargets){
+   const origin=before.poses.find(pose=>sameAnimationTarget(pose,target));
+   if(!origin?.visible)continue;
+   const resolved=target.type==='marker'?revertOriginScene?.markers.find(marker=>marker.id===target.id):undefined;
+   const position={x:resolved?.x??origin.x,y:resolved?.y??origin.y,end:structuredClone(origin.end),points:structuredClone(origin.points)};
+   for(let i=animationStep;i<(future?next.steps.length:animationStep+1);i++){
+    const pose=next.steps[i].poses.find(item=>sameAnimationTarget(item,target));if(!pose)continue;
+    Object.assign(pose,structuredClone(position),i===animationStep?{visible:true}:{});delete pose.carrierId;delete pose.offset;
+   }
+   next.transitions[animationStep-1].motions=next.transitions[animationStep-1].motions.filter(item=>!sameAnimationTarget(item,target));changed=true;
+  }
+  for(const id of selectedDrawingIds){
+   if(!before.strokeIds?.includes(id))continue;
+   const previous=before.strokeOffsets?.find(item=>item.id===id);const origin={id,x:previous?.x??0,y:previous?.y??0};
+   for(let i=animationStep;i<(future?next.steps.length:animationStep+1);i++){
+    const frame=next.steps[i];if(i===animationStep&&!frame.strokeIds?.includes(id))frame.strokeIds=[...(frame.strokeIds??[]),id];
+    frame.strokeOffsets=[...(frame.strokeOffsets??[]).filter(item=>item.id!==id),{...(frame.strokeOffsets?.find(item=>item.id===id)??{}),...origin}];
+   }
+   changed=true;
+  }
+  if(changed){changeAnimation(next);drawingOptions=null;drawingColorOptions=null;}
  };
-	const deleteHoveredElement = () => {
-		if (viewOnly) {
-			clearDeleteState();
-			return;
-		}
-		const targets = selectedTargets.length > 0 ? [...selectedTargets] : deleteTarget ? [deleteTarget] : [];
-		if (targets.length === 0) return;
-		saveHistory();
-		for (const target of targets) removeElementTarget(target);
-		clearDeleteState();
-		completeTutorialAction('delete-element');
-	};
+ const revertElementPosition=()=>revertSelectedPositions();
+ const deleteSelection=(future=false)=>{
+  if(viewOnly||animationPreview)return;
+  const targets=selectedTargets.length?[...selectedTargets]:deleteTarget?[deleteTarget]:[];
+  if(!targets.length&&!selectedDrawingIds.length)return;
+  if(animation&&animationOpen){
+   const next=currentAnimationContent().animation!;
+   for(let i=animationStep;i<(future?next.steps.length:animationStep+1);i++){
+    const step=next.steps[i];for(const target of targets){const pose=step.poses.find(item=>sameAnimationTarget(item,target));if(pose)pose.visible=false;}
+    step.strokeIds=step.strokeIds?.filter(id=>!selectedDrawingIds.includes(id));
+   }
+   if(animationStep>0)for(const target of targets){const transition=next.transitions[animationStep-1];transition.motions=[...transition.motions.filter(item=>!sameAnimationTarget(item,target)),{...defaultMotion(target),path:'jump',jumpEffect:'cut'}];}
+   changeAnimation(next);
+  }else{saveHistory();for(const target of targets)removeElementTarget(target);freeStrokes=freeStrokes.filter(stroke=>!selectedDrawingIds.includes(stroke.id));}
+  clearDeleteState();selectedDrawingIds=[];drawingColorOptions=null;drawingOptions=null;completeTutorialAction('delete-element');
+ };
+ const deleteHoveredElement=()=>deleteSelection();
+
 	const removeElementTarget = (target: SelectedTarget) => {
 		if (animation && target.type === 'marker' && animation.steps[animationStep]?.poses.some((pose) => pose.carrierId === target.id))
 			showActionMessage('Ball detached');
@@ -3904,7 +3925,13 @@
    return;
   }
   if(actionInProgress==='save'){if(event.key!=='Tab')event.preventDefault();event.stopImmediatePropagation();return;}
+  if(event.key==='Escape'&&document.querySelector('[data-element-action-menu]')){event.preventDefault();clearDeleteState();selectedDrawingIds=[];drawingOptions=null;drawingColorOptions=null;return;}
+  if(event.key==='Escape'&&(selectedTargets.length||selectedDrawingIds.length)&&!showSettings&&!showHelp&&!showShare&&!showExportSettings&&!showFeedback&&!showDraftRestore&&!showNewPrompt){event.preventDefault();event.stopImmediatePropagation();commitActiveEditor();clearDeleteState();selectedDrawingIds=[];drawingOptions=null;drawingColorOptions=null;return;}
   const editingText=(event.target as Element)?.closest('input:not([type="range"]),textarea,select,[contenteditable="true"]');
+  if(!editingText&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!event.shiftKey&&!viewOnly&&!animationPreview&&actionInProgress===null&&!showSettings&&!showExportSettings&&!showShare&&!showHelp&&!showFeedback&&!showDraftRestore&&!showNewPrompt&&!showSetupConfirm&&(!tutorialActive||animationTutorialActive)&&!videoController){
+   if(event.key==='Delete'&&(selectedTargets.length||selectedDrawingIds.length)){event.preventDefault();event.stopImmediatePropagation();deleteSelection();return;}
+   if(event.key==='Backspace'&&animationOpen&&(selectedTargets.length||selectedDrawingIds.length)){event.preventDefault();event.stopImmediatePropagation();revertSelectedPositions();return;}
+  }
   if(!editingText&&!event.isComposing&&!tutorialActive&&actionInProgress===null&&!showShare&&!showSettings&&!showExportSettings&&!showHelp&&!showFeedback&&!showDraftRestore&&!showNewPrompt&&applyToolColorShortcut(event))return;
   if(animation&&(animationOpen||viewOnly)&&!editingText&&!event.isComposing&&!tutorialActive&&actionInProgress===null&&!showShare&&!showSettings&&!showExportSettings&&!showHelp&&!showFeedback&&!showDraftRestore&&!showNewPrompt&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!event.shiftKey&&['KeyK','KeyL'].includes(event.code)){
    event.preventDefault();event.stopImmediatePropagation();if(!event.repeat)pendingPlaybackToolKey=event.code;return;
@@ -3914,11 +3941,11 @@
    if(event.key.toLowerCase()==='y'||event.shiftKey)presentationSpotlightController.redo();else presentationSpotlightController.undo();
    return;
   }
-  const inBuilder=builderRoot?.contains(event.target as Node)||(event.target as Element)?.closest('[data-animation-ui],[data-draggable-popover]');
+  const inBuilder=builderRoot?.contains(event.target as Node)||(event.target as Element)?.closest('[data-animation-ui],[data-draggable-popover]')||event.target===document.body;
   if(!viewOnly&&!animationPreview&&!videoController&&!tutorialActive&&actionInProgress===null&&inBuilder&&!editingText&&(event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&['a','c','x','v'].includes(event.key.toLowerCase())){
    const key=event.key.toLowerCase();if(key==='c'&&window.getSelection()?.toString())return;
    event.preventDefault();event.stopImmediatePropagation();
-   if(key==='a'){selectedTargets=allElementTargets();selectedDrawingIds=freeStrokes.map(stroke=>stroke.id);tool='select';singleMarqueeSelection=false;refreshSelectionUi();}
+   if(key==='a'){window.getSelection()?.removeAllRanges();selectedTargets=allElementTargets();selectedDrawingIds=freeStrokes.map(stroke=>stroke.id);tool='select';singleMarqueeSelection=false;refreshSelectionUi();}
    else if(key==='c')copySelectedElements();
    else if(key==='v')pasteElements();
    else if(copySelectedElements())builderController.cut(()=>{const drawingIds=[...selectedDrawingIds];for(const target of [...selectedTargets])removeElementTarget(target);freeStrokes=freeStrokes.filter(stroke=>!drawingIds.includes(stroke.id));selectedTargets=[];selectedDrawingIds=[];clearDeleteState();if(animation)commitAnimation();return true;});
@@ -3929,7 +3956,7 @@
   if(presentation&&!(event.target as Element)?.closest('input:not([type="range"]),textarea,select,[contenteditable="true"]')){
    if(event.altKey&&!event.ctrlKey&&!event.metaKey&&event.key.toLowerCase()==='a'){event.preventDefault();animationOpen=animation?!animationOpen:false;return;}
    if(!event.altKey&&!event.ctrlKey&&!event.metaKey&&event.key.toLowerCase()==='c'){event.preventDefault();fadeLaserDrawings();return;}
-   if(!event.altKey&&!event.ctrlKey&&!event.metaKey&&event.shiftKey&&event.key.toLowerCase()==='l'){event.preventDefault();togglePresentationLaser();return;}
+   if(!event.altKey&&!event.ctrlKey&&!event.metaKey&&event.shiftKey&&event.key.toLowerCase()==='l'){event.preventDefault();activateLaserMode();return;}
    if(!event.altKey&&!event.ctrlKey&&!event.metaKey&&event.key.toLowerCase()==='v'){event.preventDefault();releaseLaserDrawings();tool='select';return;}
   }
   if (videoController) {
@@ -4148,7 +4175,7 @@
 		}
 		if (!event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey && event.key.toLowerCase() === 'l') {
 			event.preventDefault();
-			selectTool('laser');
+			activateLaserMode();
 			return;
 		}
 		if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase() === 'd') {
@@ -4311,6 +4338,7 @@
 	const handleWindowPointerDown = (event: PointerEvent) => {
 		if (viewOnly) return;
 		const target = event.target as Node;
+  if(target instanceof Element&&target.closest('[data-element-action-menu]'))return;
   if(passBallId!==null&&event.button===0){
    if(editorElement?.contains(target))return;
    const hit=target instanceof Element?target.closest('[data-field-kind][data-layer-id]'):null;
@@ -4434,7 +4462,7 @@
 		tutorialStep(
 			'[data-tutorial="interaction-area"]',
 			'Move and Delete',
-			'Drag one element to move it. Select another and use the trash button or press <strong>Del</strong>.',
+			'Drag one element to move it. Select another and use the trash button or press <strong>DELETE</strong>.',
 			'move-and-delete'
 		),
 		tutorialStep(
@@ -4886,7 +4914,8 @@
    }
   });
  };
-	const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawings();if(spotlightEnabled)tool='laser';toolbarEditorTool=null;};
+	 const showAnnotationPointer=()=>{pointerOnField=true;updateLaserPointer(lastAnnotationPoint??hoverPoint??{x:500,y:242});};
+const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawings();if(spotlightEnabled)tool='laser';if(tool==='laser')showAnnotationPointer();toolbarEditorTool=null;};
  const selectTool = (nextTool: ActiveTool) => {
   if(nextTool!=='laser')spotlightEnabled=false;
 		if (animationPreview && !['laser','select'].includes(nextTool)) return;
@@ -4898,8 +4927,10 @@
 		lastPlacementHoverPoint = null;
 		if (toolbarEditorTool !== null && toolbarEditorTool !== nextTool) toolbarEditorTool = null;
 		tool = nextTool;
+		if(nextTool==='laser')showAnnotationPointer();
 		if (nextTool !== 'select') completeTutorialAction(`tool:${nextTool}`);
 	};
+ const activateLaserMode=()=>{if(spotlightEnabled){spotlightEnabled=false;releaseLaserDrawings();}selectTool('laser');};
 	const activateToolbarTool = (nextTool: Tool) => {
   if(nextTool==='free-draw' && tool==='free-draw'){selectTool('select');return;}
 		if (toolbarEditorTool === nextTool) {
@@ -6864,6 +6895,7 @@
 						class:laser-cursor={tool === 'laser' && pointerOnField}
 						class:cursor-crosshair={!dragTarget?.moved && (tool === 'select' || Boolean(marqueeSelection) || ((isGuideTool(tool) || isPathTool(tool)) && pointerOnField))}
 						class:drawing-cursor={tool === 'free-draw' && freeDrawMode === 'draw'}
+                        style:--drawing-cursor={crayonCursor(drawingColor(freeDrawColor))}
 						class:erasing-cursor={tool === 'free-draw' && freeDrawMode === 'erase'}
 						class:!cursor-grabbing={dragTarget?.moved}
 						style="touch-action: none;"
@@ -8663,23 +8695,23 @@
 					</form>
 				{/if}
 
-    {#if !viewOnly && !animationPreview && selectedDrawingBounds && selectedDrawingIds.length}
+    {#if !viewOnly && !animationPreview && !dragTarget?.moved && !drawingDrag?.moved && selectedTargets.length===0 && selectedDrawingBounds && selectedDrawingIds.length}
      <div data-drawing-actions class="absolute z-20 flex gap-1" style:left={`${selectedDrawingBounds.right/10}%`} style:top={`${Math.max(0,selectedDrawingBounds.top-25)/484*100}%`}>
-      {#if drawingCanRevert}<ElementActionButton kind="revert" label="Revert drawing to original position" tooltip="Revert to Original Position" buttonClass="flex h-7 w-7 items-center justify-center border-2 border-white bg-stone-900 text-white" wrapperClass="" onactivate={revertDrawingPosition}><AnimationIcon name="reset"/></ElementActionButton>{/if}
-      <ElementActionButton kind="remove" label="Delete drawing" tooltip="Delete Drawing" buttonClass="flex h-7 w-7 items-center justify-center border-2 border-white bg-stone-900 text-white" wrapperClass="" onactivate={deleteSelectedDrawings}><AnimationIcon name="trash"/></ElementActionButton>
+      {#if drawingCanRevert}<ElementActionButton count={selectedTargets.length+selectedDrawingIds.length} kind="revert" onall={selectionHasFuture?()=>revertSelectedPositions(true):undefined} label="Revert drawing to original position" tooltip="Revert to Original Position" buttonClass="flex h-7 w-7 items-center justify-center border-2 border-white bg-stone-900 text-white" wrapperClass="" onactivate={revertDrawingPosition}><AnimationIcon name="reset"/></ElementActionButton>{/if}
+      <ElementActionButton count={selectedTargets.length+selectedDrawingIds.length} kind="remove" onall={selectionHasFuture?()=>deleteSelection(true):undefined} label="Delete drawing" tooltip="Delete Drawing" buttonClass="flex h-7 w-7 items-center justify-center border-2 border-white bg-stone-900 text-white" wrapperClass="" onactivate={deleteSelectedDrawings}><AnimationIcon name="trash"/></ElementActionButton>
      </div>
     {/if}
-				{#if !viewOnly && !animationPreview && selectedTargets.length > 0 && deleteTarget && deletePosition}
+				{#if !viewOnly && !animationPreview && !dragTarget?.moved && !drawingDrag?.moved && selectedTargets.length > 0 && deleteTarget && deletePosition}
 					<div data-element-actions class="absolute z-20 -translate-y-1/2" style:left={`${deletePosition.x / 10}%`} style:top={`${(deletePosition.y / 484) * 100}%`}>
- {#if canRevertPosition}
+ {#if canRevertPosition || drawingCanRevert}
   <div class="absolute right-full mr-1">
-   <ElementActionButton kind="revert" label="Revert to original position" tooltip="Revert to Original Position" buttonClass="flex h-7 w-7 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white" wrapperClass="flex h-7 w-7 shrink-0" onactivate={revertElementPosition}>
+   <ElementActionButton count={selectedTargets.length+selectedDrawingIds.length} kind="revert" onall={selectionHasFuture?()=>revertSelectedPositions(true):undefined} label="Revert to original position" tooltip="Revert to Original Position" buttonClass="flex h-7 w-7 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white" wrapperClass="flex h-7 w-7 shrink-0" onactivate={revertElementPosition}>
      <svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6" fill="none" stroke="currentColor" stroke-width="2" /></svg>
     </ElementActionButton>
   </div>
  {/if}
 
-						<ElementActionButton kind="remove" bind:element={deleteButtonElement} label={selectedTargets.length>1?'Delete selected elements':'Delete element'} tooltip={selectedTargets.length>1?'Delete Selected Elements':'Delete Element'} wrapperClass="flex h-7 w-7 shrink-0" buttonClass="flex h-7 w-7 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white" onactivate={deleteHoveredElement}><svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" fill="none" stroke="currentColor" stroke-width="2" /></svg></ElementActionButton>
+						<ElementActionButton count={selectedTargets.length+selectedDrawingIds.length} kind="remove" onall={selectionHasFuture?()=>deleteSelection(true):undefined} bind:element={deleteButtonElement} label={selectedTargets.length>1?'Delete selected elements':'Delete element'} tooltip={selectedTargets.length>1?'Delete Selected Elements':'Delete Element'} wrapperClass="flex h-7 w-7 shrink-0" buttonClass="flex h-7 w-7 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white" onactivate={deleteHoveredElement}><svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" fill="none" stroke="currentColor" stroke-width="2" /></svg></ElementActionButton>
 					</div>
 				{/if}
 			</div>
@@ -9424,11 +9456,13 @@
 							lines to open their inline editor.
 						</p>
 						<p>
-							<strong>Delete:</strong> Click an element to show its nearby trash button, or press <kbd>Del</kbd>. Use <kbd>Shift</kbd> +
-							<kbd>Del</kbd> to clear everything.
+							<strong>Delete:</strong> Select elements or drawings and click the trash button, or press <kbd>DELETE</kbd>. Use <kbd>Shift</kbd> +
+							<kbd>DELETE</kbd> to clear everything.
 						</p>
 						<p>
-							<strong>Undo/redo:</strong> Use the Undo button or <kbd>{primaryModifierKey}</kbd> + <kbd>Z</kbd>. Redo with
+							<strong>Revert in animation:</strong> Use the revert button or <kbd>BACKSPACE</kbd> to return selected elements to their origins for this step.
+                        </p><p>
+                            <strong>Undo/redo:</strong> Use the Undo button or <kbd>{primaryModifierKey}</kbd> + <kbd>Z</kbd>. Redo with
 							<kbd>{primaryModifierKey}</kbd> + <kbd>Shift</kbd> +
 							<kbd>Z</kbd>
 							or <kbd>{primaryModifierKey}</kbd> + <kbd>Y</kbd>.
@@ -9830,10 +9864,7 @@
 	}
 	.drawing-cursor,
 	.drawing-cursor [data-field-element] {
-		cursor:
-			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M5 26l3-8L23 3l6 6-15 15-9 2Z' fill='%23fff' stroke='%231c1917' stroke-width='2' stroke-linejoin='miter'/%3E%3Cpath d='m8 18 6 6' stroke='%231c1917' stroke-width='2'/%3E%3C/svg%3E")
-				4 28,
-			crosshair !important;
+		cursor:var(--drawing-cursor,crosshair)!important;
 	}
 	.erasing-cursor,
 	.erasing-cursor [data-field-element] {

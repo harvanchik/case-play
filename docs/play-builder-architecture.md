@@ -1,6 +1,6 @@
 # Play-builder architecture and future-sport parity record
 
-Last updated: **2026-11-04**.
+Last updated: **2026-11-05**.
 
 This is the living handoff for the play-builder family. Read it before implementing basketball or changing shared builder behavior. It records what exists, what is reusable, what still needs adaptation, and the experience future sports must retain. Source code is authoritative; update this record alongside changes rather than allowing it to become an older design proposal.
 
@@ -58,6 +58,7 @@ Paths in this table are relative to `src/lib/`.
 | `components/play-builder/LineFormatControls.svelte`, `ColorSwatchPalette.svelte` | Reusable color/style palettes. Supply the sport's palette and actual shortcut keycaps. |
 | `components/play-builder/TransitionDuration.svelte` | Inline seconds editor with suffix, limits, and normal/fine keyboard increments. |
 | `play-builder-keyboard-scrub.ts` | Shared held-arrow scrubbing/shuttle behavior with injected timeline callbacks. |
+| `play-builder-color.ts` | Perceptual OKLab color blending and neutral-preserving fabric tint matrices, shared by browser and export rendering. |
 | `play-builder-definition.ts` | Existing generic sport/tool metadata types. This is a small palette contract, not a finished sport-plugin or renderer interface. |
 | `play-builder-watermark.ts`, `play-builder-watermark-guard.ts` | Geometry fitting and casual DOM-edit repair; restore the authored mark before export. This does not make a browser-controlled watermark tamper-proof. |
 | `play-builder-video-batch.ts` | Bounded parallel export orchestration, ordering, cancellation, and cleanup. |
@@ -163,7 +164,14 @@ These items are **not completed** merely because the controllers exist:
 
 ## Verification baseline and known limitations
 
-Latest refactor verification recorded on 2026-11-04:
+Latest shared-UI/refactor completion checks recorded on 2026-11-05:
+
+- 75 unit tests passed; one optional FFmpeg/server-video integration test skipped.
+- 36 focused Chrome scenarios passed across the run and focused retries, including annotation/drawing tools, timing, editor exclusivity, group/future-step operations, save/reload, fullscreen, clipboard and play reordering. Seven WebKit scenarios also passed, including all four new animation/selection regressions.
+- All nine before/final screenshot comparisons were pixel-identical: static field, plays, element editor, animation doc, movement routes/ghosts, motion editor, laser palette, spotlight and fullscreen.
+- Svelte/type checking reported 0 errors and 0 warnings. The prior full Chrome run had 68 passes, one opt-in visual harness skip, and three timeouts; all three timed-out scenarios subsequently passed. One older drawing-effect fixture was corrected to actually move the drawing before requesting animation options, matching the established unchanged-element behavior.
+
+Earlier broader baseline recorded on 2026-11-04:
 
 - 65 unit tests passed; one optional FFmpeg/server-video integration test skipped.
 - 58 Chrome browser cases and 7 WebKit cases passed, covering existing animation, mixed selections/drawings, snapping, clipboard/history, tutorial cleanup, save/reload/shared duplication, and exports.
@@ -186,6 +194,13 @@ Relevant test entry points:
 
 ## Running change log
 
+### 2026-11-05 — OKLab blending and play-reorder cursor
+
+- Replaced HSL color-wheel interpolation with shared `perceptualColorTransition`: decode sRGB, interpolate OKLab coordinates, convert back to displayable sRGB. Exact endpoints and Jump cuts remain unchanged. `fabricTintMatrix` retains single-image fabric tinting and neutral details. All preview/export and drawing/object consumers use the same implementation.
+- Shared play tabs show grabbing across the page during an active reorder gesture, restoring normal cursors on drop, cancellation, blur, and component teardown.
+- Unit tests cover known OKLab midpoints, neutrals, endpoint clamping, symmetry and fabric tinting. Verification: 77 unit tests passed (one optional FFmpeg integration skipped), four Chrome/WebKit browser checks passed for cursor restoration and actual player/drawing/fabric colors, and Svelte/type checking reported 0 errors and 0 warnings.
+
+
 Entries describe implementation milestones, not assumed Git commits. Consult Git history for commit IDs. Add new entries here in the same task as shared changes; update the affected sections above rather than only appending history.
 
 ### 2026-11-04 — Shared shell, annotation tools, and element-editor framework
@@ -193,8 +208,32 @@ Entries describe implementation milestones, not assumed Git commits. Consult Git
 - Flag football now uses shared action bars, export controls, play tabs/reordering, fullscreen lifecycle and controls, viewer playback controls, and the animation-doc portal. Existing DOM geometry, selected styles, tooltips, shortcuts, read-only states and save locks are retained.
 - Extracted transient laser/spotlight state operations and overlay rendering, plus the authored drawing palette and sampling/completion engine. Existing history adapters, animation persistence, temporary-mark exclusion and pen behavior remain connected.
 - Added per-builder editor coordination/capabilities and shared dragging/dismissal action. Marker, guide, path, team-box, drawing-color and motion editors use it. Added shared name input and Delete/Revert controls; sport-specific fields remain in adapters.
-- Added deterministic lifecycle/reorder/editor/drawing tests and an opt-in before/after screenshot harness. Nine desktop visual states were pixel-identical after extraction. Unit suite: 74 passed, 1 optional FFmpeg test skipped. Svelte check: 0 errors and 0 warnings. Browser regression results are recorded below after the run completes.
+- Added deterministic lifecycle/reorder/editor/drawing tests and an opt-in before/after screenshot harness. Nine desktop visual states were pixel-identical after extraction. The completion checks are recorded in the verification section above.
 - No basketball implementation, document-format change, new backend service, or deployment was introduced.
+
+### 2026-11-05 — Refactor completion and animation editing fixes
+
+- Guarded/deferred animation artwork placement when an SVG parent is not attached. This addresses the null `querySelector` exception during step/ghost replacement; navigation regression coverage captures uncaught page errors.
+- Laser/spotlight activation initializes its field cursor immediately. Transient marks retain independent history and export exclusion.
+- Newly appearing posed elements honor the authored departure time. Added markers/guides preselect Jump and retain their other primary controls disabled; arrows retain initial Draw/Morph options and drawings retain their own reveal types. Hard Cut/Fade/Shrink appearance uses the same deterministic evaluator for preview and export.
+- Delete handles mixed element/drawing selections; Backspace reverts selected items to their previous-step origins in animation mode. Revert supports groups. Shared action split menus offer current-step-only versus future-step updates when selected items have later poses. Reverting with future updates applies the restored origin position to those later poses; Delete with future updates hides them there.
+- Added a shared color-aware crayon cursor with pale tips. No basketball implementation or saved-document version change.
+- Verification: 75 unit passes (one optional FFmpeg skip), 36 focused Chrome scenarios passed across the run and retries, seven WebKit passes, nine exact visual matches, and clean Svelte/type checking. Fixed a portal-menu selection loss found during testing; updated a pre-existing drawing-effect fixture to move its drawing before expecting animation controls. Removed the one-off extraction scripts after their changes were integrated. Earlier dated baseline results remain distinguishable from current checks.
+
+### 2026-11-05 — Spotlight and action-control follow-up
+
+- Shared Revert/Delete menus use These for groups, and action tooltips include BACKSPACE/DELETE keycaps. Help and existing tutorial descriptions document the same shortcuts. Escape closes an action menu without clearing the selection.
+- Raised the shared annotation layer after SVG insertion/mode updates, fixing elements remaining bright until the first pointer move. Shift+L exits spotlight and selects the regular laser, including presentation mode.
+- Restored the familiar disabled primary controls for added markers/guides with Jump selected. Added arrows keep their initial Draw option; drawing animation controls are unchanged.
+- Extended browser coverage for immediate topmost spotlight placement, laser-mode switching, plural menus/keycaps, added-marker disabled controls, and added-arrow Draw availability. Verification: nine Chrome scenarios passed across the run and focused retry; five WebKit scenarios passed; Svelte/type checking reported 0 errors and 0 warnings.
+
+### 2026-11-05 — Selection, overlay ordering, and color-wheel transitions
+
+- Select-all handles body focus after leaving toolbar controls and clears stale native text selection. Escape clears mixed object/drawing selections. Mixed selections use one action bar, hidden while a drawing or group drag is active.
+- Header navigation stacks above the dock and editor portals. Annotation layer restoration keeps spotlight dimming above selected ghosts after Undo, without requiring a pointer move.
+- Shared dropdown tooltips opt into a click-dismiss latch, reopening only after pointer exit/re-entry.
+- Added `play-builder-color.ts`: all animated object/guide/arrow/drawing fills use shortest-arc HSL interpolation. Belts and bean bags use a single tinted image instead of two dissolving images, retaining neutral details. Browser and server/export renderers share the color/tint functions; Jump still cuts colors according to its transition.
+- Verification: 77 unit tests passed (one optional FFmpeg integration skipped), 11 Chrome scenarios and 10 WebKit scenarios passed across the runs and focused retries, and clean Svelte/type checking. Spotlight Undo includes an exact before/after ghost-region screenshot comparison; artwork color checks inspect the rendered artwork rather than transparent hit targets. No document schema change or new sport implementation.
 
 ### 2026-11-04 — Playback-speed arrow scrubbing
 

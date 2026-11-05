@@ -19,9 +19,15 @@
  export let width:number; export let height:number;
  export let laserColorValue:(color:LaserColor)=>string;
  export let laserPaint:(color:LaserColor|'rainbow')=>string;
+ // Raise after Svelte inserts its sibling artwork, not only on the next pointer move.
+ const annotationLayer=(node:SVGGElement,_state:unknown)=>{
+  let disposed=false;
+  const raise=()=>queueMicrotask(()=>{if(disposed)return;const surface=node.ownerSVGElement;if(surface&&surface.lastElementChild!==node)surface.appendChild(node);});
+  raise();return{update:raise,destroy:()=>{disposed=true;}};
+ };
 </script>
 						{#if tool === 'laser' || spotlightStrokes.length>0 || laserTrail.length > 0 || laserDrawings.length > 0 || (activeLaserDrawing?.points.length ?? 0) > 1}
-							<g data-laser-pointer-layer data-export-exclude pointer-events="none">
+							<g use:annotationLayer={{tool,spotlightEnabled,laserTrailClock,spotlightStrokes}} data-laser-pointer-layer data-export-exclude pointer-events="none">
          {#if spotlightStrokes.length||activeSpotlightStroke||spotlightEnabled&&tool==='laser'}
           <defs>
            <radialGradient id="builder-spotlight-edge"><stop offset="75%" stop-color="black"/><stop offset="100%" stop-color="black" stop-opacity="0"/></radialGradient>

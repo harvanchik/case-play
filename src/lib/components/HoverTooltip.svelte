@@ -11,6 +11,7 @@
 	let {
 		text,
 		reopenOnPointerMove = false,
+        dismissOnClick = false,
 		pointerPosition,
 		shortcutKeys = [],
 		cursorOffsetXPx = 24,
@@ -25,6 +26,7 @@
 	}: {
 		text: string;
 		reopenOnPointerMove?: boolean;
+        dismissOnClick?: boolean;
 		pointerPosition?: { x: number; y: number };
 		shortcutKeys?: string[];
 		cursorOffsetXPx?: number;
@@ -39,6 +41,7 @@
 	} = $props();
 
 	let isOpen = $state(false);
+ let suppressed=$state(false);
  let anchorMode = $state<'pointer'|'focus'>('pointer');
 	let panel = $state<HTMLDivElement>();
 	let cursorX = $state(0);
@@ -86,7 +89,7 @@
 	});
 
 	const openAtPointer = (event: PointerEvent) => {
-        if(keyboardNavigating)return;
+        if(keyboardNavigating||suppressed)return;
         anchorMode='pointer';
 		window.dispatchEvent(new CustomEvent('case-play-tooltip-open', { detail: tooltipId }));
 		cursorX = event.clientX;
@@ -95,6 +98,7 @@
 		positionPanel();
 	};
 	const followPointer = (event: PointerEvent) => {
+        if(suppressed)return;
         if(keyboardNavigating && !event.movementX && !event.movementY)return;
         keyboardNavigating=false;
         anchorMode='pointer';
@@ -107,6 +111,7 @@
 		positionPanel();
 	};
 	const openAtFocus = (event: FocusEvent) => {
+        if(suppressed)return;
         anchorMode='focus';
 		window.dispatchEvent(new CustomEvent('case-play-tooltip-open', { detail: tooltipId }));
 		const focusTarget = event.target instanceof Element ? event.target : (event.currentTarget as Element);
@@ -136,9 +141,10 @@
     data-tooltip-owner={tooltipId}
 	role="group"
 	onpointerenter={openAtPointer}
+    onclickcapture={()=>{if(dismissOnClick){suppressed=true;isOpen=false;}}}
 	onpointerover={reopenOnPointerMove ? openAtPointer : undefined}
 	onpointermove={followPointer}
-	onpointerleave={(event) => { if (!(event.currentTarget as Element).contains(document.activeElement)) isOpen = false; }}
+	onpointerleave={(event) => { if(suppressed){suppressed=false;isOpen=false;return;} if (!(event.currentTarget as Element).contains(document.activeElement)) isOpen = false; }}
 	onfocusin={openAtFocus}
 	onfocusout={() => (isOpen = false)}
 >

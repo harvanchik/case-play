@@ -428,6 +428,7 @@ test('Jump uses effect duration inputs, drawing Fade works, and LOS stays above 
  const save=page.getByRole('button',{name:'Save play',exact:true});await save.focus();expect(await save.evaluate(node=>getComputedStyle(node).boxShadow)).toContain('rgb(30, 144, 255)');
  await page.getByRole('button',{name:'Free Draw',exact:true}).click();await draw(page,.4);await page.getByRole('button',{name:'Free Draw',exact:true}).click();
  await page.getByRole('button',{name:'Add animation step',exact:true}).click();
+ const hit=page.locator('[data-drawing-hit]').first();const hitBox=(await hit.boundingBox())!;await page.mouse.move(hitBox.x+hitBox.width/2,hitBox.y+hitBox.height/2);await page.mouse.down();await page.mouse.move(hitBox.x+hitBox.width/2+25,hitBox.y+hitBox.height/2+20,{steps:8});await page.mouse.up();
  await page.locator('[data-drawing-hit]').first().dblclick();
  const picker=page.locator('[data-drawing-animation-picker]');await picker.getByRole('button',{name:'Jump',exact:true}).click();
  await expect(picker.locator('[data-speed-label]')).toHaveCount(0);
@@ -545,6 +546,7 @@ test('Revert and Delete tooltips open below-left and Revert inverts on hover',as
  for(const name of ['Revert to original position','Delete element']){
   const button=page.getByRole('button',{name,exact:true});await button.hover();const box=(await button.boundingBox())!,tip=(await page.getByRole('tooltip').boundingBox())!;
   expect(tip.x+tip.width).toBeLessThan(box.x+box.width/2);expect(tip.y).toBeGreaterThan(box.y+box.height/2);
+  await expect(page.getByRole('tooltip').locator('kbd')).toHaveText(name.startsWith('Revert')?'BACKSPACE':'DELETE');
   if(name.startsWith('Revert'))await expect.poll(()=>button.evaluate(node=>{const s=getComputedStyle(node);return [s.backgroundColor,s.color,s.borderTopColor];})).toEqual(['rgb(255, 255, 255)','rgb(0, 0, 0)','rgb(0, 0, 0)']);
  }
 });

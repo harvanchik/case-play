@@ -13,9 +13,15 @@
  export let onselect:(id:number)=>void;
  export let onmenu:(event:MouseEvent,id:number)=>void;
  export let onadd:()=>void;
+ const reorderCursor=(_node:HTMLElement,initial:boolean)=>{
+  let active=false;
+  const update=(value:boolean)=>{active=value;document.documentElement.classList.toggle('play-reorder-grabbing',value);};
+  update(initial);return{update,destroy:()=>{if(active)document.documentElement.classList.remove('play-reorder-grabbing');}};
+ };
 </script>
 			<div
 				data-tutorial="play-management"
+                use:reorderCursor={!!drag?.moved}
 				class="play-management-toolbar absolute left-2 z-30"
 				class:h-9={editingPlayId === null}
 				class:h-40={editingPlayId !== null}
@@ -72,6 +78,7 @@
 <slot/>
 </div>
 <style>
+ :global(html.play-reorder-grabbing),:global(html.play-reorder-grabbing *){cursor:grabbing!important;}
  .play-management-toolbar{transform:scale(var(--builder-action-scale));transform-origin:bottom left;}
  .play-tabs-scroll{scrollbar-width:none;}.play-tabs-scroll::-webkit-scrollbar{display:none;width:0;height:0;}
  @container(max-width:900px){.play-management-toolbar{transform:scale(.72);}}

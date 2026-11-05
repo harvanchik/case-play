@@ -47,6 +47,16 @@ function play() {
 }
 const near = (actual: number, expected: number, tolerance = 0.001) => assert.ok(Math.abs(actual - expected) < tolerance, `${actual} ≈ ${expected}`);
 
+test('added elements wait for their start time and fade or shrink into their first visible step',()=>{
+ const source=play();source.animation.steps[0].poses[0].visible=false;
+ const motion={...defaultMotion({type:'marker' as const,id:1}),path:'jump' as const,start:.7,jumpEffect:'fade' as const,jumpDuration:.4};source.animation.transitions[0].motions=[motion];
+ assert.equal(evaluateAnimation(source,1.39).markers.some(marker=>marker.id===1),false);
+ const half=evaluateAnimation(source,1.6).markers.find(marker=>marker.id===1)!;
+ near(half.animationOpacity!, .5);near(half.x,200);
+ source.animation.transitions[0].motions[0].jumpEffect='shrink';near(evaluateAnimation(source,1.6).markers.find(marker=>marker.id===1)!.animationScale!,.5);
+ source.animation.transitions[0].motions[0].jumpEffect='cut';assert.equal(evaluateAnimation(source,1.4).markers.some(marker=>marker.id===1),true);
+});
+
 test('v7 round trips animation; v1–v6 documents remain static and readable', () => {
 	const source = { activePlayIndex: 0, plays: [play()] };
 	assert.deepEqual(JSON.parse(JSON.stringify(decodePlayBuilderDocument(encodePlayBuilderDocument(source)))), source);
