@@ -1,3 +1,4 @@
+import { perceptualColorTransition } from './play-builder-color';
 import type { FreeStroke, Point } from './play-builder-scene';
 import type { Motion, PlayAnimation } from './play-builder-animation';
 export type DrawingAnimation = {
@@ -67,8 +68,8 @@ export function evaluateDrawings(strokes: FreeStroke[], animation: PlayAnimation
         const palette:Record<string,string>={red:'#ff1744',orange:'#ff6d00',yellow:'#ffea00',green:'#00ff66',cyan:'#00e5ff',blue:'#2979ff',purple:'#d500f9',white:'#ffffff',gray:'#9ca3af',black:'#000000'};
         const fromColor=palette[('color' in source?source.color:undefined)??stroke.color],toColor=palette[('color' in destination?destination.color:undefined)??stroke.color];
         const colorProgress=authored?.mode==='jump'||authored?.mode==='instant'?movement:movement;
-        const channels=[1,3,5].map(index=>Math.round(parseInt(fromColor.slice(index,index+2),16)*(1-colorProgress)+parseInt(toColor.slice(index,index+2),16)*colorProgress));
-        stroke = {...stroke,animationOpacity:fading&&jumpElapsed>=0&&jumpElapsed<jumpLength?Math.abs(2*jumpElapsed/jumpLength-1):1,animationColor:`rgb(${channels.join(', ')})`,points:stroke.points.map(point=>({x:point.x+offset.x,y:point.y+offset.y}))};
+        const animationColor=perceptualColorTransition(fromColor,toColor,colorProgress);
+        stroke = {...stroke,animationOpacity:fading&&jumpElapsed>=0&&jumpElapsed<jumpLength?Math.abs(2*jumpElapsed/jumpLength-1):1,animationColor,points:stroke.points.map(point=>({x:point.x+offset.x,y:point.y+offset.y}))};
         if (before) return [stroke];
 		const motion = authored ?? defaultDrawingAnimation(stroke.id, to.id);
 		if (progress >= 1) return [stroke];

@@ -1,3 +1,4 @@
+import {perceptualColorTransition} from '../src/lib/play-builder-color';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
@@ -184,7 +185,7 @@ test('drawing colors remain step-local and blend for Linear but cut for Jump',()
  assert.equal(applyAnimationStep(saved.scene,saved.animation.steps[0]).freeStrokes[0].color,'red');
  assert.equal(applyAnimationStep(saved.scene,saved.animation.steps[1]).freeStrokes[0].color,'blue');
  const play={scene:saved.scene,animation:saved.animation};
- assert.equal(evaluateAnimation(play,.5).freeStrokes[0].animationColor,'rgb(148, 72, 162)');
+ assert.equal(evaluateAnimation(play,.5).freeStrokes[0].animationColor,perceptualColorTransition('#ff1744','#2979ff',.5));
  saved.animation.drawings=[{...defaultDrawingAnimation(51,saved.animation.steps[1].id),mode:'jump',start:.4}];
  assert.equal(evaluateAnimation(play,.39).freeStrokes[0].points[0].x,100);
  assert.equal(evaluateAnimation(play,.39).freeStrokes[0].animationColor,'rgb(255, 23, 68)');

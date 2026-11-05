@@ -1,3 +1,4 @@
+import {perceptualColorTransition} from '../src/lib/play-builder-color';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
@@ -92,7 +93,7 @@ test('marker and guide colors are step-local, blend with timing and easing, and 
 	assert.equal(applyAnimationStep(saved.scene, saved.animation.steps[0]).markers[0].color, 'red');
 	assert.equal(applyAnimationStep(saved.scene, saved.animation.steps[2]).markers[0].color, 'red');
 	const middle = evaluateAnimation(saved, 0.5);
-	assert.equal(middle.markers[0].animationColor, 'rgb(157, 145, 98)');
+	assert.equal(middle.markers[0].animationColor, perceptualColorTransition('#ef4444','#4ade80',.5));
 	for (const marker of middle.markers) {
 		assert.equal(marker.colorMix, 0.5);
 		assert.ok(marker.colorFrom);

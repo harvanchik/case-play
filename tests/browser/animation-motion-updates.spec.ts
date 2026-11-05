@@ -1,3 +1,4 @@
+import {perceptualColorTransition} from '../../src/lib/play-builder-color';
 import { test, expect, type Page } from '@playwright/test';
 async function ready(page: Page, duration = '4') {
 	await page.goto('/diagram/flag-football');
@@ -380,7 +381,7 @@ test('existing drawings offer Linear/Jump and colors stay step-local without foc
  expect(await picker.getByRole('button',{name:'Linear',exact:true}).evaluate(node=>getComputedStyle(node).outlineStyle)).toBe('none');
  await page.keyboard.press('Escape');await page.keyboard.press('2');
  const drawing=page.locator('[data-free-drawing]').first();expect(await drawing.getAttribute('stroke')).toBe('#ff1744');
- await seek(page,1.5);expect(await drawing.getAttribute('stroke')).toBe('rgb(148, 72, 162)');
+ await seek(page,1.5);expect(await drawing.getAttribute('stroke')).toBe(perceptualColorTransition('#ff1744','#2979ff',.5));
  await page.keyboard.press('3');await hit.dblclick();await picker.getByRole('button',{name:'Jump',exact:true}).click();
  await page.keyboard.press('Escape');await seek(page,1.1);expect(await drawing.getAttribute('stroke')).toBe('rgb(41, 121, 255)');
 });

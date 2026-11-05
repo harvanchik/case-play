@@ -1,4 +1,5 @@
 <script lang="ts">
+ import {fabricTintMatrix,perceptualColorTransition} from '$lib/play-builder-color';
  import type { FieldMarker, PlayerKind, OfficialKind, GuideColor } from '$lib/play-builder-scene';
  import { playBuilderPlayerInk, playBuilderGuideColor as guideColor } from '$lib/play-builder-rendering';
  import { playBuilderEventTagLines as eventTagLines, playBuilderEventTagLayout, PLAY_BUILDER_EVENT_TAG_LINE_HEIGHT as eventTagLineHeight } from '$lib/play-builder-event-tag';
@@ -53,8 +54,10 @@
 </script>
 
 {#if marker.colorFrom && marker.colorMix!==undefined && (marker.kind==='deflag'||marker.kind==='bean-bag')}
- <g><svelte:self marker={{...marker,color:marker.colorFrom,colorFrom:undefined,colorMix:undefined}}/></g>
- <g opacity={marker.colorMix}><svelte:self marker={{...marker,colorFrom:undefined,colorMix:undefined}}/></g>
+ {@const reference=marker.kind==='deflag'?'red':'blue'}
+ {@const tint=marker.animationColor??perceptualColorTransition(guideColor(marker.colorFrom),guideColor(marker.color??reference),marker.colorMix)}
+ <defs><filter id={`marker-color-${marker.id}`} color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values={fabricTintMatrix(guideColor(reference),tint)}/></filter></defs>
+ <g filter={`url(#marker-color-${marker.id})`}><svelte:self marker={{...marker,color:reference,colorFrom:undefined,colorMix:undefined}}/></g>
 {:else if isTeamMarker(marker)}
 									{@const markerColor = playerMarkerColor(marker)}
 									<circle

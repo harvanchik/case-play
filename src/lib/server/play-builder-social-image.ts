@@ -1,3 +1,4 @@
+import {fabricTintMatrix,perceptualColorTransition} from '../play-builder-color';
 import { applyAnimationStep } from '../play-builder-animation';
 import {
 	defaultPlayBuilderFieldSettings,
@@ -17,6 +18,7 @@ import {
 } from '$lib/play-builder-scene';
 import {
 	PLAY_BUILDER_GUIDE_COLORS,
+ playBuilderGuideColor,
  playBuilderDrawArrow,
  playBuilderPlayerInk,
 	playBuilderAirborneLift,
@@ -261,7 +263,10 @@ const freehandPath = (points: Point[]) => {
 };
 
 const renderMarker = (marker: FieldMarker): string => {
-	if(marker.colorFrom&&marker.colorMix!==undefined&&(marker.kind==='deflag'||marker.kind==='bean-bag'))return `<g opacity="1">${renderMarker({...marker,color:marker.colorFrom,colorFrom:undefined,colorMix:undefined})}</g><g opacity="${marker.colorMix}">${renderMarker({...marker,colorFrom:undefined,colorMix:undefined})}</g>`;
+ if(marker.colorFrom&&marker.colorMix!==undefined&&(marker.kind==='deflag'||marker.kind==='bean-bag')){
+  const reference=marker.kind==='deflag'?'red':'blue';const tint=marker.animationColor??perceptualColorTransition(playBuilderGuideColor(marker.colorFrom),playBuilderGuideColor(marker.color??reference),marker.colorMix);
+  return `<defs><filter id="marker-color-${marker.id}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${fabricTintMatrix(playBuilderGuideColor(reference),tint)}"/></filter></defs><g filter="url(#marker-color-${marker.id})">${renderMarker({...marker,color:reference,colorFrom:undefined,colorMix:undefined})}</g>`;
+ }
 	const label = escapeXml(marker.label ?? '');
 	const renderImageMarker = (asset: string, size: number) =>
 		`<g><image href="${asset}" x="${marker.x - size / 2}" y="${marker.y - size / 2}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid meet"/>${label ? `<text opacity="${marker.animationLabelOpacity??1}" x="${marker.x}" y="${marker.y + size / 2 + 9}" text-anchor="middle" fill="#fff" stroke="#111827" stroke-width="2" paint-order="stroke" font-size="8" font-weight="900">${label}</text>` : ''}</g>`;

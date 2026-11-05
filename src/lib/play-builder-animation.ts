@@ -1,3 +1,4 @@
+import { perceptualColorTransition } from './play-builder-color';
 import { playBuilderGuideColor } from './play-builder-rendering';
 import { defaultDrawingAnimation, evaluateDrawings, type DrawingAnimation } from './play-builder-drawing-animation';
 import type { DownMarkerValue, GuideColor, FieldMarker, PlayBuilderScene, Point } from './play-builder-scene';
@@ -388,8 +389,8 @@ export const evaluateAnimation = (play: { scene: PlayBuilderScene; animation?: P
  const start=motion.start*transition.duration;const length=Math.min(motion.jumpDuration??.25,transition.duration-start);
  const fraction=motion.path==='jump'?(t*transition.duration-start>=((motion.jumpEffect??'fade')==='cut'?0:length/2)?1:0):ease(clamp((t-motion.start)/Math.max(.000001,motionArrival(motion)-motion.start)),motion.easing);
  const a=playBuilderGuideColor(pose.color),b=playBuilderGuideColor(destination.color);
- const channels=[1,3,5].map(index=>Math.round(mix(parseInt(a.slice(index,index+2),16),parseInt(b.slice(index,index+2),16),fraction)));
- return {...result,color:destination.color,colorFrom:pose.color,colorMix:fraction,animationColor:`rgb(${channels.join(', ')})`};
+ const animationColor=perceptualColorTransition(a,b,fraction);
+ return {...result,color:destination.color,colorFrom:pose.color,colorMix:fraction,animationColor};
  }).filter((pose): pose is AnimationPose => Boolean(pose));
 	return {...applyAnimationStep(staticScene, { id: 'preview', name: '', poses }),freeStrokes:evaluateDrawings(scene.freeStrokes,animation,index,t)};
 };
