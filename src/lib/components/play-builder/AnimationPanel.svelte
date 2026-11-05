@@ -191,7 +191,7 @@
 	export let onchange: (animation: PlayAnimation, step?: number) => void;
 	export let onstep: (index: number) => void;
 	export let onseek: (time: number) => void;
- export let onshuttle: (direction: number) => void;
+ export let onshuttle: (direction: number, speed?: number) => void;
 	export let onplay: () => void;
 	export let onclose: () => void;
  export let tutorialAttention = false;
@@ -647,7 +647,7 @@
   };
   transportFrame = requestAnimationFrame(waitForHold);
  }
- const keyboardScrubber = createKeyboardScrubber(() => time, () => total, value => onseek(value), { playing: () => playing, change: onshuttle });
+ const keyboardScrubber = createKeyboardScrubber(() => time, () => total, value => onseek(value), { rate: () => rate, change: onshuttle });
 	function animationKeydown(event: KeyboardEvent) {
   keyboardScrubber.modifier(event.shiftKey);
   if (!['ArrowLeft', 'ArrowRight', 'Shift'].includes(event.key)) keyboardScrubber.stop();
@@ -755,7 +755,7 @@
 		reopenOnPointerMove
 		pointerPosition={tooltipPointer}
 		text={tooltipTitle(tooltipText)}
-		shortcutKeys={tooltipText === 'Rewind' || tooltipText === 'Fast Forward' ? [...(playing ? [] : ['Shift']), tooltipText === 'Rewind' ? '←' : '→'] : tooltipKeys}
+		shortcutKeys={tooltipText === 'Rewind' || tooltipText === 'Fast Forward' ? ['Shift', tooltipText === 'Rewind' ? '←' : '→'] : tooltipKeys}
 		minWidthPx={0}
 		placement={tooltipAboveMarker ? "above" : "right"}
   cursorOffsetYPx={tooltipAboveMarker ? 8 : 18}
@@ -926,9 +926,9 @@
 <div class="transport-center" role="group" aria-label="Timeline playback controls">
  <button class="icon" data-animation-tooltip="Start of Timeline" aria-label="Go to animation start" data-animation-shortcut="Home" aria-keyshortcuts="Home" disabled={time <= 0} on:click={() => onstep(0)}><AnimationIcon name="timeline-start" /></button>
  <button class="icon" data-animation-tooltip="Prior Step" aria-label="Previous animation step" data-animation-shortcut="KeyJ" aria-keyshortcuts="J Control+ArrowLeft Meta+ArrowLeft Alt+Shift+ArrowLeft" disabled={preview ? time <= 0 : stepIndex <= 0} on:click={previousAnimationStep}><AnimationIcon name="start" /></button>
- <button class="icon" data-animation-tooltip="Rewind" aria-label="Rewind animation" aria-keyshortcuts={playing ? "ArrowLeft" : "Shift+ArrowLeft"} disabled={!total || time <= 0} on:pointerdown={(event) => beginTransportScrub(event, -1)} on:click={(event) => { if (event.detail === 0) scrubTransport(-1); }}><AnimationIcon name="rewind" /></button>
+ <button class="icon" data-animation-tooltip="Rewind" aria-label="Rewind animation" aria-keyshortcuts="Shift+ArrowLeft" disabled={!total || time <= 0} on:pointerdown={(event) => beginTransportScrub(event, -1)} on:click={(event) => { if (event.detail === 0) scrubTransport(-1); }}><AnimationIcon name="rewind" /></button>
  <button class="icon" data-animation-tooltip={playing ? 'Pause' : total > 0 && time >= total ? 'Restart' : 'Play'} aria-label={playing ? 'Pause animation' : total > 0 && time >= total ? 'Restart animation' : 'Play animation'} data-animation-shortcut="KeyK" aria-keyshortcuts="K Space" disabled={!total} on:click={onplay}><AnimationIcon name={playing ? 'pause' : total > 0 && time >= total ? 'reset' : 'play'} /></button>
- <button class="icon" data-animation-tooltip="Fast Forward" aria-label="Fast forward animation" aria-keyshortcuts={playing ? "ArrowRight" : "Shift+ArrowRight"} disabled={!total || time >= total} on:pointerdown={(event) => beginTransportScrub(event, 1)} on:click={(event) => { if (event.detail === 0) scrubTransport(1); }}><AnimationIcon name="fast-forward" /></button>
+ <button class="icon" data-animation-tooltip="Fast Forward" aria-label="Fast forward animation" aria-keyshortcuts="Shift+ArrowRight" disabled={!total || time >= total} on:pointerdown={(event) => beginTransportScrub(event, 1)} on:click={(event) => { if (event.detail === 0) scrubTransport(1); }}><AnimationIcon name="fast-forward" /></button>
  <button class="icon" data-animation-tooltip="Next Step" aria-label="Next animation step" data-animation-shortcut="KeyL" aria-keyshortcuts="L Control+ArrowRight Meta+ArrowRight Alt+Shift+ArrowRight" disabled={preview ? time >= total : stepIndex >= animation.steps.length - 1} on:click={nextAnimationStep}><AnimationIcon name="end" /></button>
  <button class="icon" data-animation-tooltip="End of Timeline" aria-label="Go to animation end" data-animation-shortcut="End" aria-keyshortcuts="End" disabled={!total || time >= total} on:click={() => onstep(animation.steps.length - 1)}><AnimationIcon name="timeline-end" /></button>
 </div>

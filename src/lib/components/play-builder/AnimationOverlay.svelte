@@ -4,7 +4,9 @@
  const routeMemory = new Map<string, { routes: Partial<Record<RememberedMotion['path'], RememberedMotion>>; end: number }>();
 </script>
 <script lang="ts">
- import { draggablePopover, rememberPopoverAnchor } from '$lib/play-builder-popover';
+ import { useElementEditor } from '$lib/play-builder-element-editor';
+ const elementEditor=useElementEditor();
+ import { rememberPopoverAnchor } from '$lib/play-builder-popover';
  import ElementEditorModes from './ElementEditorModes.svelte';
  import DropdownChevron from './DropdownChevron.svelte';
 	import {
@@ -406,7 +408,7 @@
 		<foreignObject width="0" height="0">
 			<div
 				data-animation-path-picker
-    use:draggablePopover
+    use:elementEditor={{close:()=>picker=null,capabilities:{motion:true}}}
     style:left={`${picker.x}px`}
     style:top={`${picker.y}px`}
 				data-animation-ui

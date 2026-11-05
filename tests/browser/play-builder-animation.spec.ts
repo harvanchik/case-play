@@ -454,7 +454,7 @@ test('seven timeline controls are ordered, evenly spaced, and navigate and scrub
 
 
 
-test('arrows shuttle at 2x without pausing and endpoints expose Restart', async ({ page }) => {
+test('arrows shuttle at playback speed, Shift gives 2x, and endpoints expose Restart', async ({ page }) => {
  await ready(page);
  await page.getByRole('button', { name: 'Animate play', exact: true }).click();
  for(let i=0;i<10;i++) await page.getByRole('button', {name:'Add animation step',exact:true}).click();
@@ -472,8 +472,10 @@ test('arrows shuttle at 2x without pausing and endpoints expose Restart', async 
  const before=Number(await slider.inputValue());
  await page.keyboard.down('ArrowRight');
  await page.clock.runFor(1000);
- expect(Number(await slider.inputValue())-before).toBeCloseTo(2,1);
+ expect(Number(await slider.inputValue())-before).toBeCloseTo(1.25,1);
  await expect(page.getByRole('button',{name:'Pause animation',exact:true})).toBeVisible();
+ await page.keyboard.down('Shift');const accelerated=Number(await slider.inputValue());await page.clock.runFor(500);expect(Number(await slider.inputValue())-accelerated).toBeCloseTo(1,1);await page.keyboard.up('Shift');
+ const normal=Number(await slider.inputValue());await page.clock.runFor(500);expect(Number(await slider.inputValue())-normal).toBeCloseTo(.625,1);
  await page.keyboard.up('ArrowRight');
  const released=Number(await slider.inputValue());
  await page.clock.runFor(1000);
@@ -481,9 +483,10 @@ test('arrows shuttle at 2x without pausing and endpoints expose Restart', async 
  await page.keyboard.down('ArrowLeft');
  const rewind=Number(await slider.inputValue());
  await page.clock.runFor(1000);
- expect(rewind-Number(await slider.inputValue())).toBeCloseTo(2,1);
+ expect(rewind-Number(await slider.inputValue())).toBeCloseTo(1.25,1);
  await page.keyboard.up('ArrowLeft');
  await page.getByRole('button',{name:'Pause animation',exact:true}).click();
+ const pausedNormal=Number(await slider.inputValue());await page.keyboard.down('ArrowRight');await page.clock.runFor(400);await page.keyboard.up('ArrowRight');expect(Number(await slider.inputValue())-pausedNormal).toBeCloseTo(.5,1);
  await page.keyboard.down('Shift');
  await page.keyboard.down('ArrowRight');
  const paused=Number(await slider.inputValue());

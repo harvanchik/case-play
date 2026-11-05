@@ -2,6 +2,10 @@
 
 `case-play` is a SvelteKit app for browsing and authoring sports officiating case plays with a protected admin area for managing content.
 
+## Play-builder development
+
+Before changing shared builder code or implementing another sport, read the [living architecture and future-sport parity record](docs/play-builder-architecture.md) and [shared-controller contracts](docs/play-builder-shared-controllers.md). Keep these records current with implementation changes; see [repository instructions](AGENTS.md).
+
 ## Stack
 
 - SvelteKit with `@sveltejs/adapter-vercel`

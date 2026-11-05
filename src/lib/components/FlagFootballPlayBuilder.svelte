@@ -1,15 +1,35 @@
 <script lang="ts">
+ import ElementNameInput from './play-builder/ElementNameInput.svelte';
+ import { createDrawingController } from '$lib/play-builder-drawing-controller';
+ import BuilderDrawingTools from '$lib/components/play-builder/BuilderDrawingTools.svelte';
+ import { createPresentationController } from '$lib/play-builder-presentation-controller';
+ import BuilderPlaybackControls from '$lib/components/play-builder/BuilderPlaybackControls.svelte';
+ import BuilderPresentationControls from '$lib/components/play-builder/BuilderPresentationControls.svelte';
+ import BuilderExportControls from '$lib/components/play-builder/BuilderExportControls.svelte';
+ import BuilderAnimationDock from '$lib/components/play-builder/BuilderAnimationDock.svelte';
+ import { createReorderController } from '$lib/play-builder-reorder-controller';
+ import BuilderPlayTabs from '$lib/components/play-builder/BuilderPlayTabs.svelte';
+ import BuilderActionBar from '$lib/components/play-builder/BuilderActionBar.svelte';
+ import { createAnnotationController, laserDrawingVisibility, laserDrawingFingerprint, laserDrawingPath, laserFadeDuration, type SpotlightStroke, type LaserDrawing, type ActiveLaserDrawing, type LaserColor } from '$lib/play-builder-annotations';
+ import BuilderAnnotationOverlay from '$lib/components/play-builder/BuilderAnnotationOverlay.svelte';
 	import { goto, replaceState } from '$app/navigation';
 	import { dev } from '$app/environment';
 	import { playerLetter, renamePlayerLetter } from '$lib/play-builder-player-letters';
  import DrawingAnimationPicker from './play-builder/DrawingAnimationPicker.svelte';
  import {defaultDrawingAnimation,type DrawingAnimation} from '$lib/play-builder-drawing-animation';
 	import { fade } from 'svelte/transition';
- import { flip } from 'svelte/animate';
+ 
+ import {createInteractionController,createMovementController,constrainTranslation,boundsOverlap,normalizedBounds,angleConstrainedPoint} from '$lib/play-builder-interaction-controller';
+ import {createAnimationController} from '$lib/play-builder-animation-controller';
+ import {createPlayBuilderController,type BuilderControllerStatus} from '$lib/play-builder-controller';
  import {guardPlayBuilderWatermark} from '$lib/play-builder-watermark-guard';
 	import SetupDropdown from './play-builder/SetupDropdown.svelte';
  import {setupYardPositions,type SetupVariant} from '$lib/play-builder-setups';
 	import { onMount, tick } from 'svelte';
+ import { provideElementEditors, useElementEditor } from '$lib/play-builder-element-editor';
+ import ElementActionButton from './play-builder/ElementActionButton.svelte';
+ const elementEditors=provideElementEditors();
+ const elementEditor=useElementEditor();
 	import { driver, type DriveStep, type Driver } from 'driver.js';
 	import 'driver.js/dist/driver.css';
 	import {
@@ -78,7 +98,7 @@
 		type FlagFootballToolDefinition
 	} from '$lib/flag-football-play-builder-definition';
 	import HoverTooltip from './HoverTooltip.svelte';
-	import ExportDropdown from './play-builder/ExportDropdown.svelte';
+
  import { downloadBrowserVideo, type VideoFormat } from '$lib/play-builder-browser-video';
 	import BuilderActionButton from './play-builder/BuilderActionButton.svelte';
 	import AnimationPanel from './play-builder/AnimationPanel.svelte';
@@ -118,16 +138,15 @@
 	type Tool = FlagFootballTool;
 	type ActiveTool = Tool | 'select';
 	type SelectedTarget = { type: 'marker' | 'path' | 'guide'; id: number };
+ type SelectableTarget=SelectedTarget|{type:'drawing';id:number};
 	type SelectionBounds = { left: number; top: number; right: number; bottom: number };
 	type MarqueeSelection = { pointerId: number; start: Point; current: Point };
 	type ElementClipboard = {
- sourcePlayId:number;sourceField:{left:number;top:number;width:number;height:number};freeStrokes:FreeStroke[];
+ freeStrokes:FreeStroke[];
 		markers: FieldMarker[];
 		paths: FieldPath[];
 		guides: FieldGuide[];
 		layerOrder: LayerRef[];
-		bounds: SelectionBounds;
-		pasteCount: number;
 	};
 	type DragTarget =
 		| { type: 'marker'; id: number; pointerStart: Point; elementStart: Point; moved: boolean; snapToMarkers?: boolean }
@@ -156,13 +175,10 @@
 		  };
 	type Scene = PlayBuilderScene;
 	type ArrowKind = Extract<PathKind, 'run' | 'pass' | 'kick'>;
-	type LaserColor = Extract<GuideColor, 'red' | 'green' | 'blue' | 'purple'>;
 	type LaserRenderColor = LaserColor | 'rainbow';
 	type ToolbarPresetTool = PlayerKind | 'deflag' | 'bean-bag' | 'laser' | ArrowKind | 'line-of-scrimmage' | 'line-to-gain';
 	type FieldSide = 'a' | 'b';
 	type ExportBackground = 'transparent' | 'grass' | 'color';
-	type LaserDrawing = { points: Point[]; color: LaserRenderColor; releasedAt: number | null; appearedAt?: number | null };
-	type ActiveLaserDrawing = { points: Point[]; color: LaserRenderColor };
 	type StoredDraft = { document: SerializedPlayBuilderDocument; updatedAt: number };
 	const exportBackgroundOptions: { id: ExportBackground; label: string; description: string }[] = [
 		{ id: 'transparent', label: 'Transparent', description: 'Field is surrounded by a transparent background.' },
@@ -175,7 +191,6 @@
 	const saveLabelFeedbackStorageKey = 'caseplay-play-builder-save-label-feedback-v1';
 	const editTokensStorageKey = 'caseplay-play-builder-edit-tokens-v1';
 	const draftStoragePrefix = 'caseplay-play-builder-draft-v1:';
-	const laserFadeDuration = 500;
 	const autoSaveIdleDelay = 3_000;
 	const autoSaveMinimumInterval = 15_000;
 	const yardLinePreviewGap = 12;
@@ -312,8 +327,6 @@
 	let animationLoop = false;
 	let animationGhosts = true;
 	let animationDrawingRoute = false;
-	let animationFrame: number | null = null;
-	let animationLastFrame = 0;
 	let animationDockLeft = 12;
 	let animationDockWidth = 720;
 	let animationContent: { scene: Scene; animation?: PlayAnimation };
@@ -329,8 +342,8 @@
 	let freeStrokes: FreeStroke[] = loadedScene.freeStrokes;
 	let layerOrder: LayerRef[] = loadedScene.layerOrder;
 	let fieldSettings: PlayBuilderFieldSettings = { ...playEntries[activePlayIndex].settings };
-	let history: BuilderState[] = [];
-	let future: BuilderState[] = [];
+	let controllerStatus:BuilderControllerStatus={canUndo:false,canRedo:false,hasClipboard:false};
+ const builderController=createPlayBuilderController<BuilderState,ElementClipboard>({snapshot:()=>builderSnapshot(),restore:state=>applyBuilderState(state),onChange:status=>controllerStatus=status});
 	let nextId = Math.max(0, ...loadedIds) + 1;
 	let actionInProgress: 'save' | 'png' | 'jpg' | 'webp' | 'pdf' | VideoFormat | null = null;
 	let actionMessage = '';
@@ -338,7 +351,6 @@
 	let canEditSavedPlay = savedPlayId === null || accountOwnedByCurrentUser;
 	// Saved links remain editable in the browser holding their private edit token.
 	let presentation=false;
- let presentationRestore:{tool:ActiveTool;open:boolean;step:number}|null=null;
  $: viewOnly = !canEditSavedPlay||presentation;
 	let ownershipResolved = savedPlayId === null || accountSessionActive;
 	let saveFeedbackState: 'idle' | 'saved' | 'failed' = 'idle';
@@ -460,11 +472,10 @@
 	let laserColor: LaserColor = 'red';
  let spotlightEnabled=false;
  let spotlightRadius=80;
- type SpotlightStroke={points:Point[];radius:number;releasedAt:number|null};
  let spotlightStrokes:SpotlightStroke[]=[];
- let presentationSpotlightPast:SpotlightStroke[][]=[],presentationSpotlightFuture:SpotlightStroke[][]=[];
+ const presentationSpotlightController=createPlayBuilderController<SpotlightStroke[]>({snapshot:()=>cloneSpotlights(),restore:strokes=>{spotlightStrokes=cloneSpotlights(strokes);activeSpotlightStroke=null;}});
  const cloneSpotlights=(strokes=spotlightStrokes)=>strokes.filter(stroke=>stroke.releasedAt===null).map(stroke=>({...stroke,points:stroke.points.map(point=>({...point}))}));
- const saveSpotlightHistory=()=>{if(presentation){presentationSpotlightPast=[...presentationSpotlightPast.slice(-29),cloneSpotlights()];presentationSpotlightFuture=[];}else saveHistory();};
+ const saveSpotlightHistory=()=>{if(presentation)presentationSpotlightController.checkpoint();else saveHistory();};
  let activeSpotlightStroke:SpotlightStroke|null=null;
  const resizeSpotlight=(event:WheelEvent)=>{
   if(!spotlightEnabled||tool!=='laser'||!event.shiftKey||!event.deltaY)return;
@@ -540,7 +551,6 @@
 	let selectedTargets: SelectedTarget[] = [];
 	let selectedGroupBounds: SelectionBounds | null = null;
 	let marqueeSelection: MarqueeSelection | null = null;
-	let elementClipboard: ElementClipboard | null = null;
 	let deleteTarget: SelectedTarget | null = null;
 	let deletePosition: Point | null = null;
 	let deleteButtonElement: HTMLElement;
@@ -1165,160 +1175,23 @@
 			y: Math.max(0, Math.min(484, ((event.clientY - rect.top) / rect.height) * 484))
 		};
 	};
-	const laserDrawingVisibility = (drawing: LaserDrawing, now: number) => {
-		const fadeOut = drawing.releasedAt === null ? 1 : Math.min(1, Math.max(0, 1 - (now - drawing.releasedAt) / laserFadeDuration));
-		const fadeIn = drawing.appearedAt == null ? 1 : Math.min(1, Math.max(0, (now - drawing.appearedAt) / laserFadeDuration));
-		return Math.min(fadeOut, fadeIn);
-	};
-	const laserDrawingFingerprint = (drawing: Pick<LaserDrawing, 'color' | 'points'>) =>
-		`${drawing.color}:${drawing.points.map((point) => `${point.x.toFixed(3)},${point.y.toFixed(3)}`).join(';')}`;
-	const startLaserAnimationFrame = () => {
-		if (laserTrailFrame === null) laserTrailFrame = requestAnimationFrame(refreshLaserTrail);
-	};
-	const refreshLaserTrail = () => {
-		const now = performance.now();
-		laserTrailClock = now;
-		laserTrail = laserTrail.filter((point) => now - point.createdAt < laserFadeDuration);
-		laserDrawings = laserDrawings
-			.filter((drawing) => drawing.releasedAt === null || now - drawing.releasedAt < laserFadeDuration)
-			.map((drawing) => (drawing.appearedAt != null && now - drawing.appearedAt >= laserFadeDuration ? { ...drawing, appearedAt: null } : drawing));
-		spotlightStrokes=spotlightStrokes.filter(stroke=>stroke.releasedAt===null||now-stroke.releasedAt<laserFadeDuration);
-  const hasAnimatingSpotlight=spotlightStrokes.some(stroke=>stroke.releasedAt!==null);
-  const hasAnimatingDrawing = laserDrawings.some((drawing) => drawing.releasedAt !== null || drawing.appearedAt != null);
-		laserTrailFrame = laserTrail.length || hasAnimatingDrawing || hasAnimatingSpotlight ? requestAnimationFrame(refreshLaserTrail) : null;
-	};
-	const updateLaserPointer = (point: Point) => {
-		const now = performance.now();
-		const lastPoint = laserTrail.at(-1);
-		laserPointer = point;
-		if (!spotlightEnabled && (!lastPoint || Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) >= 1.25)) {
-			laserTrail = [...laserTrail.slice(-47), { ...point, createdAt: now }];
-		}
-		laserTrailClock = now;
-		const laserLayer = svg?.querySelector<SVGGElement>('[data-laser-pointer-layer]');
-		if (laserLayer?.nextSibling) svg.appendChild(laserLayer);
-		startLaserAnimationFrame();
-	};
-	const beginLaserDrawing = (event: PointerEvent, point: Point) => {
-		updateLaserPointer(point);
-  if(spotlightEnabled){activeSpotlightStroke={points:[point],radius:spotlightRadius,releasedAt:null};laserDrawingPointerId=event.pointerId;svg.setPointerCapture(event.pointerId);return;}
-		activeLaserDrawing = { points: [point], color: rainbowLaserEnabled ? 'rainbow' : laserColor };
-		laserDrawingPointerId = event.pointerId;
-		svg.setPointerCapture(event.pointerId);
-	};
-	const continueLaserDrawing = (event: PointerEvent, point: Point) => {
-  if(laserDrawingPointerId===event.pointerId&&activeSpotlightStroke){
-   const last=activeSpotlightStroke.points.at(-1)!;
-   if(Math.hypot(point.x-last.x,point.y-last.y)>=1.25)activeSpotlightStroke={...activeSpotlightStroke,points:[...activeSpotlightStroke.points,point]};
-   return;
-  }
-		if (laserDrawingPointerId !== event.pointerId || !activeLaserDrawing) return;
-		const lastPoint = activeLaserDrawing.points.at(-1)!;
-		if (Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) < 1.25) return;
-		activeLaserDrawing = { ...activeLaserDrawing, points: [...activeLaserDrawing.points, point] };
-	};
-	const finishLaserDrawing = () => {
-  if(activeSpotlightStroke){saveSpotlightHistory();spotlightStrokes=[...spotlightStrokes,activeSpotlightStroke];activeSpotlightStroke=null;}
-		if (activeLaserDrawing && activeLaserDrawing.points.length > 1) {
-			if(!presentation)saveHistory();
-			laserDrawings = [...laserDrawings, { ...activeLaserDrawing, releasedAt: null, appearedAt: null }];
-		}
-		activeLaserDrawing = null;
-		laserDrawingPointerId = null;
-	};
-	const releaseLaserDrawings = () => {
-  const spotlightNow=performance.now();
-  if(activeSpotlightStroke){spotlightStrokes=[...spotlightStrokes,activeSpotlightStroke];activeSpotlightStroke=null;}
-  if(spotlightStrokes.length){spotlightStrokes=spotlightStrokes.map(stroke=>({...stroke,releasedAt:stroke.releasedAt??spotlightNow}));startLaserAnimationFrame();}
-		if (laserDrawingPointerId !== null && svg?.hasPointerCapture(laserDrawingPointerId)) svg.releasePointerCapture(laserDrawingPointerId);
-		const drawings =
-			activeLaserDrawing && activeLaserDrawing.points.length > 1
-				? [...laserDrawings, { ...activeLaserDrawing, releasedAt: null, appearedAt: null }]
-				: laserDrawings;
-		activeLaserDrawing = null;
-		laserDrawingPointerId = null;
-		laserPointer = null;
-		if (drawings.length === 0) return;
-		const now = performance.now();
-		laserTrailClock = now;
-		laserDrawings = drawings.map((drawing) => {
-			const visibility = laserDrawingVisibility(drawing, now);
-			return {
-				...drawing,
-				appearedAt: null,
-				releasedAt: now - (1 - visibility) * laserFadeDuration
-			};
-		});
-		startLaserAnimationFrame();
-	};
+ const annotationController=createAnnotationController({
+ read:()=>({laserTrailFrame, laserTrailClock, laserTrail, laserDrawings, spotlightStrokes, laserPointer, spotlightEnabled, spotlightRadius, activeSpotlightStroke, activeLaserDrawing, laserDrawingPointerId, rainbowLaserEnabled, laserColor, presentation}),
+ write:state=>{laserTrailFrame=state.laserTrailFrame;laserTrailClock=state.laserTrailClock;laserTrail=state.laserTrail;laserDrawings=state.laserDrawings;spotlightStrokes=state.spotlightStrokes;laserPointer=state.laserPointer;spotlightEnabled=state.spotlightEnabled;spotlightRadius=state.spotlightRadius;activeSpotlightStroke=state.activeSpotlightStroke;activeLaserDrawing=state.activeLaserDrawing;laserDrawingPointerId=state.laserDrawingPointerId;rainbowLaserEnabled=state.rainbowLaserEnabled;laserColor=state.laserColor;presentation=state.presentation;},
+ checkpoint:kind=>{if(kind==='spotlight')saveSpotlightHistory();else saveHistory();},
+ promoteLayer:()=>{const layer=svg?.querySelector<SVGGElement>('[data-laser-pointer-layer]');if(layer?.nextSibling)svg.appendChild(layer);},
+ capture:id=>svg.setPointerCapture(id),release:id=>{if(svg?.hasPointerCapture(id))svg.releasePointerCapture(id);},
+ clock:{now:()=>performance.now(),request:callback=>requestAnimationFrame(callback),cancel:id=>cancelAnimationFrame(id)}
+ });
+ const startLaserAnimationFrame=annotationController.startLaserAnimationFrame;
+ const updateLaserPointer=annotationController.updateLaserPointer;
+ const beginLaserDrawing=annotationController.beginLaserDrawing;
+ const continueLaserDrawing=annotationController.continueLaserDrawing;
+ const finishLaserDrawing=annotationController.finishLaserDrawing;
+ const releaseLaserDrawings=annotationController.releaseLaserDrawings;
+ const fadeLaserDrawings=annotationController.fadeLaserDrawings;
  $: if(tool!=='laser'&&(activeSpotlightStroke!==null||spotlightStrokes.some(stroke=>stroke.releasedAt===null)||activeLaserDrawing!==null||laserPointer!==null||laserDrawings.some(item=>item.releasedAt===null)))releaseLaserDrawings();
-	const fadeLaserDrawings = () => {
-		if(spotlightStrokes.some(stroke=>stroke.releasedAt===null)||activeSpotlightStroke)saveSpotlightHistory();
-  else if (laserDrawings.length > 0&&!presentation) saveHistory();
-		releaseLaserDrawings();
-	};
-	const laserDrawingPath = (points: Point[]) => points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
-	const laserTrailPath = (points: (Point & { createdAt: number })[], now: number) => {
-		if (points.length < 2) return '';
-		const left: Point[] = [];
-		const right: Point[] = [];
-		for (let index = 0; index < points.length; index += 1) {
-			const point = points[index];
-			const previous = points[Math.max(0, index - 1)];
-			const next = points[Math.min(points.length - 1, index + 1)];
-			const dx = next.x - previous.x;
-			const dy = next.y - previous.y;
-			const length = Math.hypot(dx, dy) || 1;
-			const freshness = Math.min(1, Math.max(0, 1 - (now - point.createdAt) / laserFadeDuration));
-			const halfWidth = 0.08 + Math.pow(freshness, 0.72) * 2.1;
-			const normalX = -dy / length;
-			const normalY = dx / length;
-			left.push({ x: point.x + normalX * halfWidth, y: point.y + normalY * halfWidth });
-			right.push({ x: point.x - normalX * halfWidth, y: point.y - normalY * halfWidth });
-		}
-		const boundary = [...left, ...right.reverse()];
-		const first = boundary[0];
-		const last = boundary.at(-1)!;
-		let path = `M ${(last.x + first.x) / 2} ${(last.y + first.y) / 2}`;
-		for (let index = 0; index < boundary.length; index += 1) {
-			const point = boundary[index];
-			const next = boundary[(index + 1) % boundary.length];
-			path += ` Q ${point.x} ${point.y} ${(point.x + next.x) / 2} ${(point.y + next.y) / 2}`;
-		}
-		return `${path} Z`;
-	};
-	const snapStraightDrawPoint = (start: Point, point: Point): Point => {
-		const dx = point.x - start.x;
-		const dy = point.y - start.y;
-		const distance = Math.hypot(dx, dy);
-		if (distance === 0) return point;
-
-		const diagonal = Math.SQRT1_2;
-		const directions: Point[] = [
-			{ x: 1, y: 0 },
-			{ x: diagonal, y: diagonal },
-			{ x: 0, y: 1 },
-			{ x: -diagonal, y: diagonal },
-			{ x: -1, y: 0 },
-			{ x: -diagonal, y: -diagonal },
-			{ x: 0, y: -1 },
-			{ x: diagonal, y: -diagonal }
-		];
-		const angleStep = Math.PI / 4;
-		const directionIndex = (Math.round(Math.atan2(dy, dx) / angleStep) + directions.length) % directions.length;
-		const { x: directionX, y: directionY } = directions[directionIndex];
-		let maximumDistance = Number.POSITIVE_INFINITY;
-		if (directionX > 0) maximumDistance = Math.min(maximumDistance, (1000 - start.x) / directionX);
-		else if (directionX < 0) maximumDistance = Math.min(maximumDistance, -start.x / directionX);
-		if (directionY > 0) maximumDistance = Math.min(maximumDistance, (484 - start.y) / directionY);
-		else if (directionY < 0) maximumDistance = Math.min(maximumDistance, -start.y / directionY);
-		const constrainedDistance = Math.min(distance, maximumDistance);
-
-		return {
-			x: start.x + directionX * constrainedDistance,
-			y: start.y + directionY * constrainedDistance
-		};
-	};
+ const snapStraightDrawPoint=(start:Point,point:Point)=>angleConstrainedPoint(start,point,{left:0,top:0,width:1000,height:484});
 	const sceneSnapshot = (): Scene => ({
 		markers: markers.map((marker) => ({ ...marker })),
 		paths: paths.map((path) => ({
@@ -1331,12 +1204,78 @@
 		freeStrokes: freeStrokes.map((stroke) => ({ ...stroke, points: stroke.points.map((point) => ({ ...point })) })),
 		layerOrder: layerOrder.map((layer) => ({ ...layer }))
 	});
-	const currentAnimationContent = () =>
-		animation
-			? animationPreview
-				? { scene: cloneScene(animationBaseScene), animation: cloneAnimation(animation) }
-				: captureAnimationEdits(animationBaseScene, sceneSnapshot(), animation, animationStep)
-			: { scene: sceneSnapshot(), animation: undefined };
+	const animationController = createAnimationController<Scene, PlayAnimation>({
+		read: () => ({
+			animation,
+			baseScene: animationBaseScene,
+			step: animationStep,
+			time: animationTime,
+			preview: animationPreview,
+			playing: animationPlaying,
+			shuttleRate: animationShuttleRate,
+			rate: animationRate,
+			loop: animationLoop,
+			open: animationOpen
+		}),
+		write: (patch) => {
+			if ('animation' in patch) animation = patch.animation;
+			if (patch.baseScene !== undefined) animationBaseScene = patch.baseScene;
+			if (patch.step !== undefined) animationStep = patch.step;
+			if (patch.time !== undefined) animationTime = patch.time;
+			if (patch.preview !== undefined) animationPreview = patch.preview;
+			if (patch.playing !== undefined) animationPlaying = patch.playing;
+			if (patch.shuttleRate !== undefined) animationShuttleRate = patch.shuttleRate;
+			if (patch.rate !== undefined) animationRate = patch.rate;
+			if (patch.loop !== undefined) animationLoop = patch.loop;
+			if (patch.open !== undefined) animationOpen = patch.open;
+		},
+		scene: sceneSnapshot,
+		applyScene: (scene) => applyScene(scene),
+		cloneScene: (scene) => cloneScene(scene),
+		cloneAnimation,
+		capture: captureAnimationEdits,
+		create: createAnimation,
+		evaluate: (scene, value, time) => evaluateAnimation({ scene, animation: value }, time),
+		stepScene: (scene, value, index) => applyAnimationStep(scene, value.steps[index]),
+		stepCount: (value) => value.steps.length,
+		stepTime,
+		duration: animationDuration,
+		checkpoint: () => saveHistory(),
+		editable: () => !viewOnly,
+		onStep: (scene) => {
+			const selection = selectedTargets.map((target) => ({ ...target }));
+			animationDrawingRoute = false;
+			applyScene(scene);
+			selectedTargets = selection.filter(targetExists);
+			refreshSelectionUi();
+		},
+		onPreview: () => {
+			animationDrawingRoute = false;
+			if (tool !== 'laser') {
+				tool = 'select';
+				toolbarEditorTool = null;
+				hoverPoint = null;
+				clearPlacementSnap();
+			}
+			if (selectedTargets.length) {
+				selectedTargets = [];
+				refreshSelectionUi();
+			}
+		},
+		onOpen: () => {
+			animationLaunchBouncing = false;
+			try {
+				localStorage.setItem(animationOpenedKey, '1');
+			} catch {}
+			tool = 'select';
+			toolbarEditorTool = null;
+			hoverPoint = null;
+			clearPlacementSnap();
+			selectedTargets = [];
+			refreshSelectionUi();
+		}
+	});
+ const currentAnimationContent=()=>animationController.content();
 	const syncCarriedBalls = (value: PlayAnimation, index: number, currentMarkers: FieldMarker[]) => {
 		let changed = false;
 		const next = currentMarkers.map((marker) => {
@@ -1351,140 +1290,28 @@
 		});
 		if (changed) markers = next;
 	};
-	const pauseAnimation = () => {
-        animationShuttleRate = 0;
-		animationPlaying = false;
-		if (animationFrame !== null) cancelAnimationFrame(animationFrame);
-		animationFrame = null;
-	};
-	const commitAnimation = () => {
-		const content = currentAnimationContent();
-		animationBaseScene = content.scene;
-		animation = content.animation;
-	};
-	const selectAnimationStep = (index: number) => {
-		if (!animation?.steps[index]) return;
-		const selection = selectedTargets.map((target) => ({ ...target }));
-		pauseAnimation();
-		commitAnimation();
-		animationStep = index;
-		animationPreview = false;
-		animationDrawingRoute = false;
-		animationTime = stepTime(animation!, index);
-		applyScene(applyAnimationStep(animationBaseScene, animation!.steps[index]));
-		selectedTargets = selection.filter(targetExists);
-		refreshSelectionUi();
-	};
-	const changeAnimation = (next: PlayAnimation, index = animationStep) => {
-		if (viewOnly) return;
-		saveHistory();
-		const content = currentAnimationContent();
-		animationBaseScene = content.scene;
-		animation = cloneAnimation(next);
-		animationPreview = true; // select must not capture the previous step into the replacement.
-		selectAnimationStep(Math.min(index, next.steps.length - 1));
-	};
+ const pauseAnimation=()=>animationController.pause();
+ const commitAnimation=()=>animationController.commit();
+ const selectAnimationStep=(index:number)=>animationController.selectStep(index);
+ const changeAnimation=(next:PlayAnimation,index=animationStep)=>animationController.replace(next,index);
  // Keep floating controls outside the page's isolated stacking and clipping contexts.
- const animationPortal = (node: HTMLElement, fullscreen: boolean) => {
-  const move = (active: boolean) => (active ? builderRoot : document.body).appendChild(node);
-  move(fullscreen);
-  return { update: move, destroy: () => node.remove() };
- };
- const togglePresentation=async()=>{
-  if(document.fullscreenElement===builderRoot){await document.exitFullscreen();return;}
-  if(!builderRoot.requestFullscreen){showActionMessage('Full Screen is not supported in this browser.');return;}
-  if(hasActiveInlineEditor())commitActiveEditor();pauseAnimation();commitAnimation();storeActivePlayState();
-  presentationRestore={tool,open:animationOpen,step:animationStep};animationOpen=false;clearEditorState();selectedTargets=[];selectedDrawingIds=[];tool=spotlightEnabled?'laser':'select';presentation=true;
-  try{await builderRoot.requestFullscreen();builderRoot.focus();}catch{presentation=false;animationOpen=presentationRestore?.open??false;tool=presentationRestore?.tool??'select';presentationRestore=null;showActionMessage('Unable to enter Full Screen.');}
- };
- const syncFullscreen=()=>{
-  if(presentation&&document.fullscreenElement!==builderRoot){
-   pauseAnimation();releaseLaserDrawings();animationOpen=false;presentation=false;animationPreview=true;
-   const restored=presentationRestore;presentationRestore=null;
-   if(animation)selectAnimationStep(Math.min(restored?.step??0,animation.steps.length-1));
-   animationOpen=restored?.open??false;tool=restored?.tool??'select';
-  }
- };
+ const presentationController=createPresentationController({
+  root:()=>builderRoot,active:()=>presentation,fullscreenElement:()=>document.fullscreenElement,exitFullscreen:()=>document.exitFullscreen(),message:message=>showActionMessage(message),
+  prepare:()=>{if(hasActiveInlineEditor())commitActiveEditor();pauseAnimation();commitAnimation();storeActivePlayState();const state={tool,open:animationOpen,step:animationStep};animationOpen=false;clearEditorState();selectedTargets=[];selectedDrawingIds=[];tool=spotlightEnabled?'laser':'select';presentation=true;return state;},
+  failed:state=>{presentation=false;animationOpen=state.open;tool=state.tool;},
+  leave:state=>{pauseAnimation();releaseLaserDrawings();animationOpen=false;presentation=false;animationPreview=true;if(animation)selectAnimationStep(Math.min(state?.step??0,animation.steps.length-1));animationOpen=state?.open??false;tool=state?.tool??'select';}
+ });
+ const togglePresentation=presentationController.toggle;
+ const syncFullscreen=presentationController.sync;
  const togglePresentationLaser=()=>{if(tool==='laser'){releaseLaserDrawings();tool='select';}else tool='laser';};
  const clickPresentationLaser=()=>{const wasRainbow=rainbowLaserEnabled;registerLaserToolbarClick('laser');togglePresentationLaser();if(!wasRainbow&&rainbowLaserEnabled)tool='laser';};
 
-	const openAnimation = () => {
-  if(presentation){if(animation)animationOpen=true;return;}
-		if (viewOnly) return;
-		if (!animation) {
-			saveHistory();
-			animationBaseScene = sceneSnapshot();
-			animation = createAnimation(animationBaseScene);
-		}
-		animationOpen = true;
-        animationLaunchBouncing = false;
-        try { localStorage.setItem(animationOpenedKey, '1'); } catch {}
-		tool = 'select';
-        toolbarEditorTool = null;
-        hoverPoint = null;
-        clearPlacementSnap();
-        selectedTargets = [];
-        refreshSelectionUi();
-	};
-	const closeAnimation = () => {
-  if(presentation){animationOpen=false;return;}
-		selectAnimationStep(0);
-		animationOpen = false;
-	};
-	const showAnimationTime = (time: number) => {
-		if (!animation) return;
-		animationTime = Math.max(0, Math.min(animationDuration(animation), time));
-		animationPreview = true;
-		animationDrawingRoute = false;
-  if(tool!=='laser') {tool='select'; toolbarEditorTool=null; hoverPoint=null;clearPlacementSnap();}
-  if(selectedTargets.length) {selectedTargets=[]; refreshSelectionUi();}
-			applyScene(evaluateAnimation({ scene: animationBaseScene, animation }, animationTime));
-	};
-	const seekAnimation = (time: number) => {
-		pauseAnimation();
-		commitAnimation();
-  const snappedStep = animation?.steps.findIndex((_, index) => Math.abs(stepTime(animation!, index) - time) < 0.00001) ?? -1;
-  if (snappedStep >= 0) selectAnimationStep(snappedStep);
-  else showAnimationTime(time);
-	};
-	const animateFrame = (now: number) => {
-		if ((!animationPlaying && !animationShuttleRate) || !animation) return;
-		const duration = animationDuration(animation);
-		const next = animationTime + ((now - animationLastFrame) / 1000) * (animationShuttleRate || animationRate);
-		animationLastFrame = now;
-		showAnimationTime(!animationShuttleRate && animationLoop && next >= duration ? next % duration : next);
-		if (!animationShuttleRate && next >= duration && !animationLoop) {
-			selectAnimationStep(animation.steps.length - 1);
-			return;
-		}
-		animationFrame = requestAnimationFrame(animateFrame);
-	};
- const shuttleAnimation = (direction: number) => {
-  if (!animation) return;
-  if (direction && animationShuttleRate === direction * 2) return;
-  if (animationFrame !== null) cancelAnimationFrame(animationFrame);
-  animationFrame = null;
-  if (direction) commitAnimation();
-  animationShuttleRate = direction * 2;
-  animationLastFrame = performance.now();
-  if (animationPlaying || animationShuttleRate) animationFrame = requestAnimationFrame(animateFrame);
-  else {
-   const index = animation.steps.findIndex((_, i) => Math.abs(stepTime(animation!, i) - animationTime) < .00001);
-   if (index >= 0) selectAnimationStep(index);
-  }
- };
-	const toggleAnimationPlayback = () => {
-		if (animationPlaying) {
-			pauseAnimation();
-			return;
-		}
-		if (!animation || !animationDuration(animation)) return;
-		commitAnimation();
-		if (animationTime >= animationDuration(animation)) animationTime = 0;
-		animationPlaying = true;
-		animationLastFrame = performance.now();
-		animationFrame = requestAnimationFrame(animateFrame);
-	};
+ const openAnimation=()=>{if(presentation){if(animation)animationOpen=true;return;}animationController.open();};
+ const closeAnimation=()=>{if(presentation){animationOpen=false;return;}animationController.close();};
+ const showAnimationTime=(time:number)=>animationController.showTime(time);
+ const seekAnimation=(time:number)=>animationController.seek(time);
+ const shuttleAnimation=(direction:number,speed=2)=>animationController.shuttle(direction,speed);
+ const toggleAnimationPlayback=()=>animationController.togglePlayback();
 	const updateAnimationMotion = (motion: Motion) => {
 		if (!animation) return;
 		const next = currentAnimationContent().animation!;
@@ -1601,11 +1428,7 @@
   selectedTargets: selectedTargets.map((target) => ({ ...target })),
 		animationStep
 	});
-	const pushBuilderState = (stack: BuilderState[], state: BuilderState) => [...stack.slice(-29), state];
-	const saveHistory = () => {
-		history = pushBuilderState(history, builderSnapshot());
-		future = [];
-	};
+	const saveHistory = () => builderController.checkpoint();
 	const syncActivePlayUrl = (index = activePlayIndex) => {
 		if (animationTutorialActive || !savedPlayId || typeof window === 'undefined') return;
 		const url = new URL(window.location.href);
@@ -1703,32 +1526,23 @@
 		});
 	};
  let playOrder:number[]|null=null;
- let playDrag:{id:number;x:number;moved:boolean}|null=null;
+ let playDrag:{id:number;moved:boolean}|null=null;
  let suppressPlayClick=false;
  $: orderedPlays=playOrder?playOrder.map(id=>playEntries.find(play=>play.id===id)!).filter(Boolean):playEntries;
- function beginPlayDrag(event:PointerEvent,id:number){
-  if(viewOnly||tutorialActive||actionInProgress||event.button!==0||editingPlayId!==null)return;
-  playDrag={id,x:event.clientX,moved:false};
- }
- function movePlayDrag(event:PointerEvent){
-  if(!playDrag||(!playDrag.moved&&Math.abs(event.clientX-playDrag.x)<5))return;
-  if(!playDrag.moved)playStripElement?.setPointerCapture(event.pointerId);
-  playDrag.moved=true;
-  const rail=playStripElement;if(!rail)return;const bounds=rail.getBoundingClientRect();
-  if(event.clientX<bounds.left+20)rail.scrollLeft-=12;
-  if(event.clientX>bounds.right-20)rail.scrollLeft+=12;
-  const hovered=[...rail.querySelectorAll<HTMLElement>('[data-play-id]')].find(button=>{const r=button.getBoundingClientRect();return event.clientX>=r.left&&event.clientX<=r.right;});
-  const target=Number(hovered?.dataset.playId);if(!hovered||target===playDrag.id)return;
-  const ids=playOrder??playEntries.map(play=>play.id),index=ids.indexOf(target);
-  const next=ids.filter(id=>id!==playDrag!.id);next.splice(index,0,playDrag.id);playOrder=next;
- }
- function endPlayDrag(cancel=false){
-  if(playDrag?.moved){
-   suppressPlayClick=true;setTimeout(()=>suppressPlayClick=false,0);
-   if(!cancel&&playOrder){saveHistory();const activeId=playEntries[activePlayIndex].id;storeActivePlayState();playEntries=playOrder.map(id=>playEntries.find(play=>play.id===id)!);activePlayIndex=playEntries.findIndex(play=>play.id===activeId);syncActivePlayUrl();}
-  }
-  playDrag=null;playOrder=null;
- }
+ const playReorderController=createReorderController<number>({
+  ids:()=>playEntries.map(play=>play.id),
+  enabled:()=>!viewOnly&&!tutorialActive&&!actionInProgress&&editingPlayId===null,
+  preview:(order,drag)=>{playOrder=order;playDrag=drag;},
+  capture:id=>playStripElement?.setPointerCapture(id),
+  scroll:x=>{const rail=playStripElement;if(!rail)return;const bounds=rail.getBoundingClientRect();if(x<bounds.left+20)rail.scrollLeft-=12;if(x>bounds.right-20)rail.scrollLeft+=12;},
+  hit:x=>{const hit=[...playStripElement.querySelectorAll<HTMLElement>('[data-play-id]')].find(button=>{const r=button.getBoundingClientRect();return x>=r.left&&x<=r.right;});return hit?Number(hit.dataset.playId):undefined;},
+  suppressClick:()=>{suppressPlayClick=true;setTimeout(()=>suppressPlayClick=false,0);},
+  commit:order=>{saveHistory();const activeId=playEntries[activePlayIndex].id;storeActivePlayState();playEntries=order.map(id=>playEntries.find(play=>play.id===id)!);activePlayIndex=playEntries.findIndex(play=>play.id===activeId);syncActivePlayUrl();}
+ });
+ const beginPlayDrag=playReorderController.begin;
+ const movePlayDrag=playReorderController.move;
+ const endPlayDrag=playReorderController.end;
+
 	const switchPlay = (playId: number) => {
 		if (suppressPlayClick || dismissEditorForAction() || suppressNextClick) return;
 		const nextIndex = playEntries.findIndex((play) => play.id === playId);
@@ -1845,20 +1659,8 @@
 		const retainedActiveIndex = playEntries.findIndex((play) => play.id === previousActiveId);
 		loadPlayAtIndex(retainedActiveIndex >= 0 ? retainedActiveIndex : Math.min(deleteIndex, playEntries.length - 1));
 	};
-	const undo = () => {
-		const previous = history.at(-1);
-		if (!previous) return;
-		future = pushBuilderState(future, builderSnapshot());
-		history = history.slice(0, -1);
-		applyBuilderState(previous);
-	};
-	const redo = () => {
-		const next = future.at(-1);
-		if (!next) return;
-		history = pushBuilderState(history, builderSnapshot());
-		future = future.slice(0, -1);
-		applyBuilderState(next);
-	};
+	const undo = () => builderController.undo();
+	const redo = () => builderController.redo();
 	const clear = () => {
 		if (markers.length === 0 && paths.length === 0 && guides.length === 0 && freeStrokes.length === 0) return;
 		saveHistory();
@@ -1949,8 +1751,7 @@
 		activePlayIndex = decoded.activePlayIndex;
 		nextPlayEntryId = playEntries.length + 1;
 		nextPlayNumber = nextDefaultPlayNumber();
-		history = [];
-		future = [];
+		builderController.clearHistory();
 		fieldSettings = { ...playEntries[activePlayIndex].settings };
 		nextId = maxSceneId(playEntries[activePlayIndex].scene) + 1;
 		loadPlayAtIndex(activePlayIndex, false);
@@ -2987,20 +2788,49 @@
 		const guide = guides.find((item) => item.id === target.id) ?? (animationOpen ? revertOriginScene?.guides.find(item=>item.id===target.id) : undefined);
 		return guide ? { left: guide.x - 5, top: fieldTop, right: guide.x + 5, bottom: fieldBottom } : null;
 	};
-	const refreshSelectionUi = (selectionPoint?: Point) => {
-		selectedTargets = selectedTargets.filter(targetExists);
-		const bounds = [...selectedTargets.map(targetBounds),...selectedDrawingIds.map(drawingBounds)].filter((value): value is SelectionBounds => value !== null);
-		if (bounds.length === 0) {
-			hideDeleteButton();
-			selectedGroupBounds = null;
-			return;
+ const selectionItems=():SelectableTarget[]=>[...selectedTargets,...selectedDrawingIds.map(id=>({type:'drawing' as const,id}))];
+	const interactionController = createInteractionController<SelectableTarget, DragTarget, PointerEvent, boolean>({
+		selection: selectionItems,
+		setSelection: (items) => {
+			selectedTargets = items.filter((target): target is SelectedTarget => target.type !== 'drawing');
+			selectedDrawingIds = items.filter((target) => target.type === 'drawing').map((target) => target.id);
+		},
+		all: (): SelectableTarget[] => [...allElementTargets(), ...freeStrokes.map((stroke) => ({ type: 'drawing' as const, id: stroke.id }))],
+		key: (target) => `${target.type}:${target.id}`,
+		exists: (target) => (target.type === 'drawing' ? freeStrokes.some((stroke) => stroke.id === target.id) : targetExists(target)),
+		bounds: (target) => (target.type === 'drawing' ? drawingBounds(target.id) : targetBounds(target)),
+		matchesMarquee: (target, bounds) =>
+			target.type === 'drawing' ? !!drawingBounds(target.id) && boundsOverlap(drawingBounds(target.id)!, bounds) : targetMatchesMarquee(target, bounds),
+		groupBounds: () => selectedGroupBounds,
+		marquee: () => marqueeSelection,
+		setMarquee: (value) => (marqueeSelection = value),
+		enabled: () => !viewOnly && !animationPreview,
+		checkpoint: () => saveHistory(),
+		movement: {
+			read: () => dragTarget,
+			write: (drag) => (dragTarget = drag),
+			enabled: () => !viewOnly && !animationPreview,
+			originOffset: (drag) => {
+				if (animation && animationOpen && animationStep > 0 && drag.type === 'marker') {
+					const motion = animation.transitions[animationStep - 1]?.motions.find((item) => item.type === 'marker' && item.id === drag.id);
+					if (motion?.path !== 'custom') {
+						const origin = applyAnimationStep(animationBaseScene, animation.steps[animationStep - 1]).markers.find((item) => item.id === drag.id);
+						if (origin) return { x: origin.x - drag.elementStart.x, y: origin.y - drag.elementStart.y };
+					}
+				}
+				return { x: 0, y: 0 };
+			},
+			onStart: (_drag, event) => {
+				saveHistory();
+				hideDeleteButton();
+				if (!svg.hasPointerCapture(event.pointerId)) svg.setPointerCapture(event.pointerId);
+			},
+			apply: (drag, delta, event, moved) => applyElementDrag(drag, delta, event, moved ?? false)
 		}
-		selectedGroupBounds = {
-			left: Math.min(...bounds.map((item) => item.left)),
-			top: Math.min(...bounds.map((item) => item.top)),
-			right: Math.max(...bounds.map((item) => item.right)),
-			bottom: Math.max(...bounds.map((item) => item.bottom))
-		};
+	});
+	const refreshSelectionUi = (selectionPoint?: Point) => {
+  selectedGroupBounds=interactionController.selectionBounds();
+  if(!selectedGroupBounds){hideDeleteButton();return;}
 		deleteTarget = selectedTargets.at(-1) ?? null;
 		if (selectionPoint && selectedTargets.length === 1 && selectedTargets[0].type === 'guide') {
 			const guide = guides.find((item) => item.id === selectedTargets[0].id);
@@ -3020,42 +2850,17 @@
 	const restoreSelectedElementControls = () => {
 		if (selectedTargets.length === 1) refreshSelectionUi();
 	};
-	const isPointInSelectedGroup = (point: Point) =>
-		(selectedTargets.length + selectedDrawingIds.length) > 1 &&
-		selectedGroupBounds !== null &&
-		point.x >= selectedGroupBounds.left - 6 &&
-		point.x <= selectedGroupBounds.right + 6 &&
-		point.y >= selectedGroupBounds.top - 6 &&
-		point.y <= selectedGroupBounds.bottom + 6;
-	const selectTarget = (target: SelectedTarget, additive: boolean, selectionPoint?: Point) => {
-		singleMarqueeSelection = false;
-  drawingOptions=null;
-		const selected = selectedTargets.some((item) => sameTarget(item, target));
-        if(!additive&&!selected)selectedDrawingIds=[];
-		if (additive) selectedTargets = selected ? selectedTargets.filter((item) => !sameTarget(item, target)) : [...selectedTargets, target];
-		else if (!selected) selectedTargets = [target];
-		refreshSelectionUi(selectionPoint);
-		return selectedTargets.some((item) => sameTarget(item, target));
-	};
+ const isPointInSelectedGroup=(point:Point)=>interactionController.containsGroup(point);
+ const selectTarget=(target:SelectedTarget,additive:boolean,point?:Point)=>{singleMarqueeSelection=false;drawingOptions=null;const selected=interactionController.select(target,additive);refreshSelectionUi(point);return selected;};
 	const targetKey = (target: SelectedTarget) => `${target.type}:${target.id}`;
-	const orderedTargets = (targets: SelectedTarget[]) => {
-		const requested = new Map(targets.map((target) => [targetKey(target), target]));
-		const ordered = layerOrder.map((layer) => requested.get(targetKey(layer))).filter((target): target is SelectedTarget => target !== undefined);
-		const included = new Set(ordered.map(targetKey));
-		return [...ordered, ...targets.filter((target) => !included.has(targetKey(target)))];
-	};
-	const allElementTargets = () =>
+ const orderedTargets=(targets:SelectedTarget[]):SelectedTarget[]=>interactionController.ordered(targets,layerOrder) as SelectedTarget[];
+	const allElementTargets = ():SelectedTarget[] =>
 		orderedTargets([
 			...markers.map(({ id }) => ({ type: 'marker' as const, id })),
 			...paths.map(({ id }) => ({ type: 'path' as const, id })),
 			...guides.map(({ id }) => ({ type: 'guide' as const, id }))
 		]);
-	const normalizedSelectionBounds = (start: Point, end: Point): SelectionBounds => ({
-		left: Math.min(start.x, end.x),
-		top: Math.min(start.y, end.y),
-		right: Math.max(start.x, end.x),
-		bottom: Math.max(start.y, end.y)
-	});
+ const normalizedSelectionBounds=normalizedBounds;
 	const targetMatchesMarquee = (target: SelectedTarget, bounds: SelectionBounds) => {
 		if (target.type === 'marker') {
 			const marker = markers.find((item) => item.id === target.id);
@@ -3079,12 +2884,31 @@
 		clearDeleteState();
 		clearPlacementSnap();
 		hoverPoint = null;
-		marqueeSelection = { pointerId: event.pointerId, start, current: start };
+		interactionController.beginMarquee(event.pointerId,start);
 		svg.setPointerCapture(event.pointerId);
 	};
  let selectedDrawingIds:number[]=[];
  let drawingColorOptions:{x:number;y:number}|null=null;
- let drawingDrag:{start:Point;strokes:FreeStroke[];moved:boolean}|null=null;
+ type DrawingDrag={pointerStart:Point;strokes:FreeStroke[];moved:boolean};
+ let drawingDrag:DrawingDrag|null=null;
+	const drawingMovement = createMovementController<DrawingDrag, PointerEvent>({
+		read: () => drawingDrag,
+		write: (drag) => (drawingDrag = drag),
+		enabled: () => !viewOnly && !animationPreview,
+		threshold: 3,
+		angleMode: 'radial',
+		onStart: () => {
+			saveHistory();
+			drawingColorOptions = null;
+		},
+		apply: (drag, { x: dx, y: dy }) => {
+			freeStrokes = freeStrokes.map((stroke) => {
+				const original = drag.strokes.find((item) => item.id === stroke.id);
+				return original ? { ...stroke, points: original.points.map((point) => ({ x: point.x + dx, y: point.y + dy })) } : stroke;
+			});
+		}
+	});
+
  $: selectedDrawingBounds=selectedDrawingIds.length?drawingBounds(selectedDrawingIds[0]):null;
  $: drawingCanRevert=!!(animation&&animationStep>0&&selectedDrawingIds.some(id=>{if(animationContent.animation?.steps[animationStep-1].strokeIds && !animationContent.animation.steps[animationStep-1].strokeIds!.includes(id))return false;const current=animationContent.animation?.steps[animationStep].strokeOffsets?.find(item=>item.id===id);const previous=animationContent.animation?.steps[animationStep-1].strokeOffsets?.find(item=>item.id===id);return Math.abs((current?.x??0)-(previous?.x??0))>.001||Math.abs((current?.y??0)-(previous?.y??0))>.001;}));
  const changeDrawingColor=(color:GuideColor)=>{saveHistory();freeStrokes=freeStrokes.map(stroke=>selectedDrawingIds.includes(stroke.id)?{...stroke,color}:stroke);if(animation)commitAnimation();};
@@ -3093,22 +2917,15 @@
  const beginDrawingDrag=(id:number,event:PointerEvent)=>{
   if(viewOnly||tool!=='select'||animationPreview||event.button!==0)return;
   if(selectedDrawingIds.includes(id)&&selectedTargets.length){event.preventDefault();event.stopPropagation();beginGroupDrag(event);svg.setPointerCapture(event.pointerId);return;}
-  event.preventDefault();event.stopPropagation();if(!event.shiftKey)selectedTargets=[];clearDeleteState();drawingOptions=null;
-  if(event.shiftKey)selectedDrawingIds=selectedDrawingIds.includes(id)?selectedDrawingIds.filter(value=>value!==id):[...selectedDrawingIds,id];
-  else if(!selectedDrawingIds.includes(id))selectedDrawingIds=[id];
+  event.preventDefault();event.stopPropagation();clearDeleteState();drawingOptions=null;
+  if(!interactionController.select({type:'drawing',id},event.shiftKey)){refreshSelectionUi();return;}
   refreshSelectionUi();
-  drawingDrag={start:canvasPointFromEvent(event),strokes:structuredClone(freeStrokes.filter(stroke=>selectedDrawingIds.includes(stroke.id))),moved:false};
+  drawingMovement.begin({pointerStart:canvasPointFromEvent(event),strokes:structuredClone(freeStrokes.filter(stroke=>selectedDrawingIds.includes(stroke.id))),moved:false},event.pointerId);
   (event.currentTarget as Element).setPointerCapture(event.pointerId);
  };
- const moveDrawingDrag=(event:PointerEvent)=>{
-  if(!drawingDrag)return;event.stopPropagation();const point=canvasPointFromEvent(event);let dx=point.x-drawingDrag.start.x,dy=point.y-drawingDrag.start.y;
-  if(!drawingDrag.moved&&Math.hypot(dx,dy)<3)return;
-  if(!drawingDrag.moved){saveHistory();drawingDrag.moved=true;drawingColorOptions=null;}
-  if(event.shiftKey&&!ignoresSnapping(event)){const angle=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*Math.PI/4;const length=Math.hypot(dx,dy);dx=Math.cos(angle)*length;dy=Math.sin(angle)*length;}
-  freeStrokes=freeStrokes.map(stroke=>{const original=drawingDrag!.strokes.find(item=>item.id===stroke.id);return original?{...stroke,points:original.points.map(point=>({x:point.x+dx,y:point.y+dy}))}:stroke;});
- };
+ const moveDrawingDrag=(event:PointerEvent)=>{if(!drawingDrag)return;event.stopPropagation();drawingMovement.move(canvasPointFromEvent(event),event);};
  const endDrawingDrag=(event:PointerEvent)=>{
-  if(!drawingDrag)return;event.stopPropagation();const moved=drawingDrag.moved;drawingDrag=null;
+  if(!drawingDrag)return;event.stopPropagation();const moved=drawingMovement.finish()?.moved;
   if(moved){if(animation)commitAnimation();}else {rememberPopoverAnchor(event,document.querySelector(`[data-drawing-id="${selectedDrawingIds[0]}"]`));drawingColorOptions={x:event.clientX+8,y:event.clientY+8};}
  };
  let drawingOptions:{x:number;y:number;stepId:string}|null=null;
@@ -3139,25 +2956,8 @@
   changeAnimation(next);
  };
 	let singleMarqueeSelection = false;
-	const finishMarqueeSelection = () => {
-		if (!marqueeSelection) return;
-		const bounds = normalizedSelectionBounds(marqueeSelection.start, marqueeSelection.current);
-		const dragged = bounds.right - bounds.left >= 4 || bounds.bottom - bounds.top >= 4;
-		selectedTargets = dragged ? allElementTargets().filter((target) => targetMatchesMarquee(target, bounds)) : [];
-		singleMarqueeSelection = dragged && selectedTargets.length === 1;
-  selectedDrawingIds=dragged?freeStrokes.filter(stroke=>{const b=drawingBounds(stroke.id);return b&&b.left<=bounds.right&&b.right>=bounds.left&&b.top<=bounds.bottom&&b.bottom>=bounds.top;}).map(stroke=>stroke.id):[];
-  drawingOptions=null;drawingColorOptions=null;
-
-		marqueeSelection = null;
-		refreshSelectionUi();
-	};
-	const translateSelectedTargets = (requestedDx: number, requestedDy: number) => {
-		if (selectedTargets.length + selectedDrawingIds.length === 0 || !selectedGroupBounds) return false;
-		const canMoveVertically = selectedDrawingIds.length>0 || selectedTargets.some((target) => target.type !== 'guide');
-		const dx = Math.max(-selectedGroupBounds.left, Math.min(1000 - selectedGroupBounds.right, requestedDx));
-		const dy = canMoveVertically ? Math.max(-selectedGroupBounds.top, Math.min(484 - selectedGroupBounds.bottom, requestedDy)) : 0;
-		if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) return false;
-		saveHistory();
+ const finishMarqueeSelection=()=>{if(!marqueeSelection)return;const result=interactionController.finishMarquee(marqueeSelection.pointerId);singleMarqueeSelection=!!result?.dragged&&selectedTargets.length===1;drawingOptions=null;drawingColorOptions=null;refreshSelectionUi();};
+ const translateSelectedTargets=(requestedDx:number,requestedDy:number)=>interactionController.translate({x:requestedDx,y:requestedDy},{left:0,top:0,width:1000,height:484},selectedDrawingIds.length>0||selectedTargets.some(target=>target.type!=='guide'),({x:dx,y:dy})=>{
 		const selectedMarkerIds = new Set(selectedTargets.filter((target) => target.type === 'marker').map((target) => target.id));
 		const selectedPathIds = new Set(selectedTargets.filter((target) => target.type === 'path').map((target) => target.id));
 		const selectedGuideIds = new Set(selectedTargets.filter((target) => target.type === 'guide').map((target) => target.id));
@@ -3182,39 +2982,24 @@
         freeStrokes=freeStrokes.map(stroke=>selectedDrawingIds.includes(stroke.id)?{...stroke,points:stroke.points.map(point=>({x:point.x+dx,y:point.y+dy}))}:stroke);
 		refreshSelectionUi();
 		completeTutorialAction('move-element');
-		return true;
-	};
+	});
 	const copySelectedElements = () => {
 		if (selectedTargets.length+selectedDrawingIds.length === 0 || !selectedGroupBounds) return false;
 		const selected = orderedTargets(selectedTargets);
 		const selectedKeys = new Set(selected.map(targetKey));
-		elementClipboard = {
- sourcePlayId:playEntries[activePlayIndex].id,sourceField:{left:fieldLeft,top:fieldTop,width:fieldWidth,height:fieldHeight},freeStrokes:structuredClone(freeStrokes.filter(stroke=>selectedDrawingIds.includes(stroke.id))),
+		builderController.copy({
+ freeStrokes:structuredClone(freeStrokes.filter(stroke=>selectedDrawingIds.includes(stroke.id))),
 			markers: markers.filter((marker) => selectedKeys.has(targetKey({ type: 'marker', id: marker.id }))).map((marker) => ({ ...marker })),
 			paths: paths
 				.filter((path) => selectedKeys.has(targetKey({ type: 'path', id: path.id })))
 				.map((path) => ({ ...path, start: { ...pathStart(path) }, end: { ...path.end }, points: pathPoints(path)?.map((point) => ({ ...point })) })),
 			guides: guides.filter((guide) => selectedKeys.has(targetKey({ type: 'guide', id: guide.id }))).map((guide) => ({ ...guide })),
-			layerOrder: selected.map((target) => ({ ...target })),
-			bounds: { ...selectedGroupBounds },
-			pasteCount: 0
-		};
+			layerOrder: selected.map((target) => ({ ...target }))
+		}, {playId:playEntries[activePlayIndex].id,surface:{left:fieldLeft,top:fieldTop,width:fieldWidth,height:fieldHeight},bounds:selectedGroupBounds});
 		const count=selected.length+selectedDrawingIds.length;showActionMessage(`${count===1?'Element':`${count} elements`} copied`);
 		return true;
 	};
-	const pasteOffset = (minimum: number, maximum: number, desired: number) => {
-		if (desired <= maximum) return desired;
-		if (-desired >= minimum) return -desired;
-		return Math.max(minimum, Math.min(maximum, 0));
-	};
-	const pasteElements = () => {
-		if (!elementClipboard) return false;
-		const samePlay=elementClipboard.sourcePlayId===playEntries[activePlayIndex].id;
-		const desiredOffset = samePlay?14*(elementClipboard.pasteCount+1):0;
-		const dx = pasteOffset(-elementClipboard.bounds.left, 1000 - elementClipboard.bounds.right, desiredOffset);
-		const dy = pasteOffset(-elementClipboard.bounds.top, 484 - elementClipboard.bounds.bottom, desiredOffset);
-		const sx=samePlay?1:fieldWidth/elementClipboard.sourceField.width,sy=samePlay?1:fieldHeight/elementClipboard.sourceField.height;
-  const offset=(point:Point)=>samePlay?{x:point.x+dx,y:point.y+dy}:{x:fieldLeft+(point.x-elementClipboard!.sourceField.left)*sx,y:fieldTop+(point.y-elementClipboard!.sourceField.top)*sy};
+ const pasteElements = () => builderController.paste({playId:playEntries[activePlayIndex].id,surface:{left:fieldLeft,top:fieldTop,width:fieldWidth,height:fieldHeight},viewport:{left:0,top:0,width:1000,height:484}},(elementClipboard,{mapPoint:offset})=>{
   const idMap = new Map<string, number>();
 		for (const marker of elementClipboard.markers) idMap.set(targetKey({ type: 'marker', id: marker.id }), nextId++);
 		for (const path of elementClipboard.paths) idMap.set(targetKey({ type: 'path', id: path.id }), nextId++);
@@ -3249,22 +3034,20 @@
 			.filter((layer): layer is LayerRef => layer !== null);
 		const pastedStrokes=elementClipboard.freeStrokes.map(stroke=>({...stroke,id:nextId++,points:stroke.points.map(offset)}));
 		if(pastedLayerOrder.length+pastedStrokes.length===0)return false;
-		saveHistory();
 		freeStrokes=[...freeStrokes,...pastedStrokes];selectedDrawingIds=pastedStrokes.map(stroke=>stroke.id);
 		markers = [...markers, ...pastedMarkers];
 		paths = [...paths, ...pastedPaths];
 		guides = [...guides, ...pastedGuides];
 		layerOrder = [...layerOrder, ...pastedLayerOrder];
 		selectedTargets = pastedLayerOrder.map((target) => ({ ...target }));
-		elementClipboard = { ...elementClipboard, pasteCount: elementClipboard.pasteCount + 1 };
 		refreshSelectionUi();
 		syncLayerDom();
 		const count=pastedLayerOrder.length+pastedStrokes.length;showActionMessage(`${count===1?'Element':`${count} elements`} pasted`);
 		return true;
-	};
+	});
 	const beginGroupDrag = (event: PointerEvent) => {
 		if (!selectedGroupBounds) return;
-		dragTarget = {
+		interactionController.movement.begin({
 			type: 'group',
 			pointerStart: canvasPointFromEvent(event),
 			targets: selectedTargets.map((target) => ({ ...target })),
@@ -3286,7 +3069,7 @@
 				.filter((guide) => selectedTargets.some((target) => target.type === 'guide' && target.id === guide.id))
 				.map(({ id, x }) => ({ id, x })),
 			moved: false
-		};
+		},event.pointerId);
 	};
  $: revertOriginScene = animation && animationStep > 0 ? applyAnimationStep(animationBaseScene, animation.steps[animationStep - 1]) : null;
  $: revertSelection = animationOpen && !animationPreview && selectedTargets.length === 1 ? selectedTargets[0] : null;
@@ -4045,7 +3828,7 @@
 	};
  const viewerSpeeds = [0.25, 0.5, 1, 1.25, 1.5, 1.75, 2];
  const cycleViewerSpeed = (event?:MouseEvent) => animationRate = viewerSpeeds[(viewerSpeeds.indexOf(animationRate) + (event?.shiftKey?-1:1) + viewerSpeeds.length) % viewerSpeeds.length];
- const viewerScrubber = createKeyboardScrubber(() => animationTime, () => animationDuration(animation), seekAnimation, { playing: () => animationPlaying, change: shuttleAnimation });
+ const viewerScrubber = createKeyboardScrubber(() => animationTime, () => animationDuration(animation), seekAnimation, { rate: () => animationRate, change: shuttleAnimation });
  const handleViewerPlaybackKey = (event: KeyboardEvent) => {
   viewerScrubber.modifier(event.shiftKey);
   if (!['ArrowLeft', 'ArrowRight', 'Shift'].includes(event.key)) viewerScrubber.stop();
@@ -4128,12 +3911,8 @@
   }
   if(presentation&&!editingText&&(event.ctrlKey||event.metaKey)&&!event.altKey&&['z','y'].includes(event.key.toLowerCase())){
    event.preventDefault();event.stopImmediatePropagation();if(event.repeat)return;
-   const redo=event.key.toLowerCase()==='y'||event.shiftKey;
-   const stack=redo?presentationSpotlightFuture:presentationSpotlightPast;
-   if(stack.length){const current=cloneSpotlights();spotlightStrokes=cloneSpotlights(stack.at(-1)!);activeSpotlightStroke=null;
-    if(redo){presentationSpotlightFuture=stack.slice(0,-1);presentationSpotlightPast=[...presentationSpotlightPast,current];}
-    else{presentationSpotlightPast=stack.slice(0,-1);presentationSpotlightFuture=[...presentationSpotlightFuture,current];}
-   }return;
+   if(event.key.toLowerCase()==='y'||event.shiftKey)presentationSpotlightController.redo();else presentationSpotlightController.undo();
+   return;
   }
   const inBuilder=builderRoot?.contains(event.target as Node)||(event.target as Element)?.closest('[data-animation-ui],[data-draggable-popover]');
   if(!viewOnly&&!animationPreview&&!videoController&&!tutorialActive&&actionInProgress===null&&inBuilder&&!editingText&&(event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&['a','c','x','v'].includes(event.key.toLowerCase())){
@@ -4142,7 +3921,7 @@
    if(key==='a'){selectedTargets=allElementTargets();selectedDrawingIds=freeStrokes.map(stroke=>stroke.id);tool='select';singleMarqueeSelection=false;refreshSelectionUi();}
    else if(key==='c')copySelectedElements();
    else if(key==='v')pasteElements();
-   else if(copySelectedElements()){saveHistory();const drawingIds=[...selectedDrawingIds];for(const target of [...selectedTargets])removeElementTarget(target);freeStrokes=freeStrokes.filter(stroke=>!drawingIds.includes(stroke.id));selectedTargets=[];selectedDrawingIds=[];clearDeleteState();if(animation)commitAnimation();}
+   else if(copySelectedElements())builderController.cut(()=>{const drawingIds=[...selectedDrawingIds];for(const target of [...selectedTargets])removeElementTarget(target);freeStrokes=freeStrokes.filter(stroke=>!drawingIds.includes(stroke.id));selectedTargets=[];selectedDrawingIds=[];clearDeleteState();if(animation)commitAnimation();return true;});
    return;
   }
 
@@ -4341,8 +4120,8 @@
 			if (isRedoShortcut || isUndoShortcut) {
 				event.preventDefault();
 				if (isRedoShortcut) {
-					if (future.length > 0) redo();
-				} else if (history.length > 0) undo();
+					if (controllerStatus.canRedo) redo();
+				} else if (controllerStatus.canUndo) undo();
 				return;
 			}
 		}
@@ -5011,7 +4790,7 @@
   commitActiveEditor();
   commitAnimation();
   const backup = builderSnapshot();
-  const previousHistory = history, previousFuture = future;
+  const previousHistory = builderController.exportHistory();
   const previousFeedback = saveFeedbackState;
   const previousTool = tool;
   const previousRate = animationRate, previousLoop = animationLoop, previousGhosts = animationGhosts;
@@ -5031,7 +4810,7 @@
   applyDefaultSetup();
   openAnimation();
   animationRate = 1; animationLoop = false; animationGhosts = true;
-  history = []; future = [];
+  builderController.clearHistory();
   await tick();
   const added = () => !!animation && animation.steps.length > 1;
   const moved = () => added() && !!animationContent.animation?.steps[1].poses.some(pose => {
@@ -5096,7 +4875,7 @@
     document.body.classList.remove('animation-tutorial-active');
     animationOpen=false;
     applyBuilderState(backup);
-    history=previousHistory; future=previousFuture;
+    builderController.restoreHistory(previousHistory);
     animationRate=previousRate; animationLoop=previousLoop; animationGhosts=previousGhosts;
     tool=previousTool; animationOpen=previousOpen;
     if(previousPreview) showAnimationTime(previousTime);
@@ -5264,8 +5043,7 @@
 		nextPlayEntryId = 2;
 		nextPlayNumber = 2;
 		applyScene({ markers: [], paths: [], guides: [], freeStrokes: [], layerOrder: [] });
-		history = [];
-		future = [];
+		builderController.clearHistory();
 		nextId = 1;
 		if (tool === 'laser') releaseLaserDrawings();
 		tool = 'team-a';
@@ -5677,6 +5455,7 @@
 			// Some browser/driver combinations expose the eraser signal without allowing pointer capture.
 		}
 	};
+ const drawingController=createDrawingController(minimumStraightDrawingLength);
 	const beginFreeDrawing = (event: PointerEvent) => {
 		if (viewOnly || animationPreview) return;
 		event.preventDefault();
@@ -5807,11 +5586,7 @@
 			svg.setPointerCapture(event.pointerId);
 		}
 	};
- let pendingShiftDeselection: SelectedTarget | null = null;
- const selectDragTarget = (target: SelectedTarget, shift: boolean, point?: Point) => {
-  pendingShiftDeselection = shift && selectedTargets.some(item => item.type === target.type && item.id === target.id) ? target : null;
-  return pendingShiftDeselection ? true : selectTarget(target, shift, point);
- };
+ const selectDragTarget=(target:SelectedTarget,shift:boolean,point?:Point)=>{singleMarqueeSelection=false;drawingOptions=null;const selected=interactionController.selectForDrag(target,shift);refreshSelectionUi(point);return selected;};
 	const beginOnMarker = async (event: PointerEvent, marker: FieldMarker) => {
 		if (animationPreview && tool !== 'laser' && tool !== 'free-draw') return;
 		if (viewOnly) return;
@@ -5859,14 +5634,14 @@
 			beginGroupDrag(event);
 			return;
 		}
-		dragTarget = {
+		interactionController.movement.begin({
 			type: 'marker',
 			id: marker.id,
 			pointerStart: isOfficialKind(marker.kind) ? canvasPointFromEvent(event) : isSidelineMarkerKind(marker.kind) ? clampSidelineMarkerPoint(canvasPointFromEvent(event)) : pointFromEvent(event),
 			elementStart: { x: marker.x, y: marker.y },
 			moved: false,
 			snapToMarkers: paths.some((path) => path.startMarkerId === marker.id)
-		};
+		},event.pointerId);
 	};
 	const beginOnPath = async (event: PointerEvent, path: FieldPath, mode: 'whole' | 'start' | 'end' = 'whole') => {
 		if (animationPreview && tool !== 'laser' && tool !== 'free-draw') return;
@@ -5897,14 +5672,14 @@
 					beginGroupDrag(event);
 					return;
 				}
-				dragTarget = {
+				interactionController.movement.begin({
 					type: 'marker',
 					id: attachedMarker.id,
 					pointerStart: isOfficialKind(attachedMarker.kind) ? canvasPointFromEvent(event) : isSidelineMarkerKind(attachedMarker.kind) ? clampSidelineMarkerPoint(canvasPointFromEvent(event)) : pointFromEvent(event),
 					elementStart: { x: attachedMarker.x, y: attachedMarker.y },
 					moved: false,
 					snapToMarkers: true
-				};
+				},event.pointerId);
 				return;
 			}
 		}
@@ -5914,7 +5689,7 @@
 			beginGroupDrag(event);
 			return;
 		}
-		dragTarget = {
+		interactionController.movement.begin({
 			type: 'path',
 			id: path.id,
 			pointerStart: pointFromEvent(event),
@@ -5924,7 +5699,7 @@
 			mode,
 			points: pathPoints(path)?.map((point) => ({ ...point })),
 			moved: false
-		};
+		},event.pointerId);
 	};
 	const beginOnGuide = async (event: PointerEvent, guide: FieldGuide, fromDownMarker = false) => {
 		if (animationPreview && tool !== 'laser' && tool !== 'free-draw') return;
@@ -5967,7 +5742,7 @@
 				return;
 			}
 		}
-		dragTarget = { type: 'guide', id: guide.id, pointerStart, xStart: guide.x, moved: false, fromDownMarker };
+		interactionController.movement.begin({ type: 'guide', id: guide.id, pointerStart, xStart: guide.x, moved: false, fromDownMarker },event.pointerId);
 	};
 	const continuePointer = (event: PointerEvent) => {
 		if (viewOnly) return;
@@ -5989,7 +5764,7 @@
 		}
 		const canvasPoint = canvasPointFromEvent(event);
 		if (marqueeSelection?.pointerId === event.pointerId) {
-			marqueeSelection = { ...marqueeSelection, current: canvasPoint };
+			interactionController.moveMarquee(event.pointerId,canvasPoint);
 			return;
 		}
 		pointerInsideSelectedGroup = isPointInSelectedGroup(canvasPoint);
@@ -6039,20 +5814,8 @@
 				activeFreeDrawShape === 'straight' && shouldSnapStraightDrawing(event)
 					? snapStraightDrawPoint(activeFreeStroke.points[0], canvasPoint)
 					: canvasPoint;
-			if (activeFreeDrawShape === 'straight') {
-				const first = activeFreeStroke.points[0];
-				if (Math.hypot(strokePoint.x - first.x, strokePoint.y - first.y) >= minimumStraightDrawingLength) {
-					activeFreeStroke = { ...activeFreeStroke, points: [first, strokePoint] };
-				}
-				return;
-			}
-			const last = activeFreeStroke.points.at(-1)!;
-			if (Math.hypot(strokePoint.x - last.x, strokePoint.y - last.y) >= 1.5) {
-				activeFreeStroke = {
-					...activeFreeStroke,
-					points: [...activeFreeStroke.points, strokePoint]
-				};
-			}
+   const points=drawingController.move(activeFreeStroke.points,strokePoint,activeFreeDrawShape);
+   if(points!==activeFreeStroke.points)activeFreeStroke={...activeFreeStroke,points};
 			return;
 		}
 		if (!drawing && !dragTarget) return;
@@ -6077,38 +5840,14 @@
 		const markerDragId = dragTarget.type === 'marker' ? dragTarget.id : null;
 		const draggingOfficial = markerDragId !== null && markers.some(marker => marker.id === markerDragId && isOfficialMarker(marker));
 		const dragPoint = dragTarget.type === 'group' || draggingOfficial ? canvasPoint : point;
-		let rawDx = dragPoint.x - dragTarget.pointerStart.x;
-		let rawDy = dragPoint.y - dragTarget.pointerStart.y;
-  if (event.shiftKey && !ignoresSnapping(event)) {
-   clearPlacementSnap();
-   const increment = Math.PI / 4;
-   let originOffset = { x: 0, y: 0 };
-   if (animation && animationOpen && animationStep > 0 && dragTarget.type === 'marker') {
-    const markerId = dragTarget.id;
-    const motion = animation.transitions[animationStep - 1]?.motions.find(item => item.type === 'marker' && item.id === markerId);
-    if (motion?.path !== 'custom') {
-     const origin = applyAnimationStep(animationBaseScene, animation.steps[animationStep - 1]).markers.find(item => item.id === markerId);
-     if (origin) originOffset = { x: origin.x - dragTarget.elementStart.x, y: origin.y - dragTarget.elementStart.y };
-    }
-   }
-   const dx = rawDx - originOffset.x, dy = rawDy - originOffset.y;
-   const angle = Math.round(Math.atan2(dy, dx) / increment) * increment;
-   const cosine = Math.cos(angle), sine = Math.sin(angle);
-   const distance = dx * cosine + dy * sine;
-   rawDx = originOffset.x + (Math.abs(cosine) < 1e-8 ? 0 : distance * cosine);
-   rawDy = originOffset.y + (Math.abs(sine) < 1e-8 ? 0 : distance * sine);
-  }
-		if (!dragTarget.moved && Math.hypot(rawDx, rawDy) < 4) return;
-		if (!dragTarget.moved) {
-			saveHistory();
-			hideDeleteButton();
-			dragTarget = { ...dragTarget, moved: true } as DragTarget;
-			if (!svg.hasPointerCapture(event.pointerId)) svg.setPointerCapture(event.pointerId);
-		}
+  if(event.shiftKey&&!ignoresSnapping(event))clearPlacementSnap();
+  interactionController.movement.move(dragPoint,event,placementPointerMoved);
+ };
+ const applyElementDrag=(drag:DragTarget,{x:rawDx,y:rawDy}:Point,event:PointerEvent,placementPointerMoved:boolean):void=>{
+  const dragTarget=drag;
 		if (dragTarget.type === 'group') {
 			const target = dragTarget;
-			const dx = Math.max(-target.bounds.left, Math.min(1000 - target.bounds.right, rawDx));
-			const dy = Math.max(-target.bounds.top, Math.min(484 - target.bounds.bottom, rawDy));
+			const {x:dx,y:dy}=constrainTranslation({x:rawDx,y:rawDy},target.bounds,{left:0,top:0,width:1000,height:484});
 			const selectedMarkerIds = new Set(target.markerStarts.map((item) => item.id));
 			const selectedPathIds = new Set(target.pathStarts.map((item) => item.id));
 			markers = markers.map((marker) => {
@@ -6196,8 +5935,7 @@
 			const maxX = Math.max(...draggedPathPoints.map((point) => point.x));
 			const minY = Math.min(...draggedPathPoints.map((point) => point.y));
 			const maxY = Math.max(...draggedPathPoints.map((point) => point.y));
-			const dx = Math.max(fieldLeft - minX, Math.min(fieldRight - maxX, rawDx));
-			const dy = Math.max(fieldTop - minY, Math.min(fieldBottom - maxY, rawDy));
+			const {x:dx,y:dy}=constrainTranslation({x:rawDx,y:rawDy},{left:minX,top:minY,right:maxX,bottom:maxY},{left:fieldLeft,top:fieldTop,width:fieldWidth,height:fieldHeight});
 			paths = paths.map((path) =>
 				path.id === target.id
 					? {
@@ -6214,7 +5952,7 @@
 	const endPointer = (event: PointerEvent) => {
 		if (viewOnly) return;
 		if (marqueeSelection?.pointerId === event.pointerId) {
-			marqueeSelection = { ...marqueeSelection, current: canvasPointFromEvent(event) };
+			interactionController.moveMarquee(event.pointerId,canvasPointFromEvent(event));
 			finishMarqueeSelection();
 			if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
 			return;
@@ -6244,24 +5982,9 @@
 			const rawFinalPoint = canvasPointFromEvent(event);
 			const eventFinalPoint =
 				activeFreeDrawShape === 'straight' && shouldSnapStraightDrawing(event) ? snapStraightDrawPoint(first, rawFinalPoint) : rawFinalPoint;
-			const trackedFinalPoint = activeFreeStroke.points.length > 1 ? activeFreeStroke.points.at(-1)! : null;
-			// Pen drivers can report a stale coordinate or barrel-button value as the
-			// tip lifts. Preserve the last valid move sample instead of collapsing a
-			// completed horizontal or vertical stroke at pointerup.
-			const finalPoint = activeFreeDrawShape === 'straight' && trackedFinalPoint ? trackedFinalPoint : eventFinalPoint;
-			if (activeFreeDrawShape === 'straight' && Math.hypot(finalPoint.x - first.x, finalPoint.y - first.y) < minimumStraightDrawingLength) {
-				activeFreeStroke = null;
-				activeFreeDrawShape = freeDrawShape;
-				if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
-				return;
-			}
-			const last = activeFreeStroke.points.at(-1)!;
-			const points =
-				activeFreeDrawShape === 'straight'
-					? [first, finalPoint]
-					: Math.hypot(finalPoint.x - last.x, finalPoint.y - last.y) >= 1.5
-						? [...activeFreeStroke.points, finalPoint]
-						: activeFreeStroke.points;
+   const points=drawingController.finish(activeFreeStroke.points,eventFinalPoint,activeFreeDrawShape);
+   if(!points){activeFreeStroke=null;activeFreeDrawShape=freeDrawShape;if(svg.hasPointerCapture(event.pointerId))svg.releasePointerCapture(event.pointerId);return;}
+
 			saveHistory();
 			freeStrokes = [...freeStrokes, { ...activeFreeStroke, points }];
  persistPreviewDrawings();
@@ -6273,17 +5996,11 @@
 			return;
 		}
 		if (event.pointerType === 'pen' && event.button === 2) return;
-		if (pendingShiftDeselection && dragTarget && !dragTarget.moved) {
-   const target = pendingShiftDeselection;
-   selectedTargets = selectedTargets.filter(item => item.type !== target.type || item.id !== target.id);
-   refreshSelectionUi();
-  }
-  pendingShiftDeselection = null;
-		const draggedDownMarker = dragTarget?.type === 'guide' && dragTarget.fromDownMarker && dragTarget.moved;
-		let droppedTargets: SelectedTarget[] = [];
-		if (dragTarget?.moved) {
-			droppedTargets = dragTarget.type === 'group' ? dragTarget.targets : [{ type: dragTarget.type, id: dragTarget.id }];
-		}
+  const completedDrag=interactionController.finishDrag();
+  if(completedDrag&&!completedDrag.moved)refreshSelectionUi();
+  const draggedDownMarker=completedDrag?.type==='guide'&&completedDrag.fromDownMarker&&completedDrag.moved;
+  let droppedTargets:SelectedTarget[]=[];
+  if(completedDrag?.moved)droppedTargets=completedDrag.type==='group'?completedDrag.targets:[{type:completedDrag.type,id:completedDrag.id}];
 		const canPlaceDrawing =
 			drawing &&
 			(drawing.kind === 'run' && drawing.points
@@ -6329,8 +6046,8 @@
 		activeLaserDrawing = null;
 		laserDrawingPointerId = null;
 		activeFreeDrawShape = freeDrawShape;
-		dragTarget = null;
-		marqueeSelection = null;
+		interactionController.cancel();
+  drawingMovement.cancel();
 		erasingFreeStrokes = false;
 		resetStylusEraser();
 		clearPlacementSnap();
@@ -6552,7 +6269,7 @@
 			if (autoSaveTimer) clearTimeout(autoSaveTimer);
 			if (copyFeedbackTimer) clearTimeout(copyFeedbackTimer);
 			if (deleteTargetTimer) clearTimeout(deleteTargetTimer);
-			if (laserTrailFrame !== null) cancelAnimationFrame(laserTrailFrame);
+			annotationController.dispose();
 			document.removeEventListener('pointerdown', handleWindowPointerDown, true);
 			document.removeEventListener('click', handleWindowClick, true);
 			window.removeEventListener('resize', updateDiagramModalPosition);
@@ -6825,157 +6542,19 @@
 			{/if}
 
 			{#if tool === 'free-draw'}
-				<div
-					data-tutorial="draw-options"
-					class="draw-options-panel relative z-40 mt-px w-full border-2 border-stone-900 bg-stone-900 p-px shadow-xl"
-					role="group"
-					aria-label="Drawing options"
-				>
-					<div class="draw-options-line-types grid grid-cols-2 gap-px" role="group" aria-label="Drawing line type">
-						<HoverTooltip text="Free Draw" minWidthPx={0} wrapperClass="flex h-7 min-w-0">
-							<button
-								type="button"
-								aria-label="Draw squiggle lines"
-								aria-pressed={freeDrawShape === 'squiggle' && freeDrawMode === 'draw'}
-								on:pointerdown|stopPropagation={() => {
-									freeDrawShape = 'squiggle';
-									freeDrawMode = 'draw';
-								}}
-								on:click|stopPropagation={() => {
-									freeDrawShape = 'squiggle';
-									freeDrawMode = 'draw';
-								}}
-								class="flex h-7 w-full cursor-pointer items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-								class:!bg-stone-600={freeDrawShape === 'squiggle' && freeDrawMode === 'draw'}
-								class:!text-white={freeDrawShape === 'squiggle' && freeDrawMode === 'draw'}
-							>
-								<svg viewBox="0 0 24 12" class="h-3 w-4" aria-hidden="true">
-									<path d="M2 8c4-8 6 8 10 0s6 8 10 0" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-								</svg>
-								<span class="sr-only">Squiggle</span>
-							</button>
-						</HoverTooltip>
-						<HoverTooltip text="Straight Line" minWidthPx={0} wrapperClass="flex h-7 min-w-0">
-							<button
-								type="button"
-								aria-label="Draw straight lines"
-								aria-pressed={freeDrawShape === 'straight' && freeDrawMode === 'draw'}
-								on:pointerdown|stopPropagation={() => {
-									freeDrawShape = 'straight';
-									freeDrawMode = 'draw';
-								}}
-								on:click|stopPropagation={() => {
-									freeDrawShape = 'straight';
-									freeDrawMode = 'draw';
-								}}
-								class="flex h-7 w-full cursor-pointer items-center justify-center bg-stone-100 text-stone-800 hover:bg-white"
-								class:!bg-stone-600={freeDrawShape === 'straight' && freeDrawMode === 'draw'}
-								class:!text-white={freeDrawShape === 'straight' && freeDrawMode === 'draw'}
-							>
-								<svg viewBox="0 0 24 12" class="h-3 w-4" aria-hidden="true">
-									<path d="M2 10 22 2" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-								</svg>
-								<span class="sr-only">Straight</span>
-							</button>
-						</HoverTooltip>
-					</div>
-
-					<label class="draw-options-thickness mt-px block bg-stone-100 px-0.5 py-0.5 text-[7px] font-bold text-stone-800">
-						<span class="flex items-center justify-between"><span>Line</span><span>{freeDrawThickness}</span></span>
-						<input
-							type="range"
-							min="2"
-							max="8"
-							step="1"
-							bind:value={freeDrawThickness}
-							on:pointerdown|stopPropagation
-							aria-label="Drawing line thickness"
-							class="block h-3 w-full cursor-pointer accent-red-600"
-						/>
-					</label>
-
-					<div class="draw-options-colors mt-px grid grid-cols-2 gap-px" role="group" aria-label="Drawing color">
-						{#each freeDrawColors as option, colorIndex}
-							<HoverTooltip
-								text={option.label}
-								shortcutKeys={toolColorShortcutKeys('free-draw',colorIndex)}
-								minWidthPx={0}
-								wrapperClass="flex aspect-square min-h-0 min-w-0"
-							>
-								<button
-									data-draw-color
-									type="button"
-									aria-label={`${option.label} drawing color`}
-									aria-pressed={freeDrawColor === option.id}
-									on:pointerdown|stopPropagation={() => {
-										freeDrawColor = option.id;
-										freeDrawMode = 'draw';
-									}}
-									on:keydown={(event) => handleDrawColorKeydown(event, colorIndex)}
-									on:click|stopPropagation={() => {
-										freeDrawColor = option.id;
-										freeDrawMode = 'draw';
-									}}
-									class="flex h-full w-full cursor-pointer items-center justify-center border border-stone-500 text-[8px] font-black outline-none ring-inset hover:ring-1 hover:ring-white"
-									class:ring-2={freeDrawColor === option.id}
-									class:ring-white={freeDrawColor === option.id}
-									class:text-white={!['yellow', 'white', 'gray'].includes(option.id)}
-									class:text-stone-900={['yellow', 'white', 'gray'].includes(option.id)}
-									style:background={option.value}>{colorIndex === 9 ? 0 : colorIndex + 1}</button
-								>
-							</HoverTooltip>
-						{/each}
-					</div>
-
-					<div class="draw-options-actions mt-px grid grid-cols-2 gap-px">
-						<HoverTooltip text="Drawing Eraser" shortcutKeys={['Shift', 'D']} minWidthPx={0} wrapperClass="flex h-7 min-w-0">
-							<button
-								type="button"
-								aria-label="Erase drawing strokes"
-								aria-pressed={freeDrawMode === 'erase'}
-								on:pointerdown|stopPropagation
-								on:click|stopPropagation={() => (freeDrawMode = freeDrawMode === 'erase' ? 'draw' : 'erase')}
-								class="flex h-7 w-full cursor-pointer items-center justify-center bg-white hover:ring-1 hover:ring-stone-500 hover:ring-inset"
-								class:!ring-2={freeDrawMode === 'erase'}
-								class:!ring-stone-900={freeDrawMode === 'erase'}
-								class:!ring-inset={freeDrawMode === 'erase'}
-							>
-								<img src="/images/toolbar/drawing-eraser.png" alt="" class="h-6 w-6 object-contain" draggable="false" />
-								<span class="sr-only">Eraser</span>
-							</button>
-						</HoverTooltip>
-						<HoverTooltip text="Clear Drawings" shortcutKeys={['C']} minWidthPx={0} wrapperClass="flex h-7 min-w-0">
-							<button
-								type="button"
-								aria-label="Clear free drawings"
-								disabled={freeStrokes.length === 0 && !activeFreeStroke}
-								on:pointerdown|stopPropagation
-								on:click|stopPropagation={() => runGuardedAction(clearFreeDrawings)}
-								class="flex h-7 w-full cursor-pointer items-center justify-center bg-white hover:ring-1 hover:ring-stone-500 hover:ring-inset disabled:cursor-not-allowed disabled:opacity-35"
-							>
-								<img src="/images/toolbar/clear-drawings.png" alt="" class="h-6 w-6 object-contain" draggable="false" />
-								<span class="sr-only">Clear</span>
-							</button>
-						</HoverTooltip>
-					</div>
-				</div>
+<BuilderDrawingTools bind:freeDrawShape bind:freeDrawMode bind:freeDrawColor bind:freeDrawThickness {freeDrawColors} hasDrawings={freeStrokes.length>0||!!activeFreeStroke} onclear={()=>runGuardedAction(clearFreeDrawings)} shortcutKeys={index=>toolColorShortcutKeys('free-draw',index)} oncolorkey={handleDrawColorKeydown}/>
 			{/if}
 		</div>
 
 		<div data-tutorial="interaction-area" class="play-builder-interaction relative flex min-w-0 flex-1 items-center">
-			<div
-				class="top-action-toolbar absolute left-2 z-30 flex items-start gap-1.5"
-				style="top: calc(50% - 23.8cqw);"
-				role="toolbar"
-				aria-label="Play actions"
-			>
+			<BuilderActionBar position="top-left" label="Play actions" role="toolbar">
 				<div data-tutorial="history-actions" class="flex gap-1.5">
 					<BuilderActionButton
 						tooltip="Undo"
 						shortcutKeys={[primaryModifierKey, 'Z']}
 						ariaLabel="Undo"
 						label="Undo"
-						disabled={tutorialActive && !animationTutorialActive || history.length === 0}
+						disabled={tutorialActive && !animationTutorialActive || !controllerStatus.canUndo}
 						disabledOpacity="35"
 						onclick={() => runGuardedAction(undo)}
 					>
@@ -6995,7 +6574,7 @@
 						shortcutKeys={[primaryModifierKey, 'Shift', 'Z']}
 						ariaLabel="Redo"
 						label="Redo"
-						disabled={tutorialActive && !animationTutorialActive || future.length === 0}
+						disabled={tutorialActive && !animationTutorialActive || !controllerStatus.canRedo}
 						disabledOpacity="35"
 						onclick={() => runGuardedAction(redo)}
 					>
@@ -7087,95 +6666,12 @@
 						</BuilderActionButton>
 					{/if}
 				</div>
-			</div>
-			{#if !presentation}<div
-				data-tutorial="export-buttons"
-				class="export-action-toolbar absolute right-2 z-30 flex gap-1.5"
-				style="top: calc(50% - 23.8cqw);"
-				aria-label="Export controls"
-			>
- <ExportDropdown progress={videoController && !['mp4','mov','webm','gif'].includes(actionInProgress ?? '')?videoProgress:null} oncancel={()=>videoController?.abort()} multiple={playEntries.length>1} onall={format=>exportBatch(format)} formats={['png','jpg','webp','pdf']} disabled={tutorialActive||actionInProgress!==null} onselect={format=>exportImage(format as 'png'|'jpg'|'webp'|'pdf')} />
- <ExportDropdown progress={videoController && ['mp4','mov','webm','gif'].includes(actionInProgress ?? '')?videoProgress:null} oncancel={()=>videoController?.abort()} allDisabled={(!dev && !accountSessionActive)||tutorialActive||actionInProgress!==null} multiple={animatedPlayIndexes.length>1} onall={format=>exportBatch(format)} formats={['mp4','mov','webm','gif']} video={true} badge={true} disabled={(!dev && !accountSessionActive)||!animatedPlayIndexes.length||tutorialActive||actionInProgress!==null} tooltip={!dev && !accountSessionActive?'Sign in to Use':!animatedPlayIndexes.length?'Create an Animation First':''} onselect={format=>exportVideo(format as VideoFormat)} />
-
-				<BuilderActionButton
-					tooltip="Export Settings"
-					shortcutKeys={[primaryModifierKey, 'Shift', 'O']}
-					ariaLabel="Open export settings"
-					label="Options"
-					wrapperClass="ml-2 flex h-9 w-10 shrink-0"
-					expanded={showExportSettings}
-					disabled={tutorialActive || actionInProgress !== null}
-					onclick={openExportSettings}
-				>
-					<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-						<path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" fill="none" stroke="currentColor" stroke-width="2" />
-					</svg>
-				</BuilderActionButton>
-			<BuilderActionButton tooltip="Enter Full Screen" shortcutKeys={['F11']} ariaKeyshortcuts="F11" ariaLabel="Enter full screen" label="Go Full" buttonClass="relative" disabled={tutorialActive||actionInProgress!==null} onclick={togglePresentation}><span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-600 px-1 text-[8px] leading-3 font-black text-white">NEW</span><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/></svg></BuilderActionButton>
-</div>
+			</BuilderActionBar>
+			{#if !presentation}<BuilderExportControls imageProgress={videoController&&!['mp4','mov','webm','gif'].includes(actionInProgress??'')?videoProgress:null} videoProgress={videoController&&['mp4','mov','webm','gif'].includes(actionInProgress??'')?videoProgress:null} oncancel={()=>videoController?.abort()} multipleImages={playEntries.length>1} multipleVideos={animatedPlayIndexes.length>1} onall={exportBatch} disabled={tutorialActive||actionInProgress!==null} onimage={format=>exportImage(format as 'png'|'jpg'|'webp'|'pdf')} onvideo={format=>exportVideo(format as VideoFormat)} videoAllDisabled={(!dev&&!accountSessionActive)||tutorialActive||actionInProgress!==null} videoDisabled={(!dev&&!accountSessionActive)||!animatedPlayIndexes.length||tutorialActive||actionInProgress!==null} videoTooltip={!dev&&!accountSessionActive?'Sign in to Use':!animatedPlayIndexes.length?'Create an Animation First':''} modifier={primaryModifierKey} settingsOpen={showExportSettings} onsettings={openExportSettings} onfullscreen={togglePresentation}/>
 {/if}
-{#if presentation}<div class="presentation-actions absolute left-2 top-2 z-30 flex gap-1.5" aria-label="Presentation controls">
- <BuilderActionButton tooltip="Laser Pointer" shortcutKeys={['Shift','L']} ariaLabel="Toggle presentation laser pointer" label="Laser" pressed={tool==='laser'} onclick={clickPresentationLaser}><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 20 8-8M10 4l1 3M20 14l-3-1M17 3l-2 4M21 7l-4 2"/></svg></BuilderActionButton>
- <BuilderActionButton tooltip="Clear Laser Drawings" shortcutKeys={['C']} ariaLabel="Clear presentation laser drawings" label="Clear" onclick={fadeLaserDrawings}><AnimationIcon name="trash"/></BuilderActionButton>
- </div><div class="absolute right-2 top-2 z-30">
- <BuilderActionButton tooltip="Exit Full Screen" shortcutKeys={['F11']} ariaKeyshortcuts="F11" ariaLabel="Exit full screen" label="Exit Full" onclick={togglePresentation}><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8h5V3M21 8h-5V3M16 21v-5h5M8 21v-5H3"/></svg></BuilderActionButton>
- </div>{/if}
+{#if presentation}<BuilderPresentationControls laser={tool==='laser'} onlaser={clickPresentationLaser} onclear={fadeLaserDrawings} onexit={togglePresentation}/>{/if}
 
-			<div
-				data-tutorial="play-management"
-				class="play-management-toolbar absolute left-2 z-30"
-				class:h-9={editingPlayId === null}
-				class:h-40={editingPlayId !== null}
-				style="right: 70.5%; bottom: calc(50% - 23.8cqw);"
-				aria-label="Plays in this play builder"
-			>
-				<div bind:this={playStripElement} class="play-tabs-scroll absolute right-0 bottom-0 left-0 overflow-x-auto overflow-y-hidden">
-					<div class="flex w-max items-stretch gap-1">
-						{#each orderedPlays as play (play.id)}
-       <div animate:flip={{duration:150}} class="shrink-0" class:opacity-60={playDrag?.moved&&playDrag.id===play.id}>
-							<HoverTooltip
-								text={viewOnly || editingPlayId === play.id ? '' : 'Double Click for Options'}
-								minWidthPx={0}
-								wrapperClass="flex h-9 min-w-20 shrink-0 max-lg:h-7 max-lg:min-w-14"
-							>
-								<button
-									data-focus-button
-                                    data-play-id={play.id}
-									type="button"
-									aria-label={`${viewOnly ? "View" : "Open"} ${play.name}`}
-									aria-pressed={play.id === playEntries[activePlayIndex]?.id}
-									on:pointerdown={(event)=>beginPlayDrag(event,play.id)}
-
-
-         style:touch-action={viewOnly?undefined:'pan-y'}
-         on:click={() => switchPlay(play.id)}
-									on:dblclick={(event) => { if (!viewOnly) openPlayMenu(event, play.id); }}
-									on:contextmenu|preventDefault|stopPropagation={(event) => { if (!viewOnly) openPlayMenu(event, play.id); }}
-									class="flex h-9 min-w-20 shrink-0 cursor-pointer items-center justify-center border-2 border-stone-950 bg-white px-3 text-xs font-normal whitespace-nowrap text-stone-950 hover:bg-stone-100 aria-pressed:bg-stone-200 aria-pressed:font-black aria-pressed:hover:bg-stone-300 max-lg:h-7 max-lg:min-w-14 max-lg:px-2 max-lg:text-[10px]"
-								>
-									{play.name}
-								</button>
-							</HoverTooltip>
-						</div>
-      {/each}
-						{#if !viewOnly}<HoverTooltip
-							text={playEntries.length >= PLAY_BUILDER_MAX_PLAYS ? 'Play Limit Reached' : 'Add Play'}
-							shortcutKeys={[alternateModifierKey, 'N']}
-							minWidthPx={0}
-							wrapperClass="flex h-9 w-9 shrink-0 max-lg:h-7 max-lg:w-7"
-						>
-							<button
-								type="button"
-								aria-label="Add another play"
-								disabled={playEntries.length >= PLAY_BUILDER_MAX_PLAYS}
-								on:click={addPlay}
-								class="flex h-9 w-9 cursor-pointer items-center justify-center border-2 border-stone-950 bg-white font-black text-stone-950 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40 max-lg:h-7 max-lg:w-7"
-							>
-<svg viewBox="0 0 24 24" class="h-3 w-3 max-lg:h-2.5 max-lg:w-2.5" aria-hidden="true"><path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="2.5" /></svg>
-							</button>
-						</HoverTooltip>{/if}
-					</div>
-				</div>
+<BuilderPlayTabs plays={orderedPlays} activeId={playEntries[activePlayIndex]?.id} {editingPlayId} count={playEntries.length} maximum={PLAY_BUILDER_MAX_PLAYS} {viewOnly} {presentation} addModifier={alternateModifierKey} bind:strip={playStripElement} drag={playDrag} onbegin={beginPlayDrag} onselect={switchPlay} onmenu={openPlayMenu} onadd={addPlay}>
 				{#if editingPlayId !== null}
 					<div
 						bind:this={playMenuElement} use:draggablePopover
@@ -7234,12 +6730,8 @@
 						</div>
 					</div>
 				{/if}
-			</div>
-			{#if !viewOnly}<div
-				class="bottom-action-toolbar absolute right-2 z-20 flex items-end gap-1.5"
-				style="bottom: calc(50% - 23.8cqw);"
-				aria-label="Field controls"
-			>
+			</BuilderPlayTabs>
+			{#if !viewOnly}<BuilderActionBar position="bottom-right" label="Field controls" {presentation}>
 				{#if actionMessage}
 					<span
 						class="mr-1 max-w-48 border border-stone-600 bg-stone-950/90 px-2 py-1 text-[9px] leading-tight font-semibold text-white"
@@ -7348,15 +6840,9 @@
 						</svg>
 					</BuilderActionButton>
 				</div>
-			</div>
+			</BuilderActionBar>
 			{:else}
- <div class="bottom-action-toolbar absolute right-2 z-20 flex items-end gap-1.5" class:hidden={presentation&&animationOpen} style="bottom: calc(50% - 23.8cqw);" aria-label="Shared playback controls">
- {#if presentation}<div class="mr-2"><BuilderActionButton tooltip="Open Animation Editor" shortcutKeys={['Alt','A']} ariaLabel="Open presentation timeline" label="Animate" disabled={!animation} pressed={animationOpen} onclick={()=>animationOpen=!animationOpen}><AnimationIcon name="play"/></BuilderActionButton></div>{/if}
-  <BuilderActionButton tooltip="Go to Start" shortcutKeys={['HOME']} ariaLabel="Go to animation start" label="Start" disabled={!ownershipResolved || !animation || animationTime <= 0} onclick={() => selectAnimationStep(0)}><AnimationIcon name="start" /></BuilderActionButton>
-  <BuilderActionButton tooltip={animationPlaying ? 'Pause' : animationDuration(animation) > 0 && animationTime >= animationDuration(animation) ? 'Restart' : 'Play'} shortcutKeys={['K / Space']} ariaLabel={animationPlaying ? 'Pause animation' : animationDuration(animation) > 0 && animationTime >= animationDuration(animation) ? 'Restart animation' : 'Play animation'} label={animationPlaying ? 'Pause' : animationDuration(animation) > 0 && animationTime >= animationDuration(animation) ? 'Restart' : 'Play'} disabled={!ownershipResolved || !animationDuration(animation)} onclick={toggleAnimationPlayback}><AnimationIcon name={animationPlaying ? 'pause' : animationDuration(animation) > 0 && animationTime >= animationDuration(animation) ? 'reset' : 'play'} /></BuilderActionButton>
-  <BuilderActionButton tooltip="Playback Speed" shortcutKeys={['Alt', '↑ / ↓']} ariaLabel="Cycle playback speed" label="Speed" disabled={!ownershipResolved || !animationDuration(animation)} onclick={cycleViewerSpeed}><span class="text-xs font-black leading-4">{animationRate.toFixed(animationRate % .5 === 0 ? 1 : 2)}×</span></BuilderActionButton>
-  <BuilderActionButton tooltip="Loop Playback" ariaLabel="Loop playback" label="Loop" pressed={animationLoop} disabled={!ownershipResolved || !animationDuration(animation)} onclick={() => animationLoop = !animationLoop}><span class:text-blue-500={animationLoop}><AnimationIcon name="repeat" /></span></BuilderActionButton>
- </div>
+ <BuilderPlaybackControls {presentation} open={animationOpen} hasAnimation={!!animation} duration={animationDuration(animation)} time={animationTime} playing={animationPlaying} rate={animationRate} loop={animationLoop} ready={ownershipResolved} ontimeline={()=>animationOpen=!animationOpen} onstart={()=>selectAnimationStep(0)} onplay={toggleAnimationPlayback} onspeed={cycleViewerSpeed} onloop={()=>animationLoop=!animationLoop}/>
  {/if}
  <div class="field-canvas relative my-auto w-full shrink-0">
 				<HoverTooltip text={viewOnly || tool==='laser' ? "" : animationPreview ? "Select a Step to Move Elements" : fieldControlTooltip} minWidthPx={0} wrapperClass="contents">
@@ -8603,7 +8089,7 @@
        {/each}
       {/if}
 							{#each freeStrokes as stroke (stroke.id)}
- <g opacity={stroke.animationOpacity??1} data-drawing-id={stroke.id} role="button" aria-label={`Drawing ${stroke.id}`} tabindex={tool==='select' && !animationPreview?0:undefined} on:pointerdown={(event)=>beginDrawingDrag(stroke.id,event)} on:pointermove={moveDrawingDrag} on:pointerup={endDrawingDrag} on:pointercancel={()=>drawingDrag=null} on:dblclick={(event)=>openDrawingOptions(stroke.id,event)} on:contextmenu={(event)=>openDrawingOptions(stroke.id,event)} on:click|stopPropagation on:keydown={event=>{if(event.key==='Enter'){event.preventDefault();const box=svg.getBoundingClientRect();selectedDrawingIds=[stroke.id];if(animation&&animationStep>0)drawingOptions={x:box.left+box.width*.6,y:box.top+box.height*.5,stepId:animation.steps[animationStep].id};}}}>
+ <g opacity={stroke.animationOpacity??1} data-drawing-id={stroke.id} role="button" aria-label={`Drawing ${stroke.id}`} tabindex={tool==='select' && !animationPreview?0:undefined} on:pointerdown={(event)=>beginDrawingDrag(stroke.id,event)} on:pointermove={moveDrawingDrag} on:pointerup={endDrawingDrag} on:pointercancel={()=>drawingMovement.cancel()} on:dblclick={(event)=>openDrawingOptions(stroke.id,event)} on:contextmenu={(event)=>openDrawingOptions(stroke.id,event)} on:click|stopPropagation on:keydown={event=>{if(event.key==='Enter'){event.preventDefault();const box=svg.getBoundingClientRect();selectedDrawingIds=[stroke.id];if(animation&&animationStep>0)drawingOptions={x:box.left+box.width*.6,y:box.top+box.height*.5,stepId:animation.steps[animationStep].id};}}}>
  {#if selectedDrawingIds.includes(stroke.id) && !animationPreview}{@const bounds=drawingBounds(stroke.id)!}<rect data-export-exclude x={bounds.left-5} y={bounds.top-5} width={Math.max(10,bounds.right-bounds.left+10)} height={Math.max(10,bounds.bottom-bounds.top+10)} fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="5 4"/>{/if}
  <path data-drawing-hit d={freehandPath(stroke.points)} fill="none" stroke="transparent" stroke-width={Math.max(14,stroke.width??4)} pointer-events={!viewOnly && tool==='select' && !animationPreview?'stroke':'none'} style:cursor={tool==='select'?'grab':undefined}/>
 
@@ -8851,147 +8337,7 @@
 							/>
 						{/if}
 
-						{#if tool === 'laser' || spotlightStrokes.length>0 || laserTrail.length > 0 || laserDrawings.length > 0 || (activeLaserDrawing?.points.length ?? 0) > 1}
-							<g data-laser-pointer-layer data-export-exclude pointer-events="none">
-         {#if spotlightStrokes.length||activeSpotlightStroke||spotlightEnabled&&tool==='laser'}
-          <defs>
-           <radialGradient id="builder-spotlight-edge"><stop offset="75%" stop-color="black"/><stop offset="100%" stop-color="black" stop-opacity="0"/></radialGradient>
-           <filter id="builder-spotlight-soft-edge" filterUnits="userSpaceOnUse" x="-300" y="-300" width="1600" height="1100" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="5"/></filter>
-           <mask id="builder-spotlight-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="484">
-            <rect width="1000" height="484" fill="white"/>
-            {#each [...spotlightStrokes,...(activeSpotlightStroke?[activeSpotlightStroke]:[])] as stroke}
-             <g data-spotlight-stroke opacity={stroke.releasedAt===null?1:Math.max(0,1-(laserTrailClock-stroke.releasedAt)/laserFadeDuration)} filter="url(#builder-spotlight-soft-edge)">
-              {#if stroke.points.length===1}<circle cx={stroke.points[0].x} cy={stroke.points[0].y} r={stroke.radius*.875} fill="black"/>
-              {:else}<path d={laserDrawingPath(stroke.points)} fill="none" stroke="black" stroke-width={stroke.radius*1.75} stroke-linecap="round" stroke-linejoin="round"/>{/if}
-             </g>
-            {/each}
-            {#if spotlightEnabled&&tool==='laser'&&laserPointer&&pointerOnField}<circle data-spotlight-cursor cx={laserPointer.x} cy={laserPointer.y} r={spotlightRadius} fill="url(#builder-spotlight-edge)"/>{/if}
-           </mask>
-          </defs>
-          <rect data-spotlight width="1000" height="484" fill="black" opacity=".65" mask="url(#builder-spotlight-mask)"/>
-         {/if}
-								<defs>
-									<linearGradient
-										id="builder-rainbow-laser-gradient"
-										x1="0"
-										y1="0"
-										x2="180"
-										y2="0"
-										gradientUnits="userSpaceOnUse"
-										spreadMethod="repeat"
-									>
-										<stop offset="0%" stop-color="#ff1744" />
-										<stop offset="16.67%" stop-color="#ff9100" />
-										<stop offset="33.33%" stop-color="#ffea00" />
-										<stop offset="50%" stop-color="#00e676" />
-										<stop offset="66.67%" stop-color="#00e5ff" />
-										<stop offset="83.33%" stop-color="#2979ff" />
-										<stop offset="100%" stop-color="#d500f9" />
-										<animateTransform
-											attributeName="gradientTransform"
-											type="translate"
-											from="-180 0"
-											to="180 0"
-											dur="0.8s"
-											repeatCount="indefinite"
-										/>
-									</linearGradient>
-								</defs>
-								{#each laserDrawings as drawing}
-									{@const drawingFreshness = laserDrawingVisibility(drawing, laserTrailClock)}
-									<g
-										data-laser-drawing
-										data-laser-drawing-state={drawing.releasedAt !== null ? 'fading-out' : drawing.appearedAt != null ? 'fading-in' : 'persistent'}
-										opacity={Math.pow(drawingFreshness, 1.25)}
-									>
-										<path
-											d={laserDrawingPath(drawing.points)}
-											fill="none"
-											stroke={laserPaint(drawing.color)}
-											stroke-width="8"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											opacity="0.2"
-										/>
-										<path
-											d={laserDrawingPath(drawing.points)}
-											fill="none"
-											stroke={laserPaint(drawing.color)}
-											stroke-width="3.8"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											opacity="0.88"
-											filter="url(#builder-neon-glow)"
-										/>
-									</g>
-								{/each}
-								{#if activeLaserDrawing && activeLaserDrawing.points.length > 1}
-									<g data-laser-active-drawing>
-										<path
-											d={laserDrawingPath(activeLaserDrawing.points)}
-											fill="none"
-											stroke={laserPaint(activeLaserDrawing.color)}
-											stroke-width="8"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											opacity="0.2"
-										/>
-										<path
-											d={laserDrawingPath(activeLaserDrawing.points)}
-											fill="none"
-											stroke={laserPaint(activeLaserDrawing.color)}
-											stroke-width="3.8"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											opacity="0.88"
-											filter="url(#builder-neon-glow)"
-										/>
-									</g>
-								{/if}
-								{#if laserTrail.length > 1}
-									{@const trailStart = laserTrail[0]}
-									{@const trailEnd = laserTrail.at(-1)!}
-									{@const trailFreshness = Math.min(1, Math.max(0, 1 - (laserTrailClock - trailEnd.createdAt) / laserFadeDuration))}
-									<defs>
-										<linearGradient
-											id="builder-laser-trail-gradient"
-											x1={trailStart.x}
-											y1={trailStart.y}
-											x2={trailEnd.x}
-											y2={trailEnd.y}
-											gradientUnits="userSpaceOnUse"
-										>
-											<stop offset="0%" stop-color={laserColorValue(laserColor)} stop-opacity="0" />
-											<stop offset="30%" stop-color={laserColorValue(laserColor)} stop-opacity="0.18" />
-											<stop offset="70%" stop-color={laserColorValue(laserColor)} stop-opacity="0.55" />
-											<stop offset="100%" stop-color={laserColorValue(laserColor)} stop-opacity="0.82" />
-										</linearGradient>
-									</defs>
-									<path
-										d={laserTrailPath(laserTrail, laserTrailClock)}
-										fill={rainbowLaserEnabled ? 'url(#builder-rainbow-laser-gradient)' : 'url(#builder-laser-trail-gradient)'}
-										opacity={Math.pow(trailFreshness, 1.25)}
-										filter="url(#builder-neon-glow)"
-									/>
-								{/if}
-								{#if !spotlightEnabled && (!viewOnly||presentation) && tool === 'laser' && laserPointer && pointerOnField}
-									<circle
-										cx={laserPointer.x}
-										cy={laserPointer.y}
-										r="7"
-										fill={laserPaint(rainbowLaserEnabled ? 'rainbow' : laserColor)}
-										opacity="0.2"
-									/>
-									<circle
-										cx={laserPointer.x}
-										cy={laserPointer.y}
-										r="3"
-										fill={laserPaint(rainbowLaserEnabled ? 'rainbow' : laserColor)}
-										filter="url(#builder-neon-glow)"
-									/>
-								{/if}
-							</g>
-						{/if}
+<BuilderAnnotationOverlay width={1000} height={484} {tool} {spotlightStrokes} {laserTrail} {laserDrawings} {activeLaserDrawing} {activeSpotlightStroke} {spotlightEnabled} {laserPointer} {pointerOnField} {spotlightRadius} {laserTrailClock} {laserFadeDuration} {viewOnly} {presentation} {rainbowLaserEnabled} {laserColor} {laserColorValue} {laserPaint}/>
 						</g>
 {#if passBallId!==null}
  <g data-pass-receiver-picker data-export-exclude transition:fade={{duration:180}}>
@@ -9037,7 +8383,7 @@
 
 				{#if editingDownGuide}
 					<div
-						bind:this={editorElement} use:draggablePopover
+						bind:this={editorElement} use:elementEditor={{close:commitDownMarkerEditor,capabilities:{label:true,color:true,motion:true}}}
 						class="absolute z-20 flex -translate-x-1/2 items-stretch gap-2"
 						style:left={`${inlineGuideEditorPinnedLeft ?? editingDownGuide.x / 10}%`}
 						style:top={`${((fieldTop + 14) / 484) * 100}%`}
@@ -9101,27 +8447,27 @@
 
 				{#if editingTeamBoxY !== null && tool !== 'laser' && tool !== 'free-draw'}
 					<form
-						bind:this={editorElement} use:draggablePopover
+						bind:this={editorElement} use:elementEditor={{close:commitTeamBoxEditor,capabilities:{label:true,color:true,motion:true}}}
 						class="absolute z-10 w-64 -translate-x-1/2 -translate-y-1/2 bg-white p-1 shadow-xl ring-2 ring-stone-900"
 						style:left="50%"
 						style:top={`${((editingTeamBoxY + 10) / 484) * 100}%`}
 						on:submit|preventDefault={commitTeamBoxEditor}
 					>
 						<label for="team-box-label" class="sr-only">Team box title</label>
-						<input
-							bind:this={teamBoxEditInput}
+						<ElementNameInput
+							bind:element={teamBoxEditInput}
 							bind:value={teamBoxEditValue}
 							id="team-box-label"
 							maxlength={PLAY_BUILDER_TEAM_BOX_LABEL_MAX_LENGTH}
-							aria-label="Team box title"
-							class="block h-8 w-full border-0 bg-stone-100 px-2 text-center text-sm font-black tracking-wide text-stone-900 outline-none focus:ring-2 focus:ring-stone-500"
+							label="Team box title"
+							className="block h-8 w-full border-0 bg-stone-100 px-2 text-center text-sm font-black tracking-wide text-stone-900 outline-none focus:ring-2 focus:ring-stone-500"
 						/>
 					</form>
 				{/if}
 
 				{#if editingMarker}
 					<form
-						bind:this={editorElement} use:draggablePopover
+						bind:this={editorElement} use:elementEditor={{close:commitMarkerEditor,capabilities:{label:true,color:true,motion:true,remove:true,revert:true}}}
 						data-tutorial="marker-editor"
 						class="absolute z-10 -translate-x-1/2 -translate-y-1/2 bg-white p-1 shadow-xl ring-2 ring-stone-900"
 						class:w-52={editingMarker.kind === 'deflag'}
@@ -9138,13 +8484,13 @@
 									? 'Event label'
 									: markerDescriptionName(editingMarker)}</label
 						>
-						<input
-							bind:this={editInput}
+						<ElementNameInput
+							bind:element={editInput}
 							bind:value={editValue}
 							id="marker-label"
 							maxlength={markerLabelMaxLength(editingMarker)}
 							placeholder={isTeamMarker(editingMarker) || editingMarker.kind === 'event' ? undefined : markerDescriptionPlaceholder(editingMarker)}
-							aria-label={isTeamMarker(editingMarker)
+							label={isTeamMarker(editingMarker)
 								? 'Player name'
 								: editingMarker.kind === 'event'
 									? 'Event label'
@@ -9155,9 +8501,7 @@
 									commitMarkerEditor();
 								}
 							}}
-							class="mx-auto block h-8 border-0 bg-stone-100 px-2 text-center text-sm font-bold text-stone-900 outline-none focus:ring-2 focus:ring-stone-500"
-							class:w-40={!isTeamMarker(editingMarker) && editingMarker.kind !== 'deflag' && editingMarker.kind !== 'bean-bag'}
-							class:w-full={isTeamMarker(editingMarker) || editingMarker.kind === 'deflag' || editingMarker.kind === 'bean-bag'}
+							className={'mx-auto block h-8 border-0 bg-stone-100 px-2 text-center text-sm font-bold text-stone-900 outline-none focus:ring-2 focus:ring-stone-500'+(!isTeamMarker(editingMarker)&&editingMarker.kind!=='deflag'&&editingMarker.kind!=='bean-bag'?' w-40':' w-full')}
 						/>
 						{#if editingMarker.kind === 'ball'}
 							<div class="mx-auto mt-1 flex w-40 gap-px" role="group" aria-label="Move football">
@@ -9211,7 +8555,7 @@
 
 				{#if editingGuideFromLosMarker && editingGuide?.kind === 'line-of-scrimmage'}
 					<div
-						bind:this={editorElement} use:draggablePopover
+						bind:this={editorElement} use:elementEditor={{close:commitGuideEditor,capabilities:{label:true,color:true,motion:true}}}
 						class="absolute z-20 flex -translate-x-1/2 items-center gap-2"
 						style:left={`${inlineGuideEditorPinnedLeft ?? editingGuide.x / 10}%`}
 						style:top={`${((fieldBottom - 43) / 484) * 100}%`}
@@ -9268,7 +8612,7 @@
 
 				{#if (editingGuide || editingPath) && lineEditorPoint && !editingGuideFromLosMarker}
 					<form
-						bind:this={editorElement} use:draggablePopover
+						bind:this={editorElement} use:elementEditor={{close:commitActiveEditor,capabilities:{label:true,color:true,motion:true}}}
 						data-tutorial="line-editor"
 						data-line-format-editor
 						class="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 bg-white p-2 shadow-xl ring-2 ring-stone-900"
@@ -9321,39 +8665,21 @@
 
     {#if !viewOnly && !animationPreview && selectedDrawingBounds && selectedDrawingIds.length}
      <div data-drawing-actions class="absolute z-20 flex gap-1" style:left={`${selectedDrawingBounds.right/10}%`} style:top={`${Math.max(0,selectedDrawingBounds.top-25)/484*100}%`}>
-      {#if drawingCanRevert}<HoverTooltip text="Revert to Original Position" placement="below-left" minWidthPx={0}><button aria-label="Revert drawing to original position" class="element-revert-button element-delete-button flex h-7 w-7 items-center justify-center border-2 border-white bg-stone-900 text-white" on:pointerdown|preventDefault|stopPropagation={revertDrawingPosition}><AnimationIcon name="reset"/></button></HoverTooltip>{/if}
-      <HoverTooltip text="Delete Drawing" placement="below-left" minWidthPx={0}><button aria-label="Delete drawing" class="element-delete-button flex h-7 w-7 items-center justify-center border-2 border-white bg-stone-900 text-white" on:pointerdown|preventDefault|stopPropagation={deleteSelectedDrawings}><AnimationIcon name="trash"/></button></HoverTooltip>
+      {#if drawingCanRevert}<ElementActionButton kind="revert" label="Revert drawing to original position" tooltip="Revert to Original Position" buttonClass="flex h-7 w-7 items-center justify-center border-2 border-white bg-stone-900 text-white" wrapperClass="" onactivate={revertDrawingPosition}><AnimationIcon name="reset"/></ElementActionButton>{/if}
+      <ElementActionButton kind="remove" label="Delete drawing" tooltip="Delete Drawing" buttonClass="flex h-7 w-7 items-center justify-center border-2 border-white bg-stone-900 text-white" wrapperClass="" onactivate={deleteSelectedDrawings}><AnimationIcon name="trash"/></ElementActionButton>
      </div>
     {/if}
 				{#if !viewOnly && !animationPreview && selectedTargets.length > 0 && deleteTarget && deletePosition}
 					<div data-element-actions class="absolute z-20 -translate-y-1/2" style:left={`${deletePosition.x / 10}%`} style:top={`${(deletePosition.y / 484) * 100}%`}>
  {#if canRevertPosition}
   <div class="absolute right-full mr-1">
-   <HoverTooltip text="Revert to Original Position" placement="below-left" minWidthPx={0} wrapperClass="flex h-7 w-7 shrink-0">
-    <button type="button" aria-label="Revert to original position" on:pointerdown|preventDefault|stopPropagation={revertElementPosition}
-     class="element-revert-button element-delete-button flex h-7 w-7 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white">
+   <ElementActionButton kind="revert" label="Revert to original position" tooltip="Revert to Original Position" buttonClass="flex h-7 w-7 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white" wrapperClass="flex h-7 w-7 shrink-0" onactivate={revertElementPosition}>
      <svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6" fill="none" stroke="currentColor" stroke-width="2" /></svg>
-    </button>
-   </HoverTooltip>
+    </ElementActionButton>
   </div>
  {/if}
 
-						<HoverTooltip
-							text={selectedTargets.length > 1 ? 'Delete Selected Elements' : 'Delete Element'}
-							placement="below-left"
-							minWidthPx={0}
-							wrapperClass="flex h-7 w-7 shrink-0"
-						>
-							<button
-								bind:this={deleteButtonElement}
-								type="button"
-								aria-label={selectedTargets.length > 1 ? 'Delete selected elements' : 'Delete element'}
-								on:pointerdown|preventDefault|stopPropagation={deleteHoveredElement}
-								class="element-delete-button flex h-7 w-7 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white"
-							>
-								<svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" fill="none" stroke="currentColor" stroke-width="2" /></svg>
-							</button>
-						</HoverTooltip>
+						<ElementActionButton kind="remove" bind:element={deleteButtonElement} label={selectedTargets.length>1?'Delete selected elements':'Delete element'} tooltip={selectedTargets.length>1?'Delete Selected Elements':'Delete Element'} wrapperClass="flex h-7 w-7 shrink-0" buttonClass="flex h-7 w-7 cursor-pointer items-center justify-center border-2 border-white bg-stone-900 text-white shadow-lg transition-colors focus-visible:outline-2 focus-visible:outline-white" onactivate={deleteHoveredElement}><svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" fill="none" stroke="currentColor" stroke-width="2" /></svg></ElementActionButton>
 					</div>
 				{/if}
 			</div>
@@ -9366,7 +8692,7 @@
  <DrawingAnimationPicker stationary={selectedDrawingIds.every(id=>{const before=animation!.steps[animationStep-1].strokeOffsets?.find(item=>item.id===id),after=animationContent.animation!.steps[animationStep].strokeOffsets?.find(item=>item.id===id);return (before?.x??0)===(after?.x??0)&&(before?.y??0)===(after?.y??0);})} existingDrawing={animation.steps[animationStep-1].strokeIds?.includes(selectedDrawingIds[0])??true} value={drawingMotion} duration={animation.transitions[animationStep-1].duration} x={drawingOptions.x} y={drawingOptions.y} count={selectedDrawingIds.length} onedit={event=>{rememberPopoverAnchor(event,document.querySelector(`[data-drawing-id="${selectedDrawingIds[0]}"]`));drawingOptions=null;drawingColorOptions={x:event.clientX,y:event.clientY};}} onchange={updateDrawingAnimation} onclose={()=>drawingOptions=null}/>
  {/if}
 	{#if animation && animationOpen && (!viewOnly||presentation)}
-		<div use:animationPortal={presentation} class="animation-dock" class:invisible={videoController !== null || showSetupConfirm || showSettings || showExportSettings || showFeedback || showHelp || tutorialActive && !animationTutorialActive} style:left={`${animationDockLeft}px`} style:width={`${animationDockWidth}px`}>
+		<BuilderAnimationDock fullscreenRoot={presentation?builderRoot:null} left={animationDockLeft} width={animationDockWidth} hidden={videoController !== null || showSetupConfirm || showSettings || showExportSettings || showFeedback || showHelp || tutorialActive && !animationTutorialActive}>
 			<fieldset class="contents" disabled={actionInProgress==='save'}>
    <AnimationPanel
 				animation={animationContent.animation!}
@@ -9397,7 +8723,7 @@
 				onerror={showActionMessage}
 			/>
    </fieldset>
-		</div>
+		</BuilderAnimationDock>
 	{/if}
 
 </section>
@@ -10279,11 +9605,11 @@
 <style>
  .presentation-mode{width:100vw;height:100dvh;border:0;box-shadow:none;outline:none;--builder-action-scale:1;}
  .presentation-mode [data-tutorial='draw-workspace']{height:100%;width:100%;padding:8px;gap:0;}
- .presentation-mode .tool-column,.presentation-mode .top-action-toolbar{display:none!important;}
+ .presentation-mode .tool-column,.presentation-mode :global(.top-action-toolbar){display:none!important;}
  .presentation-mode .play-builder-interaction{width:100%;height:100%;justify-content:center;}
  .presentation-mode .field-canvas{width:min(100%,calc((100dvh - 96px)*1000/484));flex-shrink:1;}
- .presentation-mode .bottom-action-toolbar,.presentation-mode .play-management-toolbar{bottom:8px!important;}
- .presentation-mode .play-management-toolbar{right:60%!important;}
+ .presentation-mode :global(.bottom-action-toolbar),.presentation-mode :global(.play-management-toolbar){bottom:8px!important;}
+ .presentation-mode :global(.play-management-toolbar){right:60%!important;}
  .presentation-mode.view-only .field-canvas,.presentation-mode.view-only .field-canvas :global(*){pointer-events:auto!important;cursor:default!important;}
  .presentation-mode.laser-active .field-canvas,.presentation-mode.laser-active .field-canvas :global(*){cursor:none!important;}
 
@@ -10305,16 +9631,6 @@
  .animation-preview:not(.view-only):not(.laser-active) .field-canvas :global(svg *) {cursor:not-allowed !important;}
  .animation-tool-disabled {opacity:.35;cursor:not-allowed !important;}
 
-	.animation-dock {
-		position: fixed;
-		bottom: 8px;
-		z-index: 1000;
-		height: 112px;
-		pointer-events: none;
-	}
-	.animation-dock :global([data-animation-ui]) {
-		pointer-events: auto;
-	}
 	:global([data-tutorial='draw-workspace'].driver-active-element) {
 		position: relative;
 		z-index: 1000000001;
@@ -10410,14 +9726,8 @@
 			outline: 3px solid #facc15;
 		}
 	}
-	.play-tabs-scroll {
-		scrollbar-width: none;
-	}
-	.play-tabs-scroll::-webkit-scrollbar {
-		display: none;
-		width: 0;
-		height: 0;
-	}
+
+
 	.play-builder-interaction {
 		container-type: inline-size;
 	}
@@ -10429,22 +9739,7 @@
 		gap: calc(0.5rem * var(--builder-action-scale));
 		padding: calc(0.5rem * var(--builder-action-scale));
 	}
-	.top-action-toolbar {
-		transform: scale(var(--builder-action-scale));
-		transform-origin: top left;
-	}
-	.export-action-toolbar {
-		transform: scale(var(--builder-action-scale));
-		transform-origin: top right;
-	}
-	.bottom-action-toolbar {
-		transform: scale(var(--builder-action-scale));
-		transform-origin: bottom right;
-	}
-	.play-management-toolbar {
-		transform: scale(var(--builder-action-scale));
-		transform-origin: bottom left;
-	}
+
 	.field-canvas {
 		aspect-ratio: 1000 / 484;
 	}
@@ -10473,11 +9768,6 @@
 		outline: 4px solid #facc15;
 		outline-offset: 2px;
 	}
-	.element-delete-button:hover,
-	.element-delete-button:focus-visible {
-		background-color: #dc2626 !important;
-	}
- .element-revert-button:hover {background-color:#ffffff !important;color:#000000 !important;border-color:#000000 !important;}
 	.scroll-modal > header {
 		top: -1px;
 		box-shadow: 0 -4px 0 #1c1917;
@@ -10527,22 +9817,7 @@
 		}
 	}
 	@container (max-width: 900px) {
-		.top-action-toolbar {
-			transform: scale(0.72);
-			transform-origin: top left;
-		}
-		.export-action-toolbar {
-			transform: scale(0.72);
-			transform-origin: top right;
-		}
-		.bottom-action-toolbar {
-			transform: scale(0.72);
-			transform-origin: bottom right;
-		}
-		.play-management-toolbar {
-			transform: scale(0.72);
-			transform-origin: bottom left;
-		}
+
 		.down-marker-graphic {
 			transform: translateY(22px);
 		}
@@ -10551,22 +9826,7 @@
 		}
 	}
 	@container (min-width: 901px) and (max-width: 1080px) {
-		.top-action-toolbar {
-			transform: scale(0.82);
-			transform-origin: top left;
-		}
-		.export-action-toolbar {
-			transform: scale(0.82);
-			transform-origin: top right;
-		}
-		.bottom-action-toolbar {
-			transform: scale(0.82);
-			transform-origin: bottom right;
-		}
-		.play-management-toolbar {
-			transform: scale(0.82);
-			transform-origin: bottom left;
-		}
+
 	}
 	.drawing-cursor,
 	.drawing-cursor [data-field-element] {
@@ -10595,39 +9855,5 @@
 		cursor: grab !important;
 	}
 	@media (max-height: 850px) {
-		.draw-options-panel {
-			position: absolute;
-			top: 100%;
-			left: 0;
-			display: grid;
-			width: min(20rem, calc(100vw - 3rem));
-			grid-template-columns: 1fr 2fr 1fr;
-			grid-template-rows: 1.75rem auto;
-			gap: 1px;
-			margin-top: 1px;
-		}
-		.draw-options-line-types {
-			grid-column: 1;
-			grid-row: 1;
-		}
-		.draw-options-thickness {
-			grid-column: 2;
-			grid-row: 1;
-			margin-top: 0;
-		}
-		.draw-options-actions {
-			grid-column: 3;
-			grid-row: 1;
-			margin-top: 0;
-		}
-		.draw-options-colors {
-			grid-column: 1 / -1;
-			grid-row: 2;
-			grid-template-columns: repeat(10, minmax(0, 1fr));
-			margin-top: 0;
-		}
-		.draw-options-colors button {
-			min-height: 0;
-		}
 	}
 </style>

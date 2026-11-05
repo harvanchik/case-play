@@ -1,5 +1,7 @@
 <script lang="ts">
- import { draggablePopover } from '$lib/play-builder-popover';
+ import { useElementEditor } from '$lib/play-builder-element-editor';
+ const elementEditor=useElementEditor();
+
  import ElementEditorModes from './ElementEditorModes.svelte';
  import DropdownChevron from './DropdownChevron.svelte';
 	import AnimationTiming from './AnimationTiming.svelte';
@@ -22,21 +24,11 @@
 	let root: HTMLDivElement;
 	let motion: Motion;
 	$: motion = { ...defaultMotion({ type: 'marker', id: value.id }), start: value.start, end: value.end, easing: value.easing, speed: value.speed, path:activeMode==='jump'?'jump':'straight',jumpEffect:value.jumpEffect??'cut' };
-	function outside(event: PointerEvent) {
-		const target = event.target as Element;
-		if (!root?.contains(target) && !target.closest('[data-drawing-id],.driver-popover')) onclose();
-	}
 </script>
 
-<svelte:window
-	on:pointerdown|capture={outside}
-	on:keydown={(event) => {
-		if (event.key === 'Escape') onclose();
-	}}
-/>
 <div
 	bind:this={root}
-	use:draggablePopover
+	use:elementEditor={{close:onclose,capabilities:{motion:true},outside:true,ignore:'[data-drawing-id],.driver-popover'}}
 	data-drawing-animation-picker
 	data-animation-ui
 	role="dialog"

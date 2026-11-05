@@ -1,5 +1,7 @@
 <script lang="ts">
- import { draggablePopover } from '$lib/play-builder-popover';
+ import { useElementEditor } from '$lib/play-builder-element-editor';
+ const elementEditor=useElementEditor();
+
  import HoverTooltip from '../HoverTooltip.svelte';
  import type { GuideColor } from '$lib/play-builder-scene';
  export let x:number; export let y:number;
@@ -9,8 +11,7 @@
  export let onclose:()=>void;
  let root:HTMLDivElement;
 </script>
-<svelte:window on:pointerdown|capture={event=>{const target=event.target as Element;if(!root?.contains(target)&&!target.closest('[data-drawing-id],[data-drawing-actions]'))onclose();}} on:keydown={event=>{if(event.key==='Escape')onclose();}} />
-<div bind:this={root} use:draggablePopover data-drawing-style-picker role="dialog" aria-label="Drawing color" tabindex="-1" style:left={`${Math.max(8,Math.min(window.innerWidth-300,x))}px`} style:top={`${Math.max(8,Math.min(window.innerHeight-80,y))}px`} on:pointerdown|stopPropagation>
+<div bind:this={root} use:elementEditor={{close:onclose,capabilities:{color:true},outside:true,ignore:'[data-drawing-id],[data-drawing-actions]'}} data-drawing-style-picker role="dialog" aria-label="Drawing color" tabindex="-1" style:left={`${Math.max(8,Math.min(window.innerWidth-300,x))}px`} style:top={`${Math.max(8,Math.min(window.innerHeight-80,y))}px`} on:pointerdown|stopPropagation>
  <div class="swatches">{#each colors as color}<HoverTooltip text={color.label} minWidthPx={0}><button aria-label={color.label} aria-pressed={selected===color.id} on:click={()=>onchange(color.id)}><span style:background={color.value}></span></button></HoverTooltip>{/each}</div>
 </div>
 <style>
