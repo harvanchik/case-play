@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PublicSiteFooter from '$lib/components/PublicSiteFooter.svelte';
 	import { goto } from '$app/navigation';
 	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
 
@@ -94,4 +95,5 @@
 			</div>
 		</section>
 	</div>
+	<PublicSiteFooter />
 </main>

@@ -1,3 +1,7 @@
+<script lang="ts">
+ import PublicSiteFooter from '$lib/components/PublicSiteFooter.svelte';
+</script>
+
 <svelte:head>
 	<title>Admin Redirect</title>
 	<meta name="description" content="Sports case play database for referee education" />
@@ -17,4 +21,5 @@
 			Open Admin
 		</a>
 	</section>
+	<PublicSiteFooter />
 </main>

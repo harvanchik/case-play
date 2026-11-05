@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { version } from '../../../package.json';
 	import { openConsentChoices } from '$lib/privacy/consent';
 	export let context: 'database' | 'play-builder' | 'general' = 'general';
 </script>
@@ -15,5 +16,6 @@
 		<a href="/contact" class="font-semibold hover:underline">Contact</a>
 		<a href="/contact" class="font-semibold hover:underline">Contribute</a>
 		<button type="button" class="cursor-pointer font-semibold hover:underline" on:click={openConsentChoices}> Your Privacy Choices </button>
+		<span data-app-version class="tabular-nums">v{version}</span>
 	</div>
 </footer>

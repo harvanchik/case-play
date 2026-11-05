@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { page } from '$app/stores';
+	import PublicSiteFooter from '$lib/components/PublicSiteFooter.svelte';
 	import { dev } from '$app/environment';
 	import { injectAnalytics } from '@vercel/analytics/sveltekit';
 	import { onMount } from 'svelte';
@@ -27,6 +29,7 @@
 </svelte:head>
 
 <slot />
+{#if $page.error}<PublicSiteFooter />{/if}
 {#if clientReady && data?.accountUser && data.accountCsrfToken}
 	<AccountBrowserPlayClaim csrfToken={data.accountCsrfToken} />
 {/if}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PublicSiteFooter from '$lib/components/PublicSiteFooter.svelte';
 	import PublicSiteNav from '$lib/components/PublicSiteNav.svelte';
 	import type { PageData } from './$types';
 
@@ -24,6 +25,7 @@
 		</div>
 		<p class="mt-5 text-xs leading-5 text-stone-500">CasePlay does not store your provider password. Your provider handles authentication.</p>
 	</div>
+	<PublicSiteFooter />
 </main>
 
 <style>

@@ -47,6 +47,7 @@ Paths in this table are relative to `src/lib/`.
 | Existing code | Reuse guidance |
 | --- | --- |
 | `components/play-builder/BuilderActionButton.svelte` | Shared white square action button, label/icon, disabled/busy states, tooltip/keycaps. |
+| `components/PublicSiteFooter.svelte` | Shared site footer with the current application version from `package.json` immediately after Privacy Choices; retain it for future sport pages. Commit versioning follows `docs/versioning.md`. |
 | `components/play-builder/BuilderActionBar.svelte`, `BuilderPlayTabs.svelte` | Shared corner bar layout/scaling and actual play-tab controls/overflow/reorder animation. Slot sport-specific actions and existing play options instead of rebuilding the shell. |
 | `components/play-builder/BuilderExportControls.svelte` | Standard image/video menus, eligible-play counts, progress/cancel, Options and Go Full. Export callbacks and authentication decisions are supplied by the host. |
 | `components/play-builder/BuilderPresentationControls.svelte`, `BuilderPlaybackControls.svelte`, `BuilderAnimationDock.svelte` | Shared presentation/viewer controls and animation-doc portal, stacking and placement. Supply playback state/callbacks; the existing panel continues to render timeline contents. |
@@ -193,6 +194,12 @@ Relevant test entry points:
 - `tests/browser/browser-video.spec.ts`, `tests/browser/batch-exports.spec.ts`
 
 ## Running change log
+
+### 2026-11-05 — Application version tracking
+
+- Established `package.json` version `1.1.0` as the shared footer's version source, displayed immediately after Privacy Choices. Added missing shared footers to login/admin/preview/redirect pages and error-layout fallback coverage.
+- Added `docs/versioning.md`, `CHANGELOG.md`, version-bump commands, and repository instructions requiring a SemVer increase for every subsequent commit, including each commit in a batch. Future sport pages reuse the shared footer and version source.
+- Verification: browser coverage checked one footer and adjacent version text across 11 routes; Svelte/type checking reported 0 errors and 0 warnings.
 
 ### 2026-11-05 — OKLab blending and play-reorder cursor
 

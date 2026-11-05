@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PublicSiteFooter from '$lib/components/PublicSiteFooter.svelte';
 	import type { LayoutData } from './$types';
 
 	export let data: LayoutData;
@@ -32,4 +33,5 @@
 	<div class="mx-auto max-w-6xl px-4 py-8">
 		<slot />
 	</div>
+	<PublicSiteFooter />
 </main>

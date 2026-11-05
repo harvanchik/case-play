@@ -6,6 +6,10 @@
 
 Before changing shared builder code or implementing another sport, read the [living architecture and future-sport parity record](docs/play-builder-architecture.md) and [shared-controller contracts](docs/play-builder-shared-controllers.md). Keep these records current with implementation changes; see [repository instructions](AGENTS.md).
 
+## Versioning
+
+The shared footer displays the version from `package.json`. Follow the [versioning instructions](docs/versioning.md) before every commit, and record significant changes in [the changelog](CHANGELOG.md).
+
 ## Stack
 
 - SvelteKit with `@sveltejs/adapter-vercel`
