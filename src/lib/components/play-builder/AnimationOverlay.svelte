@@ -95,17 +95,22 @@
  }
 
 
- function artworkLayer(node:SVGElement,value:{selected:boolean;ghost?:boolean}){
+ const artworkPlacements=new Set<()=>void>();
+ let artworkObserver:MutationObserver|null=null;
+ function artworkLayer(node:SVGElement,initial:{selected:boolean;ghost?:boolean}){
   const home=document.createComment('animation artwork');node.before(home);
-  let disposed=false;
-  const update=(value:{selected:boolean;ghost?:boolean})=>{
-   if(disposed)return;
-   const svg=node.ownerSVGElement??home.parentElement?.closest('svg');
-   if(!svg)return;
+  let disposed=false,value=initial;
+  const place=()=>{
+   if(disposed||!home.isConnected)return;
+   const svg=home.parentElement?.closest('svg')??node.ownerSVGElement;if(!svg)return;
+   if(!artworkObserver){artworkObserver=new MutationObserver(()=>{for(const update of artworkPlacements)update();});artworkObserver.observe(svg,{childList:true,subtree:true});}
    const destination=value.selected?svg.querySelector('[data-animation-selected-overlay]'):value.ghost?home.parentNode:svg.querySelector('[data-animation-route-underlay]');
-   if(destination===home.parentNode&&value.ghost&&!value.selected)destination?.insertBefore(node,home);else destination?.appendChild(node);
+   if(!destination)return;
+   if(value.ghost&&!value.selected){if(node.parentNode!==destination||node.nextSibling!==home)destination.insertBefore(node,home);}
+   else if(node.parentNode!==destination)destination.appendChild(node);
   };
-  update(value);queueMicrotask(()=>update(value));return {update,destroy(){disposed=true;node.remove();home.remove();}};
+  artworkPlacements.add(place);place();queueMicrotask(place);
+  return{update(next:{selected:boolean;ghost?:boolean}){value=next;place();},destroy(){disposed=true;artworkPlacements.delete(place);node.remove();home.remove();if(!artworkPlacements.size){artworkObserver?.disconnect();artworkObserver=null;}}};
  }
 
 	let dragging: { index: number; motion: Motion; points: Point[] } | null = null;

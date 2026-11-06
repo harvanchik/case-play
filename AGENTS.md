@@ -6,6 +6,8 @@
 - `package.json` is the single current-version source; the shared footer reads it directly. Initial tracked release: **1.1.0**. The commit introducing version tracking keeps that initial version.
 - Every subsequent commit must include a version increase: PATCH for fixes, maintenance, docs/tests or cleanup; MINOR for new backward-compatible features; MAJOR for breaking changes. Reset lower components when increasing MINOR/MAJOR. For mixed changes use the highest applicable category.
 - Stage the version change with that commit. Give each commit in a batch its own version. Do not bump twice if the correct new version is already prepared relative to HEAD. Do not create tags, releases, commits or pushes without the user's authorization.
+- Every version must have brief, user-facing Markdown notes in `CHANGELOG.md`, which powers `/changelog`. Group Play Builder separately from Case Plays, and use Across the App for general updates. Within each area use relevant Added, Changed, Fixed, or Removed headings; omit empty categories. Explain benefits/behavior in everyday language, without implementation details, commit IDs, or test counts. Add the notes with the version bump; the footer version links to its release.
+- Pending-release notes describe the net changes since the previous finalized version; consolidate in-progress refinements rather than logging each one. Leave pending releases undated and set their date to the actual finalization date (America/Chicago) when the user finalizes them.
 - New page UIs must include the shared `PublicSiteFooter` (directly or through their layout), keeping the displayed version immediately after Privacy Choices.
 
 ## Play builders and future sports

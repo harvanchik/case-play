@@ -1,10 +1,20 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
 	import PublicNavDropdown from './PublicNavDropdown.svelte';
+	let nav: HTMLElement;
+	onMount(() => {
+		const updateHeight = () => document.documentElement.style.setProperty('--public-site-nav-height', `${nav.getBoundingClientRect().height}px`);
+		updateHeight();
+		const observer = new ResizeObserver(updateHeight);
+		observer.observe(nav);
+		return () => observer.disconnect();
+	});
 	$: accountUser = $page.data?.accountUser;
 </script>
 
 <nav
+	bind:this={nav}
 	data-public-site-nav
 	aria-label="Primary navigation"
 	class="public-site-nav-glass fixed inset-x-0 top-0 z-[2147483646] flex min-h-9 flex-wrap items-center justify-center gap-x-5 gap-y-1 border-b border-white/80 px-4 py-2 text-sm font-semibold text-stone-700 shadow-[0_2px_10px_rgba(28,25,23,0.08)]"

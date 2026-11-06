@@ -104,7 +104,7 @@ test('browser encodes real MP4 MOV WebM and GIF files without export API calls',
 				},
 				new AbortController().signal,
 				() => {},
-				'test'
+				'test',true,'#214b37',2
 			);
 		}, format);
 		const file = await download;
@@ -133,14 +133,15 @@ test('browser encodes real MP4 MOV WebM and GIF files without export API calls',
 						video.onloadedmetadata = () => resolve();
 						video.onerror = () => reject(new Error('Export is not playable'));
 					});
-					return [video.videoWidth, video.videoHeight];
+					return [video.videoWidth, video.videoHeight,video.duration];
 				} finally {
 					URL.revokeObjectURL(url);
 				}
 			},
 			{ data: bytes.toString('base64'), format }
 		);
-		expect(dimensions).toEqual(format === 'gif' ? [960, 540] : [1920, 1080]);
+		expect(dimensions.slice(0,2)).toEqual(format === 'gif' ? [960, 540] : [1920, 1080]);
+        if(format!=='gif')expect(dimensions[2]).toBeCloseTo(1.1,1);
 	}
 	expect(calls).toBe(0);
 });

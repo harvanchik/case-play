@@ -1,4 +1,5 @@
 <script lang="ts">
+ import {readLockedDock,saveLockedDock} from '$lib/play-builder-dock-preference';
 	import {
 		animationDuration,
         retimeTransition,
@@ -201,6 +202,13 @@
  export let canCreatePlay = true;
 	export let onerror: (message: string) => void;
 	let timing = false;
+ let dockLocked=false;
+ function toggleDockLock(){
+  dockLocked=!dockLocked;dockDrag=null;dockResize=null;
+  const bounds=panel.getBoundingClientRect();
+  if(dockLocked){preferredWidth=bounds.width;manuallyResized=true;}
+  saveLockedDock(localStorage,dockLocked?{locked:true,x:bounds.left,y:bounds.top,width:bounds.width}:null);
+ }
 
 	let panel: HTMLDivElement;
  let durationInput: HTMLInputElement;
@@ -230,7 +238,7 @@
         growingForSteps = true;
 		await tick();
 		const rail = panel?.querySelector<HTMLElement>('.steps');
-		if (!rail || dockResize) { growingForSteps = false; void updateStepScrolling(); return; }
+		if (!rail || dockResize || dockLocked) { growingForSteps = false; void updateStepScrolling(); return; }
 		const overflow = rail.scrollWidth - rail.clientWidth;
 		const available = Math.min(viewportWidth - 16, viewportWidth * 0.75);
 		if (overflow > 1 && panelWidth < available) {
@@ -275,7 +283,7 @@
 		}
 	}
 	function beginResize(event: PointerEvent, side: 'left' | 'right') {
-		if (event.button !== 0) return;
+		if (dockLocked || event.button !== 0) return;
 		event.preventDefault();
 		event.stopPropagation();
 		const bounds = panel.getBoundingClientRect();
@@ -286,7 +294,7 @@
 		if (dockResize) resizeWidth(event.clientX - dockResize.x, dockResize);
 	}
 	function resizeKey(event: KeyboardEvent, side: 'left' | 'right') {
-		if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+		if (dockLocked || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
 		event.preventDefault();
 		event.stopPropagation();
 		const bounds = panel.getBoundingClientRect();
@@ -298,7 +306,7 @@
 	let suppressStepClick = false;
 	$: orderedSteps = order ? order.map((id) => animation.steps.find((step) => step.id === id)!).filter(Boolean) : animation.steps;
 	function beginDock(event: PointerEvent) {
-		if (fixedDock || (event.target as Element).closest('button, input, select, label, [data-animation-popup]') || event.button !== 0) return;
+		if (fixedDock || dockLocked || (event.target as Element).closest('button, input, select, label, [data-animation-popup]') || event.button !== 0) return;
 		const bounds = panel.getBoundingClientRect();
 		dockDrag = { x: event.clientX, y: event.clientY, left: bounds.left, top: bounds.top };
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -370,6 +378,7 @@
 		order = null;
 	}
 	onMount(() => {
+  if(!fixedDock){const saved=readLockedDock(localStorage);if(saved){dockLocked=true;dockX=saved.x;dockY=saved.y;preferredWidth=saved.width;manuallyResized=true;}}
 		panel.focus({ preventScroll: true });
 
 		const resize = () => {
@@ -777,7 +786,7 @@
 			style:top={dockY === null ? undefined : `${dockY}px`}
 			aria-label="Play animation controls"
 		>
-			{#each fixedDock ? [] : ['left', 'right'] as side}
+			{#each fixedDock || dockLocked ? [] : ['left', 'right'] as side}
 				<button
 					type="button"
 					class="dock-resize"
@@ -845,6 +854,7 @@
 				</div>
 
 
+    {#if !fixedDock}<button class="icon" data-animation-tooltip={dockLocked?'Unlock Animation Doc':'Lock Animation Doc'} aria-label={dockLocked?'Unlock animation dock':'Lock animation dock'} aria-pressed={dockLocked} on:click={toggleDockLock}><span style:opacity={dockLocked?1:.4}><AnimationIcon name={dockLocked?'lock':'unlock'}/></span></button>{/if}
 				<button
 					class="icon"
 					data-animation-tooltip="Close animation editor"
@@ -911,7 +921,7 @@
 						>
 					</div>
 				</div>
-				<span>{time.toFixed(2)} / {total.toFixed(2)}s</span><button
+				<span class="playback-duration">{time.toFixed(2)} / {total.toFixed(2)}s</span><button
 					class="speed subtle"
 					data-animation-tooltip="Playback speed"
 					aria-label="Cycle playback speed"
@@ -1069,6 +1079,7 @@
 		font-size: 10px;
 		font-variant-numeric: tabular-nums;
 	}
+ .playback-duration {margin-left:8px;}
 	.playback-timeline {
 		position: relative;
 		flex: 1;

@@ -1,7 +1,9 @@
 <script lang="ts">
 	export let name:
-		'tutorial' | 'timeline-start' | 'timeline-end' | 'rewind' | 'fast-forward' | 'ghost' | 'repeat' | 'reset' | 'play' | 'pause' | 'start' | 'end' | 'settings' | 'close' | 'plus' | 'minus' | 'copy' | 'trash' | 'clock' | 'motion' | 'edit' | 'draw' | 'check';
+		'lock' | 'unlock' | 'tutorial' | 'timeline-start' | 'timeline-end' | 'rewind' | 'fast-forward' | 'ghost' | 'repeat' | 'reset' | 'play' | 'pause' | 'start' | 'end' | 'settings' | 'close' | 'plus' | 'minus' | 'copy' | 'trash' | 'clock' | 'motion' | 'edit' | 'draw' | 'check';
 	const paths = {
+        lock: 'M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5ZM12 14v3',
+        unlock: 'M7 10V7a5 5 0 0 1 9.6-2M5 10h14v11H5ZM12 14v3',
         tutorial: 'M4 5h16v11H9l-4 3v-3H4z',
         'timeline-start': 'M3 5v14M12 5l-7 7 7 7ZM21 5l-7 7 7 7Z',
         'timeline-end': 'M21 5v14M3 5l7 7-7 7ZM12 5l7 7-7 7Z',

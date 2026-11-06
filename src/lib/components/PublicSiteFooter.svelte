@@ -16,6 +16,6 @@
 		<a href="/contact" class="font-semibold hover:underline">Contact</a>
 		<a href="/contact" class="font-semibold hover:underline">Contribute</a>
 		<button type="button" class="cursor-pointer font-semibold hover:underline" on:click={openConsentChoices}> Your Privacy Choices </button>
-		<span data-app-version class="tabular-nums">v{version}</span>
+		<a data-app-version href={`/changelog#v${version}`} class="font-normal tabular-nums hover:underline" aria-label={`What’s new in v${version}`}>v{version}</a>
 	</div>
 </footer>

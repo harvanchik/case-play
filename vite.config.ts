@@ -10,7 +10,7 @@ export default defineConfig(async ({ command, mode }) => {
 	return {
 		plugins: [sveltekit(), ...workflows],
 		server: {
-			watch: { ignored: ['**/.pnpm-store/**', '**/.vercel/**'] }
+			watch: { ignored: ['**/.pnpm-store/**', '**/.vercel/**', '**/test-results*/**', '**/playwright-report/**'] }
 		},
 		optimizeDeps: {
 			include: ['@iconify/svelte', 'mark.js']

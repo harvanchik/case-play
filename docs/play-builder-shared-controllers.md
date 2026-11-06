@@ -83,3 +83,11 @@ The flag football builder uses the shared controllers and UI described below. Th
 Controller unit tests use opaque selection/state types and a fake playback clock. Browser regressions exercise the real flag football adapter: mixed groups and drawings, snapping modifiers, Undo/Redo, independent step destinations, tutorial restoration, shared links, saved reloads, and image/video exports.
 
 Keep new shared behavior in the controllers and new sport rules in adapters. Adding another sport should not require copying the flag football component or importing its rules into these modules.
+
+
+## Animation dock preferences and export holds
+
+- `play-builder-dock-preference.ts` stores only locked dock geometry in browser storage (`caseplay-animation-dock-v1`). Invalid or unavailable storage falls back safely. This is UI state, excluded from documents, history, dirty state, and database persistence.
+- `AnimationPanel` restores locked position/width, clamps to the viewport, and disables dragging, resizing, and automatic width growth until unlocked. Presentation mode remains fixed and does not overwrite the preference.
+- `play-builder-video-timing.ts` adds one second of final-pose frames at the output frame rate. The browser exporter renders the exact endpoint once and reuses it for that hold, including batch exports. Authored duration and preview playback remain unchanged.
+- `AnimationOverlay` tracks route/ghost artwork placements and repairs their destinations after SVG layer replacement. A component-local child-list observer disconnects when all placements are destroyed; detached or disposed homes cannot reinsert artwork.

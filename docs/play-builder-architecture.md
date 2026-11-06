@@ -1,6 +1,6 @@
 # Play-builder architecture and future-sport parity record
 
-Last updated: **2026-11-05**.
+Last updated: **2026-11-06**.
 
 This is the living handoff for the play-builder family. Read it before implementing basketball or changing shared builder behavior. It records what exists, what is reusable, what still needs adaptation, and the experience future sports must retain. Source code is authoritative; update this record alongside changes rather than allowing it to become an older design proposal.
 
@@ -47,7 +47,7 @@ Paths in this table are relative to `src/lib/`.
 | Existing code | Reuse guidance |
 | --- | --- |
 | `components/play-builder/BuilderActionButton.svelte` | Shared white square action button, label/icon, disabled/busy states, tooltip/keycaps. |
-| `components/PublicSiteFooter.svelte` | Shared site footer with the current application version from `package.json` immediately after Privacy Choices; retain it for future sport pages. Commit versioning follows `docs/versioning.md`. |
+| `components/PublicSiteFooter.svelte` | Shared site footer with the current application version from `package.json` immediately after Privacy Choices, linked to that release on `/changelog`; retain it for future sport pages. Commit versioning follows `docs/versioning.md`. |
 | `components/play-builder/BuilderActionBar.svelte`, `BuilderPlayTabs.svelte` | Shared corner bar layout/scaling and actual play-tab controls/overflow/reorder animation. Slot sport-specific actions and existing play options instead of rebuilding the shell. |
 | `components/play-builder/BuilderExportControls.svelte` | Standard image/video menus, eligible-play counts, progress/cancel, Options and Go Full. Export callbacks and authentication decisions are supplied by the host. |
 | `components/play-builder/BuilderPresentationControls.svelte`, `BuilderPlaybackControls.svelte`, `BuilderAnimationDock.svelte` | Shared presentation/viewer controls and animation-doc portal, stacking and placement. Supply playback state/callbacks; the existing panel continues to render timeline contents. |
@@ -195,6 +195,12 @@ Relevant test entry points:
 
 ## Running change log
 
+### 2026-11-06 — User-facing changelog
+
+- Added `/changelog`, backed by the curated Markdown in `CHANGELOG.md`, and linked the shared footer version to its release anchor. User-facing notes separate Play Builder, Case Plays, and general updates, with Added/Changed/Fixed/Removed categories only where relevant.
+- Prepared feature version `1.2.0` and retained the recent `1.1.0` release notes. Repository/versioning instructions require matching brief, nontechnical notes for future versions. The page uses shared navigation/footer and supports smaller screens.
+- `src/lib/changelog.ts` parses the documented heading/bullet structure as text; the page renders semantic content without raw HTML. Verification: 79 unit passes (one optional FFmpeg skip), two Chrome scenarios covering footer placement across 11 routes and the changelog on desktop/mobile, one WebKit changelog scenario including mobile footer reachability, and clean Svelte/type checking. Desktop/mobile appearance was visually reviewed. The navigation fixture waits for hydration before clicking the footer link.
+
 ### 2026-11-05 — Application version tracking
 
 - Established `package.json` version `1.1.0` as the shared footer's version source, displayed immediately after Privacy Choices. Added missing shared footers to login/admin/preview/redirect pages and error-layout fallback coverage.
@@ -281,3 +287,11 @@ The established builder already included the animation doc, motion/drawing/arrow
 - Update parity notes when the user changes UX or shortcuts; do not preserve an obsolete requirement just because an older log entry contains it.
 - Record tests actually run and their outcomes, plus unresolved limitations. Never label planned work implemented.
 - When basketball is eventually authorized, explicitly document which shared modules it uses, what coupling was removed, and which differences are intentionally basketball-specific.
+
+
+### v1.2.0 — Dock persistence and export endpoint hold (finalized 2026-11-06)
+
+- Added sport-neutral browser dock preference validation/storage in `play-builder-dock-preference.ts`, used by the existing animation panel. Locking fixes position and width without changing authoring data; fullscreen presentation retains its existing fixed dock.
+- Added shared `play-builder-video-timing.ts` frame planning. Browser video/GIF export holds the exact final pose for one extra second using one cached canvas, with existing cancellation and batch processing.
+- Animation route/ghost placement now repairs replaced SVG destinations during step navigation and cleans up its observer on destruction. Timeline elapsed/total text has extra separation from the track.
+- Verification: 81 unit tests passed, one optional FFmpeg test skipped; five Chrome scenarios passed across the targeted runs (dock close/reload persistence, route layer replacement/repeated navigation, real MP4/MOV/WebM/GIF encoding, dock resizing/overflow, and transport controls). Svelte/TypeScript check passed with zero errors and warnings.

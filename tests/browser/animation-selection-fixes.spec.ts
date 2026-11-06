@@ -99,3 +99,23 @@ test('player, drawing and fabric colors blend in OKLab without raster dissolves'
  await expect(page.locator('[data-free-drawing]').first()).toHaveAttribute('stroke',perceptualColorTransition('#ff1744','#2979ff',.5));
  for(const id of [6,7]){await expect(page.locator(`#animation-marker-art-${id} image`)).toHaveCount(1);await expect(page.locator(`#animation-marker-art-${id} feColorMatrix`)).toHaveCount(1);}
 });
+
+test('dock lock remembers browser-local geometry across closing and reload',async({page})=>{
+ await ready(page,true);const dock=page.getByRole('toolbar',{name:'Play animation controls',exact:true});
+ const resize=page.getByRole('button',{name:'Resize animation dock from right',exact:true});const edge=(await resize.boundingBox())!;await page.mouse.move(edge.x+edge.width/2,edge.y+edge.height/2);await page.mouse.down();await page.mouse.move(edge.x-80,edge.y+edge.height/2,{steps:8});await page.mouse.up();
+ let box=(await dock.boundingBox())!;await page.mouse.move(box.x+box.width/2,box.y+box.height-10);await page.mouse.down();await page.mouse.move(box.x+box.width/2+45,box.y+box.height-160,{steps:8});await page.mouse.up();
+ const saved=(await dock.boundingBox())!;const lock=page.getByRole('button',{name:'Lock animation dock',exact:true});expect(await lock.locator('span').evaluate(node=>getComputedStyle(node).opacity)).toBe('0.4');await lock.click();await expect(page.getByRole('button',{name:'Unlock animation dock',exact:true})).toHaveAttribute('aria-pressed','true');await expect(page.getByRole('button',{name:/Resize animation dock/})).toHaveCount(0);
+ await page.mouse.move(saved.x+saved.width/2,saved.y+saved.height-10);await page.mouse.down();await page.mouse.move(saved.x+saved.width/2+100,saved.y+saved.height-110,{steps:8});await page.mouse.up();expect((await dock.boundingBox())!.x).toBe(saved.x);
+ await page.getByRole('button',{name:'Close animation editor',exact:true}).click();await page.getByRole('button',{name:'Animate play',exact:true}).click();await expect.poll(async()=>(await dock.boundingBox())!.y).toBeCloseTo(saved.y,0);expect((await dock.boundingBox())!.width).toBeCloseTo(saved.width,0);
+ await page.evaluate(()=>{for(const key of Object.keys(localStorage))if(key.startsWith('caseplay-play-builder-draft-v1:'))localStorage.removeItem(key);});await page.reload();await expect(page.getByRole('button',{name:'Animate play',exact:true})).toBeVisible();await page.waitForTimeout(750);await page.getByRole('button',{name:'Animate play',exact:true}).click();await expect(page.getByRole('button',{name:'Unlock animation dock',exact:true})).toBeVisible();await expect.poll(async()=>(await dock.boundingBox())!.y).toBeCloseTo(saved.y,0);expect((await dock.boundingBox())!.width).toBeCloseTo(saved.width,0);
+ await page.getByRole('button',{name:'Unlock animation dock',exact:true}).click();expect(await page.evaluate(()=>localStorage.getItem('caseplay-animation-dock-v1'))).toBeNull();await expect(page.getByRole('button',{name:/Resize animation dock/})).toHaveCount(2);
+});
+
+test('movement routes recover replaced layers and remain visible through step changes',async({page})=>{
+ const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));await ready(page,true);
+ const assertRoutes=async()=>{for(const id of [1,2])await expect.poll(()=>page.locator(`[data-animation-route="${id}"] [data-animation-route-line]`).evaluate(node=>node.isConnected&&!!node.closest('[data-animation-route-underlay],[data-animation-selected-overlay]')&&!!node.getAttribute('d'))).toBe(true);};
+ await assertRoutes();await page.locator('[data-animation-route-underlay]').evaluate(node=>node.replaceWith(node.cloneNode(false)));await assertRoutes();
+ for(let i=0;i<8;i++){await page.keyboard.press('1');await page.keyboard.press('2');await marker(page,1).click();await page.keyboard.press('3');await page.keyboard.press('2');await assertRoutes();}
+ expect(errors).toEqual([]);
+ const duration=page.locator('.playback-duration');const timeline=page.locator('.playback-timeline');expect((await duration.boundingBox())!.x-((await timeline.boundingBox())!.x+(await timeline.boundingBox())!.width)).toBeGreaterThanOrEqual(8);
+});
