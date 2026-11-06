@@ -153,9 +153,9 @@
 										pointer-events="none"
 									/>
 								{/if}
-								{#if artworkReady && marker.label && (isOfficialMarker(marker) || ['ball', 'flag', 'bean-bag', 'deflag'].includes(marker.kind))}
+								{#if marker.label && (isOfficialMarker(marker) || ['ball', 'flag', 'bean-bag', 'deflag'].includes(marker.kind))}
 									{@const labelLines = penaltyLabelLines(marker.label)}
-									<text opacity={marker.animationLabelOpacity ?? 1}
+									<text data-marker-image-label visibility={artworkReady?'visible':'hidden'} opacity={marker.animationLabelOpacity ?? 1}
 										x={marker.x}
 										y={markerDescriptionY(marker)}
 										text-anchor="middle"

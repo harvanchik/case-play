@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.4.0 — 2026-11-06
+
+### Play Builder
+
+#### Added
+
+- Start or stop the game clock and play clock at individual animation steps using compact controls shown while editing each clock.
+
+#### Fixed
+
+- Element labels stay visible consistently in exported videos and GIFs.
+
 ## v1.3.0 — 2026-11-06
 
 ### Play Builder

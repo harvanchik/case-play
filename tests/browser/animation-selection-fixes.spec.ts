@@ -130,8 +130,8 @@ test('Jump image labels wait for their artwork and share the element transition'
  await page.route('**/images/football.webp',async route=>{await gate;await route.continue();});
  await seek(page,.85);
  const art=page.locator('#animation-marker-art-3');
- await expect(art.locator('image')).toHaveCount(1);await expect(art.locator('text')).toHaveCount(0);
- release();await expect(art.locator('text')).toContainText(/Football\s*note/);
+ await expect(art.locator('image')).toHaveCount(1);await expect(art.locator('text')).toHaveAttribute('visibility','hidden');
+ release();await expect(art.locator('text')).toHaveAttribute('visibility','visible');await expect(art.locator('text')).toContainText(/Football\s*note/);
  expect(Number(await art.locator('..').getAttribute('opacity'))).toBeGreaterThan(0);
 });
 
@@ -190,4 +190,23 @@ test('clock run controls appear only while editing and save independent step com
  await game.press('Enter');await expect(page.locator('[data-clock-control]')).toHaveCount(0);
  await seek(page,1.75);await expect(page.locator('[data-game-clock]')).toHaveText('00:09');
  await page.keyboard.press('1');await expect(page.locator('[data-play-clock] text')).toHaveText('25');await expect(page.locator('[data-game-clock]')).toHaveText('00:10');
+});
+
+
+test('export frames keep labels stable while live image readiness changes',async({page})=>{
+ await ready(page,'image');const response=await page.request.get('/images/football.webp');const asset='data:image/webp;base64,'+(await response.body()).toString('base64');
+ await seek(page,0);let release!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);
+ await page.route('**/images/football.webp',async route=>{await gate;await route.continue();});await seek(page,.85);
+ await expect(page.locator('#animation-marker-art-3 [data-marker-image-label]')).toHaveAttribute('visibility','hidden');
+ try{
+  const result=await page.locator('svg[role="application"]').evaluate(async(node,asset)=>{
+   const path='/src/lib/play-builder-export.ts';const {renderPlayBuilderCanvas}=await import(path);const options={assetCache:new Map([['/images/football.webp',Promise.resolve(asset)]])};
+   const label=node.querySelector('#animation-marker-art-3 [data-marker-image-label]')!;
+   const first=(await renderPlayBuilderCanvas(node,options)).toDataURL();label.setAttribute('visibility','visible');
+   const second=(await renderPlayBuilderCanvas(node,options)).toDataURL();const content=label.innerHTML;label.innerHTML='';
+   const without=(await renderPlayBuilderCanvas(node,options)).toDataURL();label.innerHTML=content;
+   return {stable:first===second,hasLabel:first!==without};
+  },asset);
+  expect(result).toEqual({stable:true,hasLabel:true});
+ }finally{release();}
 });

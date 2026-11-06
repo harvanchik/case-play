@@ -332,3 +332,12 @@ The established builder already included the animation doc, motion/drawing/arrow
 - Added shared `ClockRunButton.svelte` while editing clocks: below the game clock and above the play clock. Matching compact stop/play icons set independently inherited `AnimationStep.clocks.game/play` commands at the selected step marker. These commands participate in existing history, save, duplication, and document validation.
 - Pure `evaluateAnimationClockControl` integrates only running intervals for deterministic browser/export countdown. The play clock retains its automatic football stop; a later explicit Start command can resume it. Editor controls remain outside export artwork and disappear on blur/outside editing.
 - Verification: 87 unit tests passed (one optional FFmpeg test skipped), including independent stop/resume integration, snap-stop override, round-trip persistence, and invalid-command rejection. Chrome verified edit-only controls and both clocks freezing at the selected step; Svelte/TypeScript passed with zero errors and warnings.
+
+### Follow-up — Export label stability
+
+- Image marker labels remain in SVG artwork while their live visibility waits for image readiness. The shared export renderer removes only that readiness visibility guard from its cloned labels before embedding images; authored label opacity and element transforms remain intact. This prevents fast video/GIF capture from intermittently omitting labels and retains live Jump synchronization.
+- Verification: Chrome confirmed identical rasterized frames before/after live artwork readiness changes, confirmed exported label pixels are present, and retained delayed-image Jump label synchronization. Svelte/TypeScript reported zero errors and warnings.
+
+### v1.4.0 finalized — 2026-11-06
+
+- Finalized the previously committed per-step clock controls and the export label readiness fix together; updated the public changelog and package version.

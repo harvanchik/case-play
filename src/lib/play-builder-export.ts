@@ -226,6 +226,8 @@ export const renderPlayBuilderCanvas = async (
     clone.style.visibility='visible';
 	clone.querySelector('[data-laser-pointer-layer]')?.remove();
 	clone.querySelectorAll('[data-export-exclude]').forEach((element) => element.remove());
+ // Export embeds artwork before rasterization; live image-load guards must not hide frame labels.
+ clone.querySelectorAll('[data-marker-image-label]').forEach(element=>element.removeAttribute('visibility'));
 	clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
 	clone.setAttribute('viewBox', `${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`);
 	clone.setAttribute('width', String(outputWidth));
