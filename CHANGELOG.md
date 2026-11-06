@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.5.0 — 2026-11-06
+
+### Play Builder
+
+#### Changed
+
+- Hover over either clock to reveal its Run/Stop button. Matching square controls stay reachable and remain visible while editing.
+- Clock tooltips clearly describe whether clicking will run or stop the clock.
+
+#### Fixed
+
+- Editing clocks or element text hides the placement ghost while keeping the crosshair visible.
+- Clicking outside an editor ends editing without accidentally placing an element. Enter also finishes editing.
+
 ## v1.4.0 — 2026-11-06
 
 ### Play Builder

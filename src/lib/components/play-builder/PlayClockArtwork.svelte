@@ -1,10 +1,13 @@
 <script lang="ts">
+ import {clockEditorRegion} from '$lib/play-builder-clock-editor';
  import ClockRunButton from './ClockRunButton.svelte';
  export let x: number;
  export let y: number;
  export let seconds: number;
  export let editable = false;
  export let running = true;
+ export let oncontrolchange: ((open:boolean)=>void)|undefined=undefined;
+ let controlVisible=false;
  export let ontoggle: (()=>void)|undefined = undefined;
  export let onchange: ((seconds: number) => void) | undefined = undefined;
  let input: HTMLInputElement;
@@ -13,8 +16,8 @@
  $: if(!editing) value = String(seconds);
  function commit() { const parsed=Number(value);if(value.trim()&&Number.isFinite(parsed))onchange?.(Math.max(0,Math.min(99,Math.round(parsed))));editing=false;value=String(seconds); }
 </script>
-{#if editable&&editing&&ontoggle}<ClockRunButton x={x-45} y={y-27} {running} clock="Play" {ontoggle}/>{/if}
-<g data-play-clock aria-label={`Play clock: ${seconds} seconds`}>
+<g use:clockEditorRegion={{enabled:editable&&!!ontoggle,onchange:open=>{controlVisible=open;oncontrolchange?.(open);}}} data-play-clock aria-label={`Play clock: ${seconds} seconds`}>
+ {#if controlVisible&&ontoggle}<rect data-export-exclude x={x-46} y={y-29} width="18" height="20" fill="transparent"/><ClockRunButton x={x-46} y={y-29} {running} clock="Play" {ontoggle}/>{/if}
  <rect x={x-46} y={y-9} width="18" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5"/>
  {#if editable}
  <foreignObject data-export-exclude x={x-46} y={y-9} width="18" height="18">

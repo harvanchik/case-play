@@ -341,3 +341,20 @@ The established builder already included the animation doc, motion/drawing/arrow
 ### v1.4.0 finalized — 2026-11-06
 
 - Finalized the previously committed per-step clock controls and the export label readiness fix together; updated the public changelog and package version.
+
+### Follow-up — Clock control hover/focus and dismissal
+
+- Added shared `play-builder-clock-editor.ts` hover/focus region action, including transparent bridges to compact buttons. Clock run controls match the play-clock box’s 18-unit square plus its centered 1.5-unit stroke (19.5 units outside edge to edge).
+- Hover or clock input focus exposes controls; outside dismissal consumes the click before field placement, and the host suppresses placement ghosts while a control is open. Only one clock region remains active, and action cleanup removes region listeners/registrations.
+- Verification: Chrome confirmed hover-to-button reachability, equal visible clock/control dimensions, focus retention, independent step commands, and outside dismissal without placing a selected player for both clocks. Svelte/TypeScript reported zero errors and warnings.
+
+### Follow-up — Text editing placement protection
+
+- Clock tooltips now describe their action as Run/Stop the Play Clock or Game Clock. The host tracks focused text inputs and existing element editors in static and animated modes, hides placement ghosts, and consumes the first outside dismissal click before placement. Enter/Escape releases text focus after existing editor handling. Focus listeners are removed on destruction.
+- Verification: Chrome confirmed static clocks and element-name fields suppress ghosts, outside clicks do not place selected elements, Enter restores placement, animated hover controls remain reachable, and Run/Stop tooltip text overrides parent yard-marker messages. Svelte/TypeScript passed with zero errors and warnings.
+
+- Cursor clarification: text/clock editing suppresses only placement artwork; the field retains a crosshair instead of the marker tool’s hidden native cursor.
+
+### v1.5.0 finalized — 2026-11-06
+
+- Finalized clock hover/focus controls, matching visible square sizes, action tooltips, and protected text-edit dismissal with a visible crosshair. Chrome verified hover reachability, both clock dismissal paths, static text editing, Enter, and crosshair visibility; prior Svelte/TypeScript checks passed.

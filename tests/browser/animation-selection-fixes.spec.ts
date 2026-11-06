@@ -187,7 +187,7 @@ test('clock run controls appear only while editing and save independent step com
  await page.keyboard.press('2');await page.locator('[data-scoreboard-control="clock"]').click();
  const game=page.getByRole('textbox',{name:'Game clock',exact:true});await game.fill('00:10');await game.press('Enter');await page.locator('[data-scoreboard-control="clock"]').click();
  await page.getByRole('button',{name:'Stop game clock from this step',exact:true}).click();await expect(page.getByRole('button',{name:'Start game clock from this step',exact:true})).toBeVisible();
- await game.press('Enter');await expect(page.locator('[data-clock-control]')).toHaveCount(0);
+ await game.press('Enter');await page.mouse.move(2,2);await expect(page.locator('[data-clock-control]')).toHaveCount(0);
  await seek(page,1.75);await expect(page.locator('[data-game-clock]')).toHaveText('00:09');
  await page.keyboard.press('1');await expect(page.locator('[data-play-clock] text')).toHaveText('25');await expect(page.locator('[data-game-clock]')).toHaveText('00:10');
 });
@@ -209,4 +209,30 @@ test('export frames keep labels stable while live image readiness changes',async
   },asset);
   expect(result).toEqual({stable:true,hasLabel:true});
  }finally{release();}
+});
+
+
+test('clock controls stay reachable on hover and consume outside dismissal without placement',async({page})=>{
+ await ready(page,'clock');await page.keyboard.press('1');await page.getByRole('button',{name:'Team A',exact:true}).click();
+ const before=await page.locator('[data-layer-type="marker"]').count();
+ const play=page.getByRole('textbox',{name:'Play clock seconds',exact:true});await play.hover();
+ const stopPlay=page.getByRole('button',{name:'Stop play clock from this step',exact:true});await expect(stopPlay).toBeVisible();await stopPlay.hover();await expect(stopPlay).toBeVisible();
+ const square=await page.locator('[data-play-clock] > rect').last().boundingBox();const button=await stopPlay.boundingBox();expect(button!.width).toBeCloseTo(square!.width,1);expect(button!.height).toBeCloseTo(square!.height,1);
+ await play.click();await page.locator('svg[role="application"]').click({position:{x:650,y:230}});await expect(page.locator('[data-clock-control]')).toHaveCount(0);expect(await page.locator('[data-layer-type="marker"]').count()).toBe(before);
+ const game=page.locator('[data-scoreboard-control="clock"]');await game.hover();const stopGame=page.getByRole('button',{name:'Stop game clock from this step',exact:true});await expect(stopGame).toBeVisible();await stopGame.hover();await expect(stopGame).toBeVisible();
+ await game.click();await page.locator('svg[role="application"]').click({position:{x:650,y:230}});await expect(page.locator('[data-clock-control]')).toHaveCount(0);expect(await page.locator('[data-layer-type="marker"]').count()).toBe(before);
+});
+
+
+test('static clock and element text editing hide placement ghosts and consume dismissal clicks',async({page})=>{
+ await ready(page);await page.getByRole('button',{name:'Set up default play',exact:true}).click();await page.getByRole('button',{name:'Team A',exact:true}).click();
+ const svg=page.locator('svg[role="application"]');const count=()=>page.locator('[data-layer-type="marker"]').count();let before=await count();
+ const play=page.getByRole('textbox',{name:'Play clock seconds',exact:true});await play.click();await svg.hover({position:{x:650,y:230}});await expect(svg.locator('circle[opacity="0.55"]')).toHaveCount(0);expect(await svg.evaluate(node=>getComputedStyle(node).cursor)).toBe('crosshair');await svg.click({position:{x:650,y:230}});expect(await count()).toBe(before);
+ await page.locator('[data-scoreboard-control="clock"]').click();await svg.hover({position:{x:650,y:230}});await expect(svg.locator('circle[opacity="0.55"]')).toHaveCount(0);expect(await svg.evaluate(node=>getComputedStyle(node).cursor)).toBe('crosshair');await svg.click({position:{x:650,y:230}});expect(await count()).toBe(before);
+ await page.locator('[data-field-kind="team-a"]').first().click({button:'right'});const name=page.getByRole('textbox',{name:'Player name',exact:true});await name.fill('Runner');await svg.hover({position:{x:650,y:230}});await expect(svg.locator('circle[opacity="0.55"]')).toHaveCount(0);expect(await svg.evaluate(node=>getComputedStyle(node).cursor)).toBe('crosshair');await svg.click({position:{x:650,y:230}});expect(await count()).toBe(before);await expect(name).toHaveCount(0);
+ await play.click();await play.press('Enter');await svg.hover({position:{x:650,y:230}});await expect(svg.locator('circle[opacity="0.55"]')).toHaveCount(1);await svg.click({position:{x:650,y:230}});expect(await count()).toBe(before+1);
+});
+
+test('clock control tooltips describe run and stop actions',async({page})=>{
+ await ready(page,'clock');const play=page.getByRole('textbox',{name:'Play clock seconds',exact:true});await play.click();const stop=page.getByRole('button',{name:'Stop play clock from this step',exact:true});await stop.hover();await expect(page.getByRole('tooltip')).toHaveText('Stop the Play Clock');await stop.click();const run=page.getByRole('button',{name:'Start play clock from this step',exact:true});await run.hover();await expect(page.getByRole('tooltip')).toHaveText('Run the Play Clock');
 });

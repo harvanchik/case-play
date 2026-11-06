@@ -1,4 +1,5 @@
 <script lang="ts">
+ import {clockEditorRegion,dismissClockEditors} from '$lib/play-builder-clock-editor';
  import ClockRunButton from './play-builder/ClockRunButton.svelte';
  import {firstBallMovementTime,evaluateAnimationClockControl} from '$lib/play-builder-animation';
  import PlayClockArtwork from './play-builder/PlayClockArtwork.svelte';
@@ -684,6 +685,14 @@
 					y: (pathStart(editingPath).y + editingPath.end.y) / 2
 				}
 			: null;
+ let gameClockControlVisible=false,playClockControlVisible=false;
+ let suppressClockClick=false;
+ let focusedTextInput:HTMLElement|null=null;
+ const textInput=(target:EventTarget|null):HTMLElement|null=>target instanceof HTMLElement&&(target instanceof HTMLTextAreaElement||target.isContentEditable||target instanceof HTMLInputElement&&['text','number','search','tel','url','email','password'].includes(target.type))?target:null;
+ const handleTextFocus=(event:FocusEvent)=>{focusedTextInput=textInput(event.target);};
+ const handleTextBlur=(event:FocusEvent)=>{focusedTextInput=textInput(event.relatedTarget);};
+ $: placementEditing=clockControlVisible||focusedTextInput!==null||editingMarkerId!==null||editingGuideId!==null||editingPathId!==null||editingTeamBoxY!==null||editingScoreboard!==null||editingDownGuideId!==null||editingPlayId!==null;
+ $: clockControlVisible=gameClockControlVisible||playClockControlVisible;
  const toggleClockRunning=(kind:'game'|'play')=>{
   if(!animation||animationPreview||viewOnly)return;
   const next=currentAnimationContent().animation!;
@@ -3944,6 +3953,9 @@
   return true;
  };
  const handleGlobalKeydown = (event: KeyboardEvent) => {
+  if((event.key==='Enter'||event.key==='Escape')&&textInput(event.target)&&!(event.target instanceof HTMLTextAreaElement)){
+   const input=textInput(event.target)!;queueMicrotask(()=>{if(document.activeElement===input)input.blur();focusedTextInput=null;});
+  }
   if(event.code.startsWith('Key'))heldToolKeys.add(event.code);
   if(event.key==='F11'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!event.shiftKey){
    event.preventDefault();event.stopImmediatePropagation();
@@ -4364,6 +4376,11 @@
 	const handleWindowPointerDown = (event: PointerEvent) => {
 		if (viewOnly) return;
 		const target = event.target as Node;
+  if(focusedTextInput&&!focusedTextInput.isConnected)focusedTextInput=null;
+  if((clockControlVisible||focusedTextInput)&&!editorElement?.contains(target)&&!(target instanceof Element&&target.closest('[data-clock-editor-region],[data-clock-control]'))){
+   const input=focusedTextInput;dismissClockEditors();commitActiveEditor();input?.blur();focusedTextInput=null;hoverPoint=null;
+   event.preventDefault();event.stopImmediatePropagation();suppressClockClick=true;return;
+  }
   if(target instanceof Element&&target.closest('[data-element-action-menu],[data-clock-control]'))return;
   if(passBallId!==null&&event.button===0){
    if(editorElement?.contains(target))return;
@@ -6307,6 +6324,8 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 			sessionStorage.removeItem(saveLabelFeedbackStorageKey);
 			showSavedLabel();
 		}
+		document.addEventListener('focusin',handleTextFocus,true);
+  document.addEventListener('focusout',handleTextBlur,true);
 		document.addEventListener('pointerdown', handleWindowPointerDown, true);
 		document.addEventListener('click', handleWindowClick, true);
 		window.addEventListener('resize', updateDiagramModalPosition);
@@ -6328,6 +6347,8 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 			if (copyFeedbackTimer) clearTimeout(copyFeedbackTimer);
 			if (deleteTargetTimer) clearTimeout(deleteTargetTimer);
 			annotationController.dispose();
+			document.removeEventListener('focusin',handleTextFocus,true);
+   document.removeEventListener('focusout',handleTextBlur,true);
 			document.removeEventListener('pointerdown', handleWindowPointerDown, true);
 			document.removeEventListener('click', handleWindowClick, true);
 			window.removeEventListener('resize', updateDiagramModalPosition);
@@ -6338,7 +6359,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 </script>
 
 <svelte:document on:fullscreenchange={syncFullscreen}/>
-<svelte:window on:pointermove={movePlayDrag} on:pointerup={()=>endPlayDrag()} on:pointercancel={()=>endPlayDrag(true)} on:keyup={(event) => {releaseToolShortcut(event);placementIgnoreSnap=event.ctrlKey||event.metaKey;viewerScrubber.keyup(event);}} on:keydown|capture={(event)=>{placementIgnoreSnap=event.ctrlKey||event.metaKey;if(placementIgnoreSnap)clearPlacementSnap();}} on:blur={() => {heldToolKeys.clear();pendingPlaybackToolKey=null;endPlayDrag(true);placementIgnoreSnap=false;clearPlacementSnap();viewerScrubber.stop();}} on:keydown|capture={handleGlobalKeydown} on:beforeunload={handleBeforeUnload} />
+<svelte:window on:click|capture={event=>{if(suppressClockClick){suppressClockClick=false;event.preventDefault();event.stopImmediatePropagation();}}} on:pointermove={movePlayDrag} on:pointerup={()=>endPlayDrag()} on:pointercancel={()=>endPlayDrag(true)} on:keyup={(event) => {releaseToolShortcut(event);placementIgnoreSnap=event.ctrlKey||event.metaKey;viewerScrubber.keyup(event);}} on:keydown|capture={(event)=>{placementIgnoreSnap=event.ctrlKey||event.metaKey;if(placementIgnoreSnap)clearPlacementSnap();}} on:blur={() => {heldToolKeys.clear();pendingPlaybackToolKey=null;endPlayDrag(true);placementIgnoreSnap=false;clearPlacementSnap();viewerScrubber.stop();}} on:keydown|capture={handleGlobalKeydown} on:beforeunload={handleBeforeUnload} />
 
 <fieldset class="contents" disabled={actionInProgress==='save'}>
 <section
@@ -6911,7 +6932,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 						viewBox="0 0 1000 484"
 						font-family="ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"
 						class="block h-auto w-full select-none"
-						class:cursor-none={!dragTarget?.moved &&
+						class:cursor-none={!placementEditing && !dragTarget?.moved &&
 							tool !== 'select' &&
 							tool !== 'free-draw' &&
 							!isGuideTool(tool) &&
@@ -6920,7 +6941,8 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 						class:group-selection-outside={(selectedTargets.length + selectedDrawingIds.length) > 1 && !pointerInsideSelectedGroup}
 						class:group-selection-inside={(selectedTargets.length + selectedDrawingIds.length) > 1 && pointerInsideSelectedGroup && !dragTarget?.moved}
 						class:laser-cursor={tool === 'laser' && pointerOnField}
-						class:cursor-crosshair={!dragTarget?.moved && (tool === 'select' || Boolean(marqueeSelection) || ((isGuideTool(tool) || isPathTool(tool)) && pointerOnField))}
+						class:placement-editing={placementEditing}
+      class:cursor-crosshair={!dragTarget?.moved && (placementEditing || tool === 'select' || Boolean(marqueeSelection) || ((isGuideTool(tool) || isPathTool(tool)) && pointerOnField))}
 						class:drawing-cursor={tool === 'free-draw' && freeDrawMode === 'draw'}
                         style:--drawing-cursor={crayonCursor(drawingColor(freeDrawColor))}
 						class:erasing-cursor={tool === 'free-draw' && freeDrawMode === 'erase'}
@@ -7099,7 +7121,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 								{@const quarterBoxX = xForYards(scoreboardTeamBox[0]) - scoreboardGap - scoreboardWidth}
 								{@const clockBoxX = xForYards(scoreboardTeamBox[1]) + scoreboardGap}
 								{#each [{ kind: 'quarter' as const, x: quarterBoxX, value: fieldSettings.gameQuarter.toUpperCase(), label: `Quarter ${fieldSettings.gameQuarter}, click for next quarter` }, { kind: 'clock' as const, x: clockBoxX, value: formatPlayBuilderGameClock(animatedClock.seconds), label: `Game clock ${formatPlayBuilderGameClock(animatedClock.seconds)}, click to edit` }] as scoreboardItem}
-									<g data-export-scoreboard>
+									<g use:clockEditorRegion={{enabled:!!animation&&!viewOnly&&!animationPreview&&scoreboardItem.kind==='clock',onchange:open=>{if(scoreboardItem.kind==='clock')gameClockControlVisible=open;}}} data-export-scoreboard>
 										<rect
 											x={scoreboardItem.x}
 											y={scoreboardTeamBoxY}
@@ -7110,7 +7132,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 											stroke-width="2"
 											pointer-events="none"
 										/>
-										{#if animation&&scoreboardItem.kind==='clock'&&editingScoreboard==='clock'}<ClockRunButton x={scoreboardItem.x+scoreboardWidth/2-8} y={scoreboardTeamBoxY+23} running={gameClockControl.running} clock="Game" ontoggle={()=>toggleClockRunning('game')}/>{/if}
+										{#if animation&&scoreboardItem.kind==='clock'&&gameClockControlVisible}<rect data-export-exclude x={scoreboardItem.x} y={scoreboardTeamBoxY+20} width={scoreboardWidth} height="23" fill="transparent"/><ClockRunButton x={scoreboardItem.x+scoreboardWidth/2-9} y={scoreboardTeamBoxY+23} running={gameClockControl.running} clock="Game" ontoggle={()=>toggleClockRunning('game')}/>{/if}
           {#if scoreboardItem.kind === 'clock' && editingScoreboard === 'clock' && tool !== 'laser' && tool !== 'free-draw'}
 											<foreignObject
 												bind:this={editorElement}
@@ -7510,7 +7532,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 							{/if}
 						</g>
 
-						{#if !viewOnly && hoverPoint && !hoveringElement && !drawing && !dragTarget}
+						{#if !placementEditing && !viewOnly && hoverPoint && !hoveringElement && !drawing && !dragTarget}
 							{#if isGuideTool(tool)}
 								{@const rawGuidePreviewX = placementIgnoreSnap?hoverPoint.x:placementSnapX ?? hoverPoint.x}
 								{@const guidePreviewX =
@@ -8204,7 +8226,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 						</g>
 
 						<g data-down-marker-layer>
-							{#if !viewOnly && hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-to-gain' && fieldSettings.showDownMarker}
+							{#if !placementEditing && !viewOnly && hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-to-gain' && fieldSettings.showDownMarker}
 								{@const previewGuideX = (placementIgnoreSnap?hoverPoint.x:wholeYardLineToGainX(placementSnapX ?? hoverPoint.x))}
 								{@const previewDownMarker = downMarkerDisplay(currentLineToGain?.down ?? '1st', previewGuideX, lineOfScrimmageX)}
 								<g class="down-marker-graphic" opacity="0.72" pointer-events="none">
@@ -8279,7 +8301,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 									</g>
 								{/each}
 							{/if}
-							{#if !viewOnly && hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-of-scrimmage' && fieldSettings.showLineOfScrimmageMarker}
+							{#if !placementEditing && !viewOnly && hoverPoint && !hoveringElement && !drawing && !dragTarget && tool === 'line-of-scrimmage' && fieldSettings.showLineOfScrimmageMarker}
 								{@const previewGuideX = (placementIgnoreSnap?hoverPoint.x:wholeYardLineOfScrimmageX(placementSnapX ?? hoverPoint.x))}
 								{@const previewLosMarker = lineOfScrimmageMarkerDisplay(previewGuideX)}
 								<g class="los-marker-graphic" opacity="0.72" pointer-events="none">
@@ -8334,7 +8356,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 										class:cursor-grab={!isDragging('guide', guide.id)}
 										class:cursor-grabbing={isDragging('guide', guide.id)}
 									>
-										{#if fieldSettings.showPlayClock}<PlayClockArtwork x={guide.x} y={fieldBottom} seconds={playClockSeconds} editable={!viewOnly&&!animationPreview} running={playClockControl.running} ontoggle={animation?()=>toggleClockRunning('play'):undefined} onchange={seconds=>{if(seconds!==playClockSeconds){saveHistory();fieldSettings={...fieldSettings,playClockSeconds:seconds};}}}/>{/if}
+										{#if fieldSettings.showPlayClock}<PlayClockArtwork x={guide.x} y={fieldBottom} seconds={playClockSeconds} editable={!viewOnly&&!animationPreview} running={playClockControl.running} oncontrolchange={open=>playClockControlVisible=open} ontoggle={animation?()=>toggleClockRunning('play'):undefined} onchange={seconds=>{if(seconds!==playClockSeconds){saveHistory();fieldSettings={...fieldSettings,playClockSeconds:seconds};}}}/>{/if}
           <rect x={guide.x - 26} y={fieldBottom - 9} width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
 										<text
 											x={guide.x - (markerDisplay.half ? 3.5 : 0)}
@@ -9915,6 +9937,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 	.group-selection-inside [data-field-element] {
 		cursor: grab !important;
 	}
+	.placement-editing, .placement-editing [data-field-element] { cursor: crosshair !important; }
 	@media (max-height: 850px) {
 	}
 </style>

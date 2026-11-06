@@ -106,3 +106,8 @@ Keep new shared behavior in the controllers and new sport rules in adapters. Add
 - Optional `AnimationStep.clocks` contains independent boolean game/play run commands, effective at that step marker and inherited until the next command. `evaluateAnimationClockControl` integrates elapsed running time and can insert the football snap stop; explicit later commands override it. Use the same result for preview, scrubbing, and video export. `ClockRunButton` is the shared compact edit-only control; clock commands never modify authored initial seconds.
 
 - `MarkerArtwork` marks image-attached text with `data-marker-image-label`. Live readiness controls visibility, not label existence. `renderPlayBuilderCanvas` removes that visibility guard in the export clone because it awaits embedded artwork itself; preserve authored opacity/scale and never depend on live image-load timing for deterministic frames.
+
+- `clockEditorRegion` shares hover/focus/open state for each clock and its reachable button bridge. `dismissClockEditors` clears active editing before an outside click; hosts consume that click and hide placement ghosts while controls are open. Regions unregister on destruction and keep preference/document state separate from interaction state.
+
+- Placement protection includes all active text inputs, independent of animation mode. Hosts must commit/blur on outside dismissal, consume its pointer/click events, and hide placement artwork while editing. Enter ends text editing through the existing commit handlers and releases focus; textarea Enter retains normal multiline behavior.
+- While placement is suppressed for text editing, retain the field’s native crosshair; do not reuse the hidden cursor used alongside marker-placement artwork.
