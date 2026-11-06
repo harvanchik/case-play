@@ -295,3 +295,34 @@ The established builder already included the animation doc, motion/drawing/arrow
 - Added shared `play-builder-video-timing.ts` frame planning. Browser video/GIF export holds the exact final pose for one extra second using one cached canvas, with existing cancellation and batch processing.
 - Animation route/ghost placement now repairs replaced SVG destinations during step navigation and cleans up its observer on destruction. Timeline elapsed/total text has extra separation from the track.
 - Verification: 81 unit tests passed, one optional FFmpeg test skipped; five Chrome scenarios passed across the targeted runs (dock close/reload persistence, route layer replacement/repeated navigation, real MP4/MOV/WebM/GIF encoding, dock resizing/overflow, and transport controls). Svelte/TypeScript check passed with zero errors and warnings.
+
+
+### Follow-up — Jump label/artwork synchronization
+
+- Marker artwork waits for SVG image readiness before displaying its attached label. Field marker rendering is keyed by ID so visibility changes do not reuse another marker’s artwork instance. Opacity/scale remain shared by the complete element.
+- Verification: Chrome delayed-image Jump label regression and repeated route/step navigation both passed; Svelte/TypeScript reported zero errors and warnings.
+
+### Follow-up — Loop endpoint hold
+
+- Shared animation playback holds the final evaluated frame for one real-time second before looping, independent of playback speed. Pause, seek, and shuttle clear the pending hold. Authored duration and non-loop completion remain unchanged.
+
+### Follow-up — Play clock
+
+- Added shared `PlayClockArtwork.svelte` beside the LOS yard marker without changing marker centering. Its square follows guide movement and uses the same border/background with red, bold centered seconds. Field settings include a persisted Play Clock toggle (appended setting bit; older masks remain readable).
+- Shared `playBuilderPlayClockSeconds` derives 25 seconds (40 for NFL Flag) minus playhead elapsed time, clamped to zero; browser playback/exports and server diagram/video rendering use the same rule. Revert to Defaults now matches the settings close button height.
+- Verification: 83 unit tests passed (one optional FFmpeg test skipped); Chrome verified attached clock geometry/countdown, toggle behavior, NFL defaults, and matching settings button heights. Svelte/TypeScript passed with zero errors and warnings.
+
+### Follow-up — Drawing restoration, Start drawing controls, and editable play clock
+
+- Deleted drawing ghosts are selectable and use previous-step bounds to expose Revert/Backspace restoration. Start drawings remain visible through an outgoing transition when absent from the next pose; their Draw/Instant settings can be authored from Start using the first transition duration.
+- Play Clock defaults on for old and new documents (an appended opt-out bit). Optional initial seconds persist in the field-settings tuple and are validated from 0–99. The shared clock square exposes an invisible inline editor, isolated from LOS editor events, with explicit red text; the plain SVG text remains available for exports.
+- Verification: 85 unit tests passed (one optional FFmpeg test skipped); Chrome verified Start controls/deleted-ghost Revert, inline red clock editing, toggle defaults/NFL defaults, and settings button sizes. Shared selection validation now recognizes previous-step drawing geometry so ghost selections are retained.
+
+### Follow-up — Stop play clock at the snap
+
+- Shared `firstBallMovementTime` finds the football’s first authored movement, including motion delays, curved/custom routes, Jump, and carrying. Browser play-clock time and server video rendering clamp elapsed seconds to that instant; game clock remains independent. Scrubbing and looping recompute the same frozen value without saved state.
+- Verification: 86 unit tests passed (one optional FFmpeg test skipped), Chrome confirmed delayed football movement freezes the clock and scrubbing back restores earlier values, and Svelte/TypeScript reported zero errors and warnings.
+
+### v1.3.0 finalized — 2026-11-06
+
+- Finalized the preceding follow-ups together: play-clock display/editing and first-movement freeze, Start drawing controls and deleted-ghost restoration, Jump artwork/label synchronization, and the one-second loop endpoint hold. User-facing release notes are in `CHANGELOG.md`; version source is `package.json`.

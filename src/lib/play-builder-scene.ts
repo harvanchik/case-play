@@ -28,6 +28,8 @@ export type PlayBuilderFieldSettings = {
 	showTeamBoxes: boolean;
 	showDownMarker: boolean;
 	showLineOfScrimmageMarker: boolean;
+ showPlayClock?: boolean;
+ playClockSeconds?: number;
 	teamBoxTopLabel: string;
 	teamBoxBottomLabel: string;
 	gameQuarter: PlayBuilderGameQuarter;
@@ -100,7 +102,8 @@ const fieldSettingKeys = [
 	'showTeamBoxes',
 	'showNoRunZoneText',
 	'showDownMarker',
-	'showLineOfScrimmageMarker'
+	'showLineOfScrimmageMarker',
+ 'showPlayClock'
 ] as const;
 
 type LegacyMarkerTuple = [number, number, number, number, string | null, number | null];
@@ -110,7 +113,7 @@ type LegacyGuideTuple = [number, number, number, number, number];
 type GuideTuple = [number, number, number, number, number, number | null, string?, boolean?];
 type LegacyStrokeTuple = [number, number, number[]];
 type StrokeTuple = [number, number, number, number[]];
-type FieldSettingsTuple = [number, number, number, string?, string?, number?, number?, string?];
+type FieldSettingsTuple = [number, number, number, string?, string?, number?, number?, string?, number?];
 
 export type SerializedPlayBuilderScene = {
 	v: 1;
@@ -145,6 +148,7 @@ export const DEFAULT_PLAY_BUILDER_FIELD_SETTINGS: Readonly<PlayBuilderFieldSetti
 	showTeamBoxes: true,
 	showDownMarker: true,
 	showLineOfScrimmageMarker: true,
+ showPlayClock: true,
 	teamBoxTopLabel: 'TEAM BOX',
 	teamBoxBottomLabel: 'TEAM BOX',
 	gameQuarter: '1st',
@@ -449,14 +453,14 @@ export const decodePlayBuilderScene = (value: unknown): PlayBuilderScene => {
 };
 
 const encodeFieldSettings = (settings: PlayBuilderFieldSettings): FieldSettingsTuple => [
-	fieldSettingKeys.reduce((mask, key, index) => mask | (settings[key] ? 1 << index : 0), 0),
+	fieldSettingKeys.reduce((mask, key, index) => mask | ((key === 'showPlayClock' ? settings[key] === false : settings[key]) ? 1 << index : 0), 0),
 	indexOf(fieldTypes, settings.fieldType),
 	indexOf(fieldColors, settings.fieldColor),
 	settings.teamBoxTopLabel,
 	settings.teamBoxBottomLabel,
 	indexOf(PLAY_BUILDER_GAME_QUARTERS, settings.gameQuarter),
 	settings.gameClockSeconds,
-	...(settings.playerLetters ? [settings.playerLetters] as const : [] as const)
+	...(settings.playClockSeconds !== undefined ? [settings.playerLetters ?? 'ABKR', settings.playClockSeconds] as const : settings.playerLetters ? [settings.playerLetters] as const : [] as const)
 ] as FieldSettingsTuple;
 
 const decodeFieldSettings = (
@@ -467,9 +471,10 @@ const decodeFieldSettings = (
 ): PlayBuilderFieldSettings => {
 	if (
 		!Array.isArray(value) ||
-		(includesScoreboardSettings ? value.length !== 7 && value.length !== 8 : value.length !== 3 && value.length !== 4 && value.length !== 5) ||
-		(value.length === 8 && (typeof value[7] !== 'string' || !/^[A-Z]{4}$/.test(value[7]))) ||
-		!validInteger(value[0]) ||
+		(includesScoreboardSettings ? value.length !== 7 && value.length !== 8 && value.length !== 9 : value.length !== 3 && value.length !== 4 && value.length !== 5) ||
+		(value.length >= 8 && (typeof value[7] !== 'string' || !/^[A-Z]{4}$/.test(value[7]))) ||
+		(value.length === 9 && (!validInteger(value[8]) || Number(value[8]) < 0 || Number(value[8]) > 99)) ||
+  !validInteger(value[0]) ||
 		Number(value[0]) < 0 ||
 		Number(value[0]) >= 1 << fieldSettingKeys.length ||
 		!validIndex(value[1], fieldTypes.length) ||
@@ -484,11 +489,12 @@ const decodeFieldSettings = (
 		throw new Error('Invalid field settings.');
 	}
 	const settings = defaultPlayBuilderFieldSettings();
-	if (value.length === 8) settings.playerLetters = String(value[7]);
-	fieldSettingKeys.forEach((key, index) => {
+	if (value.length >= 8) settings.playerLetters = String(value[7]);
+	if(value.length === 9) settings.playClockSeconds = Number(value[8]);
+ fieldSettingKeys.forEach((key, index) => {
 		if (key === 'showDownMarker' && !includesDownMarkerSetting) return;
 		if (key === 'showLineOfScrimmageMarker' && !includesLineOfScrimmageMarkerSetting) return;
-		settings[key] = (Number(value[0]) & (1 << index)) !== 0;
+		settings[key] = key === 'showPlayClock' ? (Number(value[0]) & (1 << index)) === 0 : (Number(value[0]) & (1 << index)) !== 0;
 	});
 	settings.fieldType = fieldTypes[Number(value[1])];
 	settings.fieldColor = fieldColors[Number(value[2])];
@@ -544,3 +550,5 @@ export const decodePlayBuilderDocument = (value: unknown): PlayBuilderDocument =
 	});
 	return { activePlayIndex: Number(document.a), plays };
 };
+
+export const playBuilderPlayClockSeconds = (fieldType: PlayBuilderFieldType, time = 0, initialSeconds?: number) => Math.max(0, (initialSeconds ?? (fieldType === 'nfl-flag' ? 40 : 25)) - Math.floor(Math.max(0, time)));

@@ -37,7 +37,7 @@ export function retimeTransition(animation: PlayAnimation, index: number, durati
   timing.start = Math.max(0, Math.min(timing.end - minimum, timing.start * previous / duration));
  };
  transition.motions.forEach(motion => retime(motion, motion.path === 'jump'));
- animation.drawings?.filter(drawing => drawing.stepId === transition.to).forEach(drawing => retime(drawing,drawing.mode==='jump'));
+ animation.drawings?.filter(drawing => drawing.stepId === transition.to || drawing.stepId === animation.steps[0].id && transition.from === drawing.stepId).forEach(drawing => retime(drawing,drawing.mode==='jump'));
  transition.duration = duration;
 }
 export const targetKey = (target: { type: string; id: number }) => `${target.type}:${target.id}`;
@@ -99,7 +99,7 @@ export const createAnimation = (scene: PlayBuilderScene): PlayAnimation => ({
 /** Keep transition settings only when the same two neighboring steps remain adjacent. */
 export const rebuildTransitions = (animation: PlayAnimation): PlayAnimation => ({
 	...animation,
-	...(animation.drawings?{drawings:animation.drawings.filter(item=>animation.steps.slice(1).some(step=>step.id===item.stepId))}:{}),
+	...(animation.drawings?{drawings:animation.drawings.filter(item=>animation.steps.some(step=>step.id===item.stepId))}:{}),
 	steps: animation.steps,
 	transitions: animation.steps.slice(1).map(
 		(step, index) =>
@@ -521,7 +521,7 @@ export const validateAnimation = (value: unknown, scene: PlayBuilderScene): Play
   if(!Array.isArray(animation.drawings)||animation.drawings.length>scene.freeStrokes.length*animation.steps.length)return invalid();
   const keys=new Set<string>();
   for(const drawing of animation.drawings){
-   if(!drawing||!scene.freeStrokes.some(stroke=>stroke.id===drawing.id)||!animation.steps.slice(1).some(step=>step.id===drawing.stepId)||!['draw','instant','linear','jump'].includes(drawing.mode)||!['linear','in','out','in-out'].includes(drawing.easing)||!finite(drawing.start)||!finite(drawing.end)||drawing.start<0||drawing.end>1||drawing.start>=drawing.end||drawing.speed!==undefined&&!MOTION_SPEEDS.includes(drawing.speed as typeof MOTION_SPEEDS[number])||drawing.jumpEffect!==undefined&&!['cut','fade'].includes(drawing.jumpEffect)||drawing.jumpDuration!==undefined&&(!finite(drawing.jumpDuration)||drawing.jumpDuration<.01||drawing.jumpDuration>(animation.transitions.find(item=>item.to===drawing.stepId)?.duration??0)))return invalid();
+   if(!drawing||!scene.freeStrokes.some(stroke=>stroke.id===drawing.id)||!animation.steps.some(step=>step.id===drawing.stepId)||!['draw','instant','linear','jump'].includes(drawing.mode)||!['linear','in','out','in-out'].includes(drawing.easing)||!finite(drawing.start)||!finite(drawing.end)||drawing.start<0||drawing.end>1||drawing.start>=drawing.end||drawing.speed!==undefined&&!MOTION_SPEEDS.includes(drawing.speed as typeof MOTION_SPEEDS[number])||drawing.jumpEffect!==undefined&&!['cut','fade'].includes(drawing.jumpEffect)||drawing.jumpDuration!==undefined&&(!finite(drawing.jumpDuration)||drawing.jumpDuration<.01||drawing.jumpDuration>(animation.transitions.find(item=>item.to===drawing.stepId||item.from===drawing.stepId)?.duration??1)))return invalid();
    const key=`${drawing.stepId}:${drawing.id}`;if(keys.has(key))return invalid();keys.add(key);
   }
  }
@@ -536,3 +536,30 @@ export const evaluateAnimationClock = (initialSeconds: number, time: number) => 
 	const expired = initial > 0 && elapsed >= initial;
 	return { seconds: Math.max(0, Math.ceil(initial - elapsed)), expired, visible: !expired || Math.floor((elapsed - initial) * 2) % 2 === 0 };
 };
+
+
+/** First football movement, in authored seconds; independent of playback/scrubbing history. */
+export function firstBallMovementTime(scene: PlayBuilderScene, animation?: PlayAnimation): number {
+ if(!animation)return Infinity;
+ let elapsed=0;
+ for(let index=0;index<animation.transitions.length;index++){
+  const transition=animation.transitions[index],from=animation.steps[index],to=animation.steps[index+1];
+  let first=Infinity;
+  for(const ball of scene.markers.filter(marker=>marker.kind==='ball')){
+   const a=from.poses.find(p=>p.type==='marker'&&p.id===ball.id),b=to.poses.find(p=>p.type==='marker'&&p.id===ball.id);
+   if(!a?.visible||!b?.visible)continue;
+   const carried=a.carrierId!==undefined&&a.carrierId===b.carrierId;
+   const source=carried?from.poses.find(p=>p.type==='marker'&&p.id===a.carrierId):a;
+   const destination=carried?to.poses.find(p=>p.type==='marker'&&p.id===b.carrierId):b;
+   if(!source||!destination)continue;
+   const motion=transition.motions.find(m=>sameTarget(m,source))??defaultMotion(source);
+   const resolve=(pose:AnimationPose,step:AnimationStep)=>{const carrier=step.poses.find(p=>p.type==='marker'&&p.id===pose.carrierId);return carrier?.visible?{x:carrier.x+(pose.offset?.x??12),y:carrier.y+(pose.offset?.y??8)}:pose;};
+   const start=resolve(source,from),end=resolve(destination,to);
+   const points=motion.path==='jump'?[start,end]:motionPoints(motion,start,end);
+   if(points.some(point=>Math.hypot(point.x-start.x,point.y-start.y)>.000001))first=Math.min(first,elapsed+motion.start*transition.duration);
+  }
+  if(Number.isFinite(first))return first;
+  elapsed+=transition.duration;
+ }
+ return Infinity;
+}

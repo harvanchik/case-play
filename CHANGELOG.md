@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.3.0 — 2026-11-06
+
+### Play Builder
+
+#### Added
+
+- A play clock beside the L.O.S. yard marker, with inline editing and a visibility toggle. Starts at 25 seconds, or 40 for NFL Flag, and stops when the football first moves.
+- Animation controls for drawings on the Start step.
+
+#### Changed
+
+- Loop playback holds the final frame for one second before restarting.
+
+#### Fixed
+
+- Labels no longer flash ahead of image artwork during Jump transitions.
+- Deleted drawing ghosts can be selected and restored with Revert.
+- Start drawings stay visible through their step instead of disappearing as playback begins.
+- Revert to Defaults and Close have matching heights in field settings.
+
 ## v1.2.0 — 2026-11-06
 
 ### Play Builder

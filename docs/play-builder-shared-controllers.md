@@ -91,3 +91,14 @@ Keep new shared behavior in the controllers and new sport rules in adapters. Add
 - `AnimationPanel` restores locked position/width, clamps to the viewport, and disables dragging, resizing, and automatic width growth until unlocked. Presentation mode remains fixed and does not overwrite the preference.
 - `play-builder-video-timing.ts` adds one second of final-pose frames at the output frame rate. The browser exporter renders the exact endpoint once and reuses it for that hold, including batch exports. Authored duration and preview playback remain unchanged.
 - `AnimationOverlay` tracks route/ghost artwork placements and repairs their destinations after SVG layer replacement. A component-local child-list observer disconnects when all placements are destroyed; detached or disposed homes cannot reinsert artwork.
+
+- `MarkerArtwork` keeps attached image labels hidden until the SVG image loads; parent opacity/scale still controls the complete Jump transition. Keep marker instances keyed by stable IDs when their visibility changes between steps.
+
+- The animation controller owns the one-second real-time loop endpoint hold. It is transient playback state, not an authored pause; pause/seek/shuttle cancel it. Reuse this controller for editor, shared viewing, and presentation playback.
+
+- `PlayClockArtwork` is a reusable SVG clock square; the football adapter attaches it to the LOS label. `playBuilderPlayClockSeconds` owns field defaults and deterministic elapsed-time evaluation. The visibility toggle is document state; clock countdown is derived preview state, not a saved edit.
+
+- Drawing tracks may target Start to author the first outgoing transition. Default Start artwork stays visible unless explicitly authored otherwise; a drawing absent from the destination is removed at that boundary rather than on the first playback tick. Ghost selection supplies previous-pose geometry to shared action controls.
+- Play Clock visibility uses an opt-out setting bit for compatibility with older documents; optional initial seconds are validated integers from 0–99. Clock input event isolation must not open guide properties, and export output uses SVG text rather than the editing input.
+
+- `firstBallMovementTime(scene, animation)` derives the play-clock stop time. Clamp clock elapsed time to this value in preview and exports; never modify authored clock settings or apply the stop to the game clock. The football adapter owns this sport-specific rule.

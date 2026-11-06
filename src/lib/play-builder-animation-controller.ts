@@ -40,6 +40,7 @@ export function createAnimationController<Scene, Animation>(adapter: {
 	};
 	let frame: number | null = null,
 		lastTime = 0;
+ let loopHold = 0;
 	function content(): { scene: Scene; animation: Animation | undefined } {
 		const state = adapter.read();
 		return !state.animation
@@ -57,6 +58,7 @@ export function createAnimationController<Scene, Animation>(adapter: {
 		frame = null;
 	}
 	function pause() {
+  loopHold = 0;
 		cancelFrame();
 		adapter.write({ playing: false, shuttleRate: 0 });
 	}
@@ -118,10 +120,23 @@ export function createAnimationController<Scene, Animation>(adapter: {
 		frame = null;
 		const state = adapter.read();
 		if ((!state.playing && !state.shuttleRate) || !state.animation) return;
-		const duration = adapter.duration(state.animation),
-			next = state.time + ((now - lastTime) / 1000) * (state.shuttleRate || state.rate);
-		lastTime = now;
-		showTime(!state.shuttleRate && state.loop && next >= duration ? next % duration : next);
+		const duration = adapter.duration(state.animation);
+  let delta = Math.max(0, (now - lastTime) / 1000);
+  lastTime = now;
+  if(loopHold > 0 && !state.shuttleRate && state.loop) {
+   loopHold -= delta;
+   if(loopHold > 1e-9) { frame = clock.request(tick); return; }
+   delta = Math.max(0, -loopHold); loopHold = 0;
+   showTime(0);
+  }
+  let next = adapter.read().time + delta * (state.shuttleRate || state.rate);
+  if(!state.shuttleRate && state.loop && next >= duration && duration > 0) {
+   // A real-time second at the endpoint, independent of preview speed.
+   const remainder = ((next - duration) / state.rate) % (duration / state.rate + 1);
+   if(remainder < 1) { loopHold = 1 - remainder; next = duration; }
+   else next = (remainder - 1) * state.rate;
+  }
+  showTime(next);
 		if (!state.shuttleRate && next >= duration && !state.loop) {
 			selectStep(adapter.stepCount(state.animation) - 1);
 			return;
@@ -137,6 +152,7 @@ export function createAnimationController<Scene, Animation>(adapter: {
 		)
 			return;
 		cancelFrame();
+  loopHold = 0;
 		if (direction) commit();
 		adapter.write({ shuttleRate: direction * speed });
 		lastTime = clock.now();

@@ -157,7 +157,11 @@ test('looping, temporary 2x shuttle and release preserve configured playback spe
 	f.c.shuttle(0);
 	assert.equal(f.state.rate, 0.5);
 	f.advance(3000);
-	assert.equal(f.state.time, 0.25);
+	assert.equal(f.state.time, 2);
+ f.advance(500);
+ assert.equal(f.state.time, 0);
+ f.advance(500);
+ assert.equal(f.state.time, 0.25);
 	f.c.pause();
 	assert.equal(f.frames, 0);
 });
@@ -199,4 +203,18 @@ test('readonly viewing cannot create or replace animations and a static Start ne
 test('variable-speed shuttle preserves pause/play state and switches without an initial jump',()=>{
  const f=fixture();f.patch({rate:1.25});f.c.shuttle(1,1.25);assert.equal(f.state.time,0);f.advance(400);assert.equal(f.state.time,.5);f.c.shuttle(1,2);assert.equal(f.state.time,.5);f.advance(250);assert.equal(f.state.time,1);f.c.shuttle(-1,1.25);f.advance(400);assert.equal(f.state.time,.5);f.c.shuttle(0);assert.equal(f.state.playing,false);assert.equal(f.frames,0);
  f.c.togglePlayback();f.c.shuttle(1,2);assert.equal(f.frames,1);f.advance(250);f.c.shuttle(0);f.advance(400);assert.equal(f.state.time,1.5);assert.equal(f.state.playing,true);assert.equal(f.state.rate,1.25);f.c.dispose();
+});
+
+
+test('loop endpoint holds for one real second at different playback rates and cancels on seek',()=>{
+ for(const rate of [.5,1,2]){
+  const f=fixture();f.patch({loop:true,rate});f.c.togglePlayback();
+  f.advance(2000/rate);assert.equal(f.state.time,2);assert.equal(f.scene.x,200);
+  f.advance(990);assert.equal(f.state.time,2);assert.equal(f.state.playing,true);
+  f.advance(10);assert.equal(f.state.time,0);
+  f.advance(100);assert.ok(Math.abs(f.state.time-.1*rate)<1e-9);
+  f.c.seek(1.9);f.c.togglePlayback();f.advance(200/rate);assert.equal(f.state.time,2);
+  f.c.seek(.5);f.c.togglePlayback();f.advance(100);assert.ok(Math.abs(f.state.time-(.5+.1*rate))<1e-9);
+  f.c.dispose();
+ }
 });

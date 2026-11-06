@@ -1,9 +1,10 @@
+import {playBuilderPlayClockSeconds} from '../play-builder-scene';
 /** Bundled at build time, then executed inside the export sandbox (never in an HTTP request). */
 import { readFileSync, writeFileSync, createWriteStream } from 'node:fs';
 import { once } from 'node:events';
 import { spawn } from 'node:child_process';
 import { Resvg } from '@resvg/resvg-js';
-import { animationDuration, evaluateAnimation, evaluateAnimationClock } from '../play-builder-animation';
+import { animationDuration, evaluateAnimation, evaluateAnimationClock, firstBallMovementTime } from '../play-builder-animation';
 import { decodePlayBuilderDocument } from '../play-builder-scene';
 import { renderPlayBuilderDiagramSvg, playBuilderSocialRenderOptions } from './play-builder-social-image';
 
@@ -55,6 +56,7 @@ export async function renderVideo(input: string, output: string, progressPath: s
 	});
 	const exited = new Promise<number | null>((resolve) => encoder.on('close', resolve));
 	const font = playBuilderSocialRenderOptions().font;
+ const snapTime=firstBallMovementTime(active.scene,active.animation);
 	try {
 		for (let i = 0; i < frames; i++) {
 			if (encoderError) throw encoderError;
@@ -66,7 +68,7 @@ export async function renderVideo(input: string, output: string, progressPath: s
 					activePlayIndex: 0,
 					plays: [{ ...active, animation: undefined, scene, settings: { ...active.settings, gameClockSeconds: clock.seconds } }]
 				},
-				{ clockVisible: clock.visible }
+				{ clockVisible: clock.visible, playClockSeconds: playBuilderPlayClockSeconds(active.settings.fieldType,Math.min(time,snapTime),active.settings.playClockSeconds) }
 			);
 			const frame = `<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080"><rect width="1920" height="1080" fill="#292524"/><svg x="0" y="75" width="1920" height="930" viewBox="0 0 1000 484">${svg}</svg></svg>`;
 			const png = new Resvg(frame, { font }).render().asPng();

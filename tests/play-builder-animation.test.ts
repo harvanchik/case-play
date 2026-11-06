@@ -314,3 +314,33 @@ test('jump motion teleports at its start time and round-trips', () => {
  const encoded = encodePlayBuilderDocument({ activePlayIndex: 0, plays: [{ name: 'Jump', ...play, settings: defaultPlayBuilderFieldSettings() }] });
  assert.equal(decodePlayBuilderDocument(encoded).plays[0].animation!.transitions[0].motions[0].path, 'jump');
 });
+
+
+test('Start drawings persist through their outgoing transition and support authored reveal settings',()=>{
+ const base=scene();base.freeStrokes=[{id:8,color:'green',points:[{x:200,y:200},{x:400,y:250}]}];
+ const animation=appendAnimationStep(createAnimation(base));animation.steps[1].strokeIds=[];
+ for(const time of [.01,.5,.99])assert.equal(evaluateAnimation({scene:base,animation},time).freeStrokes.length,1);
+ assert.equal(evaluateAnimation({scene:base,animation},1).freeStrokes.length,0);
+ animation.drawings=[{id:8,stepId:animation.steps[0].id,mode:'draw',start:.25,end:.75,easing:'linear'}];
+ assert.equal(validateAnimation(animation,base).steps[0].id,animation.steps[0].id);
+ assert.equal(evaluateAnimation({scene:base,animation},.1).freeStrokes.length,0);
+ assert.ok(evaluateAnimation({scene:base,animation},.5).freeStrokes[0].points[1].x<400);
+ const saved=encodePlayBuilderDocument({activePlayIndex:0,plays:[{name:'Start drawing',scene:base,animation,settings:defaultPlayBuilderFieldSettings()}]});
+ assert.equal(decodePlayBuilderDocument(saved).plays[0].animation!.drawings![0].stepId,animation.steps[0].id);
+});
+
+
+test('play clock freeze follows first football movement including delayed and carried motion',async()=>{
+ const {firstBallMovementTime}=await import('../src/lib/play-builder-animation');
+ const base=scene();let animation=appendAnimationStep(createAnimation(base));
+ assert.equal(firstBallMovementTime(base,animation),Infinity);
+ animation.transitions[0].duration=4;animation.steps[1].poses.find(p=>p.id===3)!.x+=100;
+ animation.transitions[0].motions=[{...defaultMotion({type:'marker',id:3}),start:.5}];
+ assert.equal(firstBallMovementTime(base,animation),2);
+ animation=appendAnimationStep(createAnimation(base));animation.transitions[0].duration=4;
+ for(const step of animation.steps)step.poses.find(p=>p.id===3)!.carrierId=1;
+ animation.steps[1].poses.find(p=>p.id===1)!.x+=100;
+ animation.transitions[0].motions=[{...defaultMotion({type:'marker',id:1}),start:.25}];assert.equal(firstBallMovementTime(base,animation),1);
+ animation=appendAnimationStep(animation);animation.steps[1].poses.find(p=>p.id===1)!.x=100;
+ animation.steps[2].poses.find(p=>p.id===1)!.x=200;assert.equal(firstBallMovementTime(base,animation),4);
+});

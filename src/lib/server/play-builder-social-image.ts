@@ -2,6 +2,7 @@ import {fabricTintMatrix,perceptualColorTransition} from '../play-builder-color'
 import { applyAnimationStep } from '../play-builder-animation';
 import {
 	defaultPlayBuilderFieldSettings,
+ playBuilderPlayClockSeconds,
 	formatPlayBuilderGameClock,
 	PLAY_BUILDER_HASH_PYLON_END_LINE_OFFSET,
 	type FieldGuide,
@@ -350,7 +351,7 @@ const downMarkerDisplay = (guide: FieldGuide, los: FieldGuide | undefined, yards
 	return { base, half, baseWidth: base.length * 5.8 - (half ? 4 : 0) };
 };
 
-const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings, standalone = false, clockVisible = true) => {
+const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings, standalone = false, clockVisible = true, playClockSeconds = playBuilderPlayClockSeconds(settings.fieldType,0,settings.playClockSeconds)) => {
 	const layout = fieldLayouts[settings.fieldType];
 	const palette = fieldPalettes[settings.fieldColor];
 	const fixtureScale =
@@ -540,7 +541,7 @@ const renderField = (scene: PlayBuilderScene, settings: PlayBuilderFieldSettings
 			: ''
 	}${
 		settings.showLineOfScrimmageMarker && los && losMarker
-			? `<g><rect x="${los.x - 26}" y="${fieldBottom - 9}" width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5"/><text x="${los.x - (losMarker.half ? 3.5 : 0)}" y="${fieldBottom + 3.5}" text-anchor="middle" fill="#fff" font-size="10" font-weight="900">${escapeXml(losMarker.base)}</text>${
+			? `<g>${settings.showPlayClock ? `<g data-play-clock><rect x="${los.x-46}" y="${fieldBottom-9}" width="18" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5"/><text x="${los.x-37}" y="${fieldBottom}" dominant-baseline="central" text-anchor="middle" fill="#ff1744" font-size="10" font-weight="900">${playClockSeconds}</text></g>` : ''}<rect x="${los.x - 26}" y="${fieldBottom - 9}" width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5"/><text x="${los.x - (losMarker.half ? 3.5 : 0)}" y="${fieldBottom + 3.5}" text-anchor="middle" fill="#fff" font-size="10" font-weight="900">${escapeXml(losMarker.base)}</text>${
 					losMarker.half
 						? `<g fill="#fff" font-size="5.5" font-weight="900" text-anchor="middle"><text x="${los.x + losMarker.baseWidth / 2 - 1.5}" y="${fieldBottom - 1.5}">1</text><line x1="${los.x + losMarker.baseWidth / 2 - 4}" y1="${fieldBottom + 0.25}" x2="${los.x + losMarker.baseWidth / 2 + 1}" y2="${fieldBottom + 0.25}" stroke="#fff" stroke-width="0.8"/><text x="${los.x + losMarker.baseWidth / 2 - 1.5}" y="${fieldBottom + 5.5}">2</text></g>`
 						: ''
@@ -595,10 +596,10 @@ export const renderPlayBuilderSocialSvg = (document: PlayBuilderDocument) => {
  * The field renderer is intentionally shared with the social image so both
  * previews stay visually identical and continue to reflect the same play.
  */
-export const renderPlayBuilderDiagramSvg = (document: PlayBuilderDocument, options: { clockVisible?: boolean } = {}) => {
+export const renderPlayBuilderDiagramSvg = (document: PlayBuilderDocument, options: { clockVisible?: boolean; playClockSeconds?: number } = {}) => {
 	const activePlayIndex = document.plays[document.activePlayIndex] ? document.activePlayIndex : 0;
 	const active = document.plays[activePlayIndex];
-	const field = renderField(active.animation ? applyAnimationStep(active.scene,active.animation.steps[0]) : active.scene, active.settings, true, options.clockVisible ?? true);
+	const field = renderField(active.animation ? applyAnimationStep(active.scene,active.animation.steps[0]) : active.scene, active.settings, true, options.clockVisible ?? true, options.playClockSeconds);
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="484" viewBox="0 0 1000 484" font-family="Inter, sans-serif">
 		${field}
 	</svg>`;

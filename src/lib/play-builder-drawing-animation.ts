@@ -50,11 +50,25 @@ export function evaluateDrawings(strokes: FreeStroke[], animation: PlayAnimation
 		to = animation.steps[index + 1];
 	const beforeIds = from.strokeIds ? new Set(from.strokeIds) : null,
 		afterIds = to.strokeIds ? new Set(to.strokeIds) : null;
-	const tracks = new Map(animation.drawings?.filter((item) => item.stepId === to.id).map((item) => [item.id, item]));
+	const tracks = new Map(animation.drawings?.filter((item) => item.stepId === to.id || index===0&&item.stepId===from.id).map((item) => [item.id, item]));
 	return strokes.flatMap((stroke) => {
 		const before = beforeIds?.has(stroke.id) ?? true,
 			after = afterIds?.has(stroke.id) ?? true;
-		if (!after) return [];
+		if (!after) {
+   if(!before||progress>=1)return [];
+   const offset=from.strokeOffsets?.find(item=>item.id===stroke.id)??{x:0,y:0};
+   const removal=tracks.get(stroke.id);
+   if(index===0&&removal?.stepId===from.id&&removal.mode==='draw'){
+    const fraction=ease(Math.max(0,Math.min(1,(progress-removal.start)/Math.max(.000001,removal.end-removal.start))),removal.easing);
+    const points=revealDrawing(stroke.points.map(point=>({x:point.x+offset.x,y:point.y+offset.y})),fraction);
+    return points.length?[{...stroke,points}]:[];
+   }
+   const elapsed=(progress-(removal?.start??1))*animation.transitions[index].duration;
+   const fade=removal?.mode==='jump'&&removal.jumpEffect==='fade';
+   const fraction=Math.max(0,Math.min(1,elapsed/Math.max(.01,removal?.jumpDuration??.25)));
+   if(removal&&(removal.mode==='jump'||removal.mode==='instant')&&elapsed>=0&&(!fade||fraction>=1))return [];
+   return [{...stroke,color:('color' in offset?offset.color:undefined)??stroke.color,animationOpacity:fade&&elapsed>=0?1-fraction:1,points:stroke.points.map(point=>({x:point.x+offset.x,y:point.y+offset.y}))}];
+  }
 		const authored = tracks.get(stroke.id);
 		const source = from.strokeOffsets?.find(item=>item.id===stroke.id) ?? {x:0,y:0};
         const destination = to.strokeOffsets?.find(item=>item.id===stroke.id) ?? {x:0,y:0};
@@ -70,7 +84,7 @@ export function evaluateDrawings(strokes: FreeStroke[], animation: PlayAnimation
         const colorProgress=authored?.mode==='jump'||authored?.mode==='instant'?movement:movement;
         const animationColor=perceptualColorTransition(fromColor,toColor,colorProgress);
         stroke = {...stroke,animationOpacity:fading&&jumpElapsed>=0&&jumpElapsed<jumpLength?Math.abs(2*jumpElapsed/jumpLength-1):1,animationColor,points:stroke.points.map(point=>({x:point.x+offset.x,y:point.y+offset.y}))};
-        if (before) return [stroke];
+        if (before && !(authored?.stepId===from.id && authored.mode==='draw')) return [stroke];
 		const motion = authored ?? defaultDrawingAnimation(stroke.id, to.id);
 		if (progress >= 1) return [stroke];
 		if (progress < motion.start) return [];

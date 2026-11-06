@@ -3,10 +3,12 @@ import {test,expect,type Page} from '@playwright/test';
 import {createAnimation,appendAnimationStep,defaultMotion} from '../../src/lib/play-builder-animation';
 import {encodePlayBuilderDocument,defaultPlayBuilderFieldSettings,type PlayBuilderScene} from '../../src/lib/play-builder-scene';
 
-async function ready(page:Page,seed:boolean|'arrow'|'mixed'|'colors'=false){
+async function ready(page:Page,seed:boolean|'arrow'|'mixed'|'colors'|'image'|'clock'|'clock-ball'=false){
  let url='/diagram/flag-football';
  if(seed){
   const scene:PlayBuilderScene={markers:[{id:1,kind:'team-a',label:'A-1',x:200,y:200},{id:2,kind:'team-b',label:'B-1',x:450,y:300},{id:3,kind:'team-a',label:'A-2',x:700,y:250}],paths:[],guides:[],freeStrokes:[],layerOrder:[{type:'marker',id:1},{type:'marker',id:2},{type:'marker',id:3}]};
+  if(seed==='clock'||seed==='clock-ball')scene.guides.push({id:4,kind:'line-of-scrimmage',x:300,color:'white',style:'dashed'});
+  if(seed==='image'){scene.markers[2].kind='ball';scene.markers[2].label='Football note';}
   if(seed==='colors'){scene.markers[0].color='red';scene.markers.push({id:6,kind:'deflag',color:'red',x:400,y:400},{id:7,kind:'bean-bag',color:'blue',x:600,y:400});scene.layerOrder.push({type:'marker',id:6},{type:'marker',id:7});scene.freeStrokes.push({id:5,color:'red',points:[{x:500,y:350},{x:600,y:370}]});}
   if(seed==='mixed')scene.freeStrokes.push({id:5,color:'green',points:[{x:500,y:350},{x:600,y:370}]});
   if(seed==='arrow'){scene.paths.push({id:4,kind:'pass',start:{x:100,y:100},end:{x:300,y:100},color:'cyan',style:'dashed'});scene.layerOrder.push({type:'path',id:4});}
@@ -15,6 +17,7 @@ async function ready(page:Page,seed:boolean|'arrow'|'mixed'|'colors'=false){
   for(let i=1;i<3;i++){animation.steps[i].poses[0].x+=100*i;animation.steps[i].poses[1].x+=50*i;}
   if(seed==='colors'){for(const id of [1,6,7])animation.steps[1].poses.find(p=>p.type==='marker'&&p.id===id)!.color=id===7?'pink':'blue';animation.steps[0].strokeOffsets=[{id:5,x:0,y:0,color:'red'}];animation.steps[1].strokeOffsets=[{id:5,x:0,y:0,color:'blue'}];}
   animation.transitions[0].motions=[{...defaultMotion({type:'marker',id:3}),path:'jump',start:.7,jumpEffect:'fade',jumpDuration:.25}];
+  if(seed==='clock-ball'){scene.markers[2].kind='ball';animation.steps[0].poses[2].visible=true;animation.steps[1].poses[2].x+=100;animation.steps[2].poses[2].x+=200;for(const transition of animation.transitions)transition.duration=4;animation.transitions[0].motions=[{...defaultMotion({type:'marker',id:3}),start:.5}];}
   const response=await page.request.post('/api/play-builders',{data:{document:encodePlayBuilderDocument({activePlayIndex:0,plays:[{name:'Test',scene,animation,settings:defaultPlayBuilderFieldSettings()}]})}});
   expect(response.status()).toBe(201);const saved=await response.json();
   await page.addInitScript(({id,token})=>localStorage.setItem('caseplay-play-builder-edit-tokens-v1',JSON.stringify({[id]:token})),{id:saved.id,token:saved.editToken});url+=`/${saved.id}`;
@@ -118,4 +121,58 @@ test('movement routes recover replaced layers and remain visible through step ch
  for(let i=0;i<8;i++){await page.keyboard.press('1');await page.keyboard.press('2');await marker(page,1).click();await page.keyboard.press('3');await page.keyboard.press('2');await assertRoutes();}
  expect(errors).toEqual([]);
  const duration=page.locator('.playback-duration');const timeline=page.locator('.playback-timeline');expect((await duration.boundingBox())!.x-((await timeline.boundingBox())!.x+(await timeline.boundingBox())!.width)).toBeGreaterThanOrEqual(8);
+});
+
+
+test('Jump image labels wait for their artwork and share the element transition',async({page})=>{
+ let release!:()=>void;const gate=new Promise<void>(resolve=>release=resolve);
+ await ready(page,'image');await seek(page,0);
+ await page.route('**/images/football.webp',async route=>{await gate;await route.continue();});
+ await seek(page,.85);
+ const art=page.locator('#animation-marker-art-3');
+ await expect(art.locator('image')).toHaveCount(1);await expect(art.locator('text')).toHaveCount(0);
+ release();await expect(art.locator('text')).toContainText(/Football\s*note/);
+ expect(Number(await art.locator('..').getAttribute('opacity'))).toBeGreaterThan(0);
+});
+
+
+test('play clock is attached beside the LOS marker and counts down with the playhead',async({page})=>{
+ await ready(page,'clock');await page.keyboard.press('1');
+ const clock=page.locator('[data-los-marker] [data-play-clock]');await expect(clock.locator('text')).toHaveText('25');
+ await seek(page,1.5);await expect(clock.locator('text')).toHaveText('24');
+ const los=page.locator('[data-los-marker] > rect');const left=await clock.locator('rect').boundingBox();const right=await los.boundingBox();
+ expect(left!.height).toBeCloseTo(left!.width,1);expect(left!.x+left!.width).toBeLessThan(right!.x);
+ await page.keyboard.press('1');await expect(clock.locator('text')).toHaveText('25');
+});
+
+
+test('play clock toggle and NFL defaults work and settings header buttons match heights',async({page})=>{
+ await ready(page);await page.getByRole('button',{name:'Set up default play',exact:true}).click();await page.getByRole('button',{name:'Open field settings',exact:true}).click();
+ const revert=page.getByRole('button',{name:'Revert to Defaults',exact:true});const close=page.getByRole('button',{name:'Close settings',exact:true});
+ expect((await revert.boundingBox())!.height).toBe((await close.boundingBox())!.height);
+ const toggle=page.getByRole('switch',{name:/^Play Clock/});await expect(toggle).toHaveAttribute('aria-checked','true');await toggle.click();await close.click();await expect(page.locator('[data-play-clock]')).toHaveCount(0);
+ await page.getByRole('button',{name:'Open field settings',exact:true}).click();await toggle.click();await page.getByRole('radio',{name:/NFL Flag/}).click();await close.click();await page.getByRole('button',{name:'Set up default play',exact:true}).click();await expect(page.locator('[data-los-marker] [data-play-clock] text')).toHaveText('40');
+});
+
+
+test('Start drawings expose animation settings and deleted drawing ghosts can be reverted',async({page})=>{
+ await ready(page,'mixed');await page.keyboard.press('v');await page.keyboard.press('1');
+ await page.locator('[data-drawing-id="5"]').click({button:'right'});
+ const picker=page.locator('[data-drawing-animation-picker]');await expect(picker).toBeVisible();await expect(picker.getByRole('button',{name:'Draw',exact:true})).toBeEnabled();await picker.getByRole('button',{name:'Instant',exact:true}).click();
+ await page.keyboard.press('Escape');await page.keyboard.press('2');await page.keyboard.press('v');await page.locator('[data-drawing-hit]').click();await page.keyboard.press('Delete');
+ await expect(page.locator('[data-drawing-id="5"]')).toHaveCount(0);await page.locator('[data-drawing-ghost]').first().click();
+ await page.getByRole('button',{name:'Revert drawing to original position',exact:true}).click();await expect(page.locator('[data-drawing-id="5"]')).toHaveCount(1);
+});
+
+test('play clock edits inline in red without opening LOS properties',async({page})=>{
+ await ready(page,'clock');await page.keyboard.press('1');const input=page.getByRole('textbox',{name:'Play clock seconds',exact:true});await input.click();await input.fill('17');await input.press('Enter');
+ await expect(page.locator('[data-los-marker] [data-play-clock] text')).toHaveText('17');
+ await expect(page.getByRole('textbox',{name:'Line of Scrimmage yard line',exact:true})).toHaveCount(0);
+ expect(await page.locator('[data-play-clock] text').evaluate(node=>getComputedStyle(node).fill)).toBe('rgb(255, 23, 68)');
+});
+
+
+test('play clock stops at the first football movement and rewinds deterministically',async({page})=>{
+ await ready(page,'clock-ball');const clock=page.locator('[data-los-marker] [data-play-clock] text');
+ await seek(page,1);await expect(clock).toHaveText('24');await seek(page,3);await expect(clock).toHaveText('23');await seek(page,7);await expect(clock).toHaveText('23');await seek(page,0);await expect(clock).toHaveText('25');
 });

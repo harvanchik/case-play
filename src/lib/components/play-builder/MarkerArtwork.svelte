@@ -4,6 +4,17 @@
  import { playBuilderPlayerInk, playBuilderGuideColor as guideColor } from '$lib/play-builder-rendering';
  import { playBuilderEventTagLines as eventTagLines, playBuilderEventTagLayout, PLAY_BUILDER_EVENT_TAG_LINE_HEIGHT as eventTagLineHeight } from '$lib/play-builder-event-tag';
  export let marker: FieldMarker;
+ let artworkReady = false;
+ function imageReadiness(node: SVGImageElement, source: string) {
+  let current = source;
+  artworkReady = false;
+  const loaded = () => { artworkReady = true; };
+  node.addEventListener('load', loaded);
+  return {
+   update(next: string) { if(next !== current) { current = next; artworkReady = false; } },
+   destroy() { node.removeEventListener('load', loaded); }
+  };
+ }
  const playerRadius = 14.025, playerStrokeWidth = 2.55, officialSize = playerRadius * 3.3;
  const footballSize = 30, deflagSize = 33.75, foulFlagSize = 31.5, beanBagSize = 31.5;
  const isTeamMarker = (m: FieldMarker): m is FieldMarker & {kind: PlayerKind} => m.kind.startsWith('team-');
@@ -79,7 +90,7 @@
 									>
 								{:else if isOfficialMarker(marker)}
 									<image
-										href={officialImages[marker.kind]}
+										href={officialImages[marker.kind]} use:imageReadiness={officialImages[marker.kind]}
 										x={marker.x - officialSize / 2}
 										y={marker.y - officialSize / 2}
 										width={officialSize}
@@ -88,7 +99,7 @@
 									/>
 								{:else if marker.kind === 'ball'}
 									<image
-										href="/images/football.webp"
+										href="/images/football.webp" use:imageReadiness={'/images/football.webp'}
 										x={marker.x - footballSize / 2}
 										y={marker.y - footballSize / 2}
 										width={footballSize}
@@ -97,7 +108,7 @@
 									/>
 								{:else if marker.kind === 'deflag'}
 									<image
-										href={deflagImage(marker.color)}
+										href={deflagImage(marker.color)} use:imageReadiness={deflagImage(marker.color)}
 										x={marker.x - deflagSize / 2}
 										y={marker.y - deflagSize / 2}
 										width={deflagSize}
@@ -106,7 +117,7 @@
 									/>
 								{:else if marker.kind === 'bean-bag'}
 									<image
-										href={beanBagImage(marker.color)}
+										href={beanBagImage(marker.color)} use:imageReadiness={beanBagImage(marker.color)}
 										x={marker.x - beanBagSize / 2}
 										y={marker.y - beanBagSize / 2}
 										width={beanBagSize}
@@ -134,7 +145,7 @@
 									</text>
 								{:else}
 									<image
-										href="/images/penalty-flag.webp"
+										href="/images/penalty-flag.webp" use:imageReadiness={'/images/penalty-flag.webp'}
 										x={marker.x - foulFlagSize / 2}
 										y={marker.y - foulFlagSize / 2}
 										width={foulFlagSize}
@@ -142,7 +153,7 @@
 										pointer-events="none"
 									/>
 								{/if}
-								{#if marker.label && (isOfficialMarker(marker) || ['ball', 'flag', 'bean-bag', 'deflag'].includes(marker.kind))}
+								{#if artworkReady && marker.label && (isOfficialMarker(marker) || ['ball', 'flag', 'bean-bag', 'deflag'].includes(marker.kind))}
 									{@const labelLines = penaltyLabelLines(marker.label)}
 									<text opacity={marker.animationLabelOpacity ?? 1}
 										x={marker.x}

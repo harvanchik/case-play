@@ -20,3 +20,21 @@ test('video and GIF schedules hold the exact final pose for one additional secon
   assert.deepEqual(Array.from({length:fps},(_,i)=>plan.time(plan.authoredFrames+i)),Array(fps).fill(duration));
  }
 });
+
+
+test('play clock defaults follow the field and its toggle survives document round trips',async()=>{
+ const {playBuilderPlayClockSeconds:clock,defaultPlayBuilderFieldSettings,encodePlayBuilderDocument,decodePlayBuilderDocument}=await import('../src/lib/play-builder-scene');
+ assert.equal(clock('traditional'),25);assert.equal(clock('nfl-flag'),40);assert.equal(clock('traditional',1.99),24);assert.equal(clock('nfl-flag',80),0);
+ for(const showPlayClock of [true,false]){
+  const document={activePlayIndex:0,plays:[{name:'Clock',scene:{markers:[],paths:[],guides:[],freeStrokes:[],layerOrder:[]},settings:{...defaultPlayBuilderFieldSettings(),showPlayClock}}]};
+  assert.equal(decodePlayBuilderDocument(encodePlayBuilderDocument(document)).plays[0].settings.showPlayClock,showPlayClock);
+ }
+});
+
+
+test('edited play clock seconds round-trip and old documents enable the clock by default',async()=>{
+ const {defaultPlayBuilderFieldSettings,encodePlayBuilderDocument,decodePlayBuilderDocument}=await import('../src/lib/play-builder-scene');
+ const document={activePlayIndex:0,plays:[{name:'Clock',scene:{markers:[],paths:[],guides:[],freeStrokes:[],layerOrder:[]},settings:{...defaultPlayBuilderFieldSettings(),playClockSeconds:17}}]};
+ const saved=encodePlayBuilderDocument(document);assert.equal(decodePlayBuilderDocument(saved).plays[0].settings.playClockSeconds,17);
+ saved.p[0][2]![0]&=8191;assert.equal(decodePlayBuilderDocument(saved).plays[0].settings.showPlayClock,true);
+});

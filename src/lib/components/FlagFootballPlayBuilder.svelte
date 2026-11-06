@@ -1,4 +1,7 @@
 <script lang="ts">
+ import {firstBallMovementTime} from '$lib/play-builder-animation';
+ import PlayClockArtwork from './play-builder/PlayClockArtwork.svelte';
+ import {playBuilderPlayClockSeconds} from '$lib/play-builder-scene';
  import ElementNameInput from './play-builder/ElementNameInput.svelte';
  import { createDrawingController, crayonCursor } from '$lib/play-builder-drawing-controller';
  import BuilderDrawingTools from '$lib/components/play-builder/BuilderDrawingTools.svelte';
@@ -680,6 +683,8 @@
 					y: (pathStart(editingPath).y + editingPath.end.y) / 2
 				}
 			: null;
+ $: ballMovementTime = firstBallMovementTime(animationContent.scene,animationContent.animation);
+ $: playClockSeconds = playBuilderPlayClockSeconds(fieldSettings.fieldType, Math.min(ballMovementTime,animation && (animationOpen || animationPreview || viewOnly) ? animationTime : 0), fieldSettings.playClockSeconds);
  $: animatedClock = evaluateAnimationClock(fieldSettings.gameClockSeconds, animation && (animationOpen || animationPreview || viewOnly) ? animationTime : 0);
 	$: if (animation && !animationPreview) syncCarriedBalls(animation, animationStep, markers);
 	$: animationContent = animation
@@ -921,6 +926,7 @@
 			| 'showTeamBoxes'
 			| 'showDownMarker'
 			| 'showLineOfScrimmageMarker'
+   | 'showPlayClock'
 		>;
 		label: string;
 		description: string;
@@ -1029,7 +1035,13 @@
 			fieldTypes: ['traditional', 'four-on-four', 'unified', 'nfl-flag']
 		},
 		{
-			key: 'showLineOfScrimmageMarker',
+			key: 'showPlayClock',
+   label: 'Play Clock',
+   description: 'Show the play clock beside the L.O.S. yard marker.',
+   fieldTypes: ['traditional', 'four-on-four', 'unified', 'nfl-flag']
+  },
+  {
+   key: 'showLineOfScrimmageMarker',
 			label: 'L.O.S. Yard Marker',
 			description: 'Show the Line of Scrimmage yard line on the near sideline.',
 			fieldTypes: ['traditional', 'four-on-four', 'unified', 'nfl-flag']
@@ -2798,7 +2810,7 @@
 		},
 		all: (): SelectableTarget[] => [...allElementTargets(), ...freeStrokes.map((stroke) => ({ type: 'drawing' as const, id: stroke.id }))],
 		key: (target) => `${target.type}:${target.id}`,
-		exists: (target) => (target.type === 'drawing' ? freeStrokes.some((stroke) => stroke.id === target.id) : targetExists(target)),
+		exists: (target) => (target.type === 'drawing' ? !!drawingBounds(target.id) : targetExists(target)),
 		bounds: (target) => (target.type === 'drawing' ? drawingBounds(target.id) : targetBounds(target)),
 		matchesMarquee: (target, bounds) =>
 			target.type === 'drawing' ? !!drawingBounds(target.id) && boundsOverlap(drawingBounds(target.id)!, bounds) : targetMatchesMarquee(target, bounds),
@@ -2911,10 +2923,14 @@
 	});
 
  $: selectedDrawingBounds=selectedDrawingIds.length?drawingBounds(selectedDrawingIds[0]):null;
- $: drawingCanRevert=!!(animation&&animationStep>0&&selectedDrawingIds.some(id=>{if(animationContent.animation?.steps[animationStep-1].strokeIds && !animationContent.animation.steps[animationStep-1].strokeIds!.includes(id))return false;const current=animationContent.animation?.steps[animationStep].strokeOffsets?.find(item=>item.id===id);const previous=animationContent.animation?.steps[animationStep-1].strokeOffsets?.find(item=>item.id===id);return Math.abs((current?.x??0)-(previous?.x??0))>.001||Math.abs((current?.y??0)-(previous?.y??0))>.001;}));
+ $: drawingCanRevert=!!(animation&&animationStep>0&&selectedDrawingIds.some(id=>{if(animationContent.animation?.steps[animationStep-1].strokeIds && !animationContent.animation.steps[animationStep-1].strokeIds!.includes(id))return false;const current=animationContent.animation?.steps[animationStep].strokeOffsets?.find(item=>item.id===id);const previous=animationContent.animation?.steps[animationStep-1].strokeOffsets?.find(item=>item.id===id);return !freeStrokes.some(stroke=>stroke.id===id)||Math.abs((current?.x??0)-(previous?.x??0))>.001||Math.abs((current?.y??0)-(previous?.y??0))>.001;}));
  const changeDrawingColor=(color:GuideColor)=>{saveHistory();freeStrokes=freeStrokes.map(stroke=>selectedDrawingIds.includes(stroke.id)?{...stroke,color}:stroke);if(animation)commitAnimation();};
  const deleteSelectedDrawings=()=>deleteSelection();
  const revertDrawingPosition=()=>revertSelectedPositions();
+ const selectDrawingGhost=(id:number,event:MouseEvent|PointerEvent)=>{
+  if(viewOnly||animationPreview||tool!=='select')return;
+  event.preventDefault();event.stopPropagation();clearDeleteState();selectedDrawingIds=[id];drawingOptions=null;drawingColorOptions=null;refreshSelectionUi();
+ };
  const beginDrawingDrag=(id:number,event:PointerEvent)=>{
   if(viewOnly||tool!=='select'||animationPreview||event.button!==0)return;
   if(selectedDrawingIds.includes(id)&&selectedTargets.length){event.preventDefault();event.stopPropagation();beginGroupDrag(event);svg.setPointerCapture(event.pointerId);return;}
@@ -2930,10 +2946,10 @@
   if(moved){if(animation)commitAnimation();}else {rememberPopoverAnchor(event,document.querySelector(`[data-drawing-id="${selectedDrawingIds[0]}"]`));drawingColorOptions={x:event.clientX+8,y:event.clientY+8};}
  };
  let drawingOptions:{x:number;y:number;stepId:string}|null=null;
- $: drawingMotion = animation && animationStep>0 && selectedDrawingIds.length ? animation.drawings?.find(item=>item.id===selectedDrawingIds[0]&&item.stepId===animation!.steps[animationStep].id) ?? {...defaultDrawingAnimation(selectedDrawingIds[0],animation.steps[animationStep].id), ...(animation.steps[animationStep-1].strokeIds?.includes(selectedDrawingIds[0])?{mode:'linear' as const,start:0}: {})} : null;
+ $: drawingMotion = animation && selectedDrawingIds.length ? animation.drawings?.find(item=>item.id===selectedDrawingIds[0]&&item.stepId===animation!.steps[animationStep].id) ?? {...defaultDrawingAnimation(selectedDrawingIds[0],animation.steps[animationStep].id), ...(animationStep>0&&animation.steps[animationStep-1].strokeIds?.includes(selectedDrawingIds[0])?{mode:'linear' as const,start:0}: {})} : null;
  $: if(animationPreview || viewOnly){drawingOptions=null;drawingColorOptions=null;selectedDrawingIds=[];}
  $: if(!animationOpen || drawingOptions && drawingOptions.stepId!==animation?.steps[animationStep]?.id)drawingOptions=null;
- const drawingBounds=(id:number)=>{const points=freeStrokes.find(stroke=>stroke.id===id)?.points??[];return points.length?{left:Math.min(...points.map(p=>p.x)),right:Math.max(...points.map(p=>p.x)),top:Math.min(...points.map(p=>p.y)),bottom:Math.max(...points.map(p=>p.y))}:null;};
+ const drawingBounds=(id:number)=>{const points=(freeStrokes.find(stroke=>stroke.id===id)??(animation&&animationStep>0?applyAnimationStep(animationBaseScene,animation.steps[animationStep-1]).freeStrokes.find(stroke=>stroke.id===id):undefined))?.points??[];return points.length?{left:Math.min(...points.map(p=>p.x)),right:Math.max(...points.map(p=>p.x)),top:Math.min(...points.map(p=>p.y)),bottom:Math.max(...points.map(p=>p.y))}:null;};
  const drawingChanged = (id:number) => {
   const value=animationContent.animation;if(!value||animationStep<1)return false;
   const before=value.steps[animationStep-1],after=value.steps[animationStep];
@@ -2947,11 +2963,11 @@
   event.preventDefault();event.stopPropagation();selectedTargets=[];clearDeleteState();
   editingMarkerId=null;editingGuideId=null;editingPathId=null;editingDownGuideId=null;
   drawingColorOptions=null;selectedDrawingIds=event.shiftKey?[...new Set([...selectedDrawingIds,id])]:selectedDrawingIds.includes(id)?selectedDrawingIds:[id];
-  if(!selectedDrawingIds.some(drawingChanged)){drawingOptions=null;drawingColorOptions={x:event.clientX+8,y:event.clientY+8};return;}
-  drawingOptions=animation && animationStep>0 && selectedDrawingIds.length?{x:event.clientX+8,y:event.clientY+8,stepId:animation.steps[animationStep].id}:null;
+  if(animationStep>0&&!selectedDrawingIds.some(drawingChanged)){drawingOptions=null;drawingColorOptions={x:event.clientX+8,y:event.clientY+8};return;}
+  drawingOptions=animation && selectedDrawingIds.length?{x:event.clientX+8,y:event.clientY+8,stepId:animation.steps[animationStep].id}:null;
  };
  const updateDrawingAnimation=(value:DrawingAnimation)=>{
-  if(!animation||animationPreview||animationStep<=0)return;
+  if(!animation||animationPreview)return;
   const next=currentAnimationContent().animation!;next.drawings ??=[];
   for(const id of selectedDrawingIds){const track={...value,id,stepId:next.steps[animationStep].id};const index=next.drawings.findIndex(item=>item.id===id&&item.stepId===track.stepId);if(index<0)next.drawings.push(track);else next.drawings[index]=track;}
   changeAnimation(next);
@@ -5050,6 +5066,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 			| 'showTeamBoxes'
 			| 'showDownMarker'
 			| 'showLineOfScrimmageMarker'
+   | 'showPlayClock'
 		>
 	) => updateFieldSetting(key, !fieldSettings[key]);
 	const resetFieldSettings = () => {
@@ -7962,7 +7979,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 							{/if}
 						{/if}
 
-						{#each markers as marker}
+						{#each markers as marker (marker.id)}
 							<g
 								transform={marker.animationScale===undefined?undefined:`translate(${marker.x} ${marker.y}) scale(${marker.animationScale}) translate(${-marker.x} ${-marker.y})`} opacity={marker.animationOpacity ?? 1}
 								data-layer-type="marker"
@@ -8116,12 +8133,12 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
         {@const current=freeStrokes.find(item=>item.id===previous.id)}
         {#if !current || current.points[0].x!==previous.points[0].x || current.points[0].y!==previous.points[0].y}
          {#if current&&!selectedDrawingIds.includes(previous.id)}<path role="button" tabindex="0" aria-label="Drawing movement route" on:keydown={event=>{if(event.key==='Enter'){const rect=event.currentTarget.getBoundingClientRect();openDrawingOptions(previous.id,new MouseEvent('dblclick',{clientX:rect.x,clientY:rect.y}));}}} data-drawing-motion-route={previous.id} data-export-exclude d={`M ${previous.points[0].x} ${previous.points[0].y} L ${current.points[0].x} ${current.points[0].y}`} fill="none" stroke="white" stroke-width="2" stroke-dasharray="5 4" opacity={selectedDrawingIds.includes(previous.id)?1:.25} pointer-events="stroke" on:dblclick={event=>openDrawingOptions(previous.id,event)} on:contextmenu={event=>openDrawingOptions(previous.id,event)}/>{/if}
-         {#if animationGhosts&&!selectedDrawingIds.includes(previous.id)}<path data-drawing-ghost data-export-exclude d={freehandPath(previous.points)} fill="none" stroke={drawingColor(previous.color)} stroke-width={previous.width??4} stroke-linecap="round" stroke-linejoin="round" opacity="0.25"/>{/if}
+         {#if animationGhosts&&(!selectedDrawingIds.includes(previous.id)||!current)}<path role="button" tabindex="0" aria-label="Deleted drawing ghost" on:keydown={event=>{if(event.key==='Enter')selectDrawingGhost(previous.id,event as unknown as MouseEvent);}} on:pointerdown={event=>selectDrawingGhost(previous.id,event)} on:click|stopPropagation on:dblclick={event=>openDrawingOptions(previous.id,event)} on:contextmenu={event=>openDrawingOptions(previous.id,event)} pointer-events={!current&&tool==='select'?'stroke':'none'} data-drawing-ghost data-export-exclude d={freehandPath(previous.points)} fill="none" stroke={drawingColor(previous.color)} stroke-width={previous.width??4} stroke-linecap="round" stroke-linejoin="round" opacity="0.25"/>{/if}
         {/if}
        {/each}
       {/if}
 							{#each freeStrokes as stroke (stroke.id)}
- <g opacity={stroke.animationOpacity??1} data-drawing-id={stroke.id} role="button" aria-label={`Drawing ${stroke.id}`} tabindex={tool==='select' && !animationPreview?0:undefined} on:pointerdown={(event)=>beginDrawingDrag(stroke.id,event)} on:pointermove={moveDrawingDrag} on:pointerup={endDrawingDrag} on:pointercancel={()=>drawingMovement.cancel()} on:dblclick={(event)=>openDrawingOptions(stroke.id,event)} on:contextmenu={(event)=>openDrawingOptions(stroke.id,event)} on:click|stopPropagation on:keydown={event=>{if(event.key==='Enter'){event.preventDefault();const box=svg.getBoundingClientRect();selectedDrawingIds=[stroke.id];if(animation&&animationStep>0)drawingOptions={x:box.left+box.width*.6,y:box.top+box.height*.5,stepId:animation.steps[animationStep].id};}}}>
+ <g opacity={stroke.animationOpacity??1} data-drawing-id={stroke.id} role="button" aria-label={`Drawing ${stroke.id}`} tabindex={tool==='select' && !animationPreview?0:undefined} on:pointerdown={(event)=>beginDrawingDrag(stroke.id,event)} on:pointermove={moveDrawingDrag} on:pointerup={endDrawingDrag} on:pointercancel={()=>drawingMovement.cancel()} on:dblclick={(event)=>openDrawingOptions(stroke.id,event)} on:contextmenu={(event)=>openDrawingOptions(stroke.id,event)} on:click|stopPropagation on:keydown={event=>{if(event.key==='Enter'){event.preventDefault();const box=svg.getBoundingClientRect();selectedDrawingIds=[stroke.id];if(animation)drawingOptions={x:box.left+box.width*.6,y:box.top+box.height*.5,stepId:animation.steps[animationStep].id};}}}>
  {#if selectedDrawingIds.includes(stroke.id) && !animationPreview}{@const bounds=drawingBounds(stroke.id)!}<rect data-export-exclude x={bounds.left-5} y={bounds.top-5} width={Math.max(10,bounds.right-bounds.left+10)} height={Math.max(10,bounds.bottom-bounds.top+10)} fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="5 4"/>{/if}
  <path data-drawing-hit d={freehandPath(stroke.points)} fill="none" stroke="transparent" stroke-width={Math.max(14,stroke.width??4)} pointer-events={!viewOnly && tool==='select' && !animationPreview?'stroke':'none'} style:cursor={tool==='select'?'grab':undefined}/>
 
@@ -8255,7 +8272,8 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 								{@const previewGuideX = (placementIgnoreSnap?hoverPoint.x:wholeYardLineOfScrimmageX(placementSnapX ?? hoverPoint.x))}
 								{@const previewLosMarker = lineOfScrimmageMarkerDisplay(previewGuideX)}
 								<g class="los-marker-graphic" opacity="0.72" pointer-events="none">
-									<rect x={previewGuideX - 26} y={fieldBottom - 9} width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
+									{#if fieldSettings.showPlayClock}<PlayClockArtwork x={previewGuideX} y={fieldBottom} seconds={playClockSeconds}/>{/if}
+         <rect x={previewGuideX - 26} y={fieldBottom - 9} width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
 									<text
 										x={previewGuideX - (previewLosMarker.half ? 3.5 : 0)}
 										y={fieldBottom + 3.5}
@@ -8305,7 +8323,8 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 										class:cursor-grab={!isDragging('guide', guide.id)}
 										class:cursor-grabbing={isDragging('guide', guide.id)}
 									>
-										<rect x={guide.x - 26} y={fieldBottom - 9} width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
+										{#if fieldSettings.showPlayClock}<PlayClockArtwork x={guide.x} y={fieldBottom} seconds={playClockSeconds} editable={!viewOnly&&!animationPreview} onchange={seconds=>{if(seconds!==playClockSeconds){saveHistory();fieldSettings={...fieldSettings,playClockSeconds:seconds};}}}/>{/if}
+          <rect x={guide.x - 26} y={fieldBottom - 9} width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
 										<text
 											x={guide.x - (markerDisplay.half ? 3.5 : 0)}
 											y={fieldBottom + 3.5}
@@ -8405,7 +8424,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
  {@const current=freeStrokes.find(stroke=>stroke.id===previous.id)}
  {#if !current||current.points[0].x!==previous.points[0].x||current.points[0].y!==previous.points[0].y}
  {#if current}<path data-drawing-motion-route={previous.id} aria-label="Drawing movement route" role="button" tabindex="0" on:keydown={event=>{if(event.key==='Enter'){const rect=event.currentTarget.getBoundingClientRect();openDrawingOptions(previous.id,new MouseEvent('dblclick',{clientX:rect.x,clientY:rect.y}));}}} d={`M ${previous.points[0].x} ${previous.points[0].y} L ${current.points[0].x} ${current.points[0].y}`} fill="none" stroke="white" stroke-width="2" stroke-dasharray="5 4" pointer-events={tool==='select'&&!animationDrawingRoute?'stroke':'none'} on:dblclick={event=>openDrawingOptions(previous.id,event)} on:contextmenu={event=>openDrawingOptions(previous.id,event)}/>{/if}
- {#if animationGhosts}<path data-drawing-ghost d={freehandPath(previous.points)} fill="none" stroke={drawingColor(previous.color)} stroke-width={previous.width??4} stroke-linecap="round" stroke-linejoin="round" opacity=".25" pointer-events="none"/>{/if}
+ {#if animationGhosts&&current}<path role="button" tabindex="0" aria-label="Selected drawing ghost" on:keydown={event=>{if(event.key==='Enter')selectDrawingGhost(previous.id,event as unknown as MouseEvent);}} on:pointerdown={event=>selectDrawingGhost(previous.id,event)} on:click|stopPropagation on:dblclick={event=>openDrawingOptions(previous.id,event)} on:contextmenu={event=>openDrawingOptions(previous.id,event)} data-drawing-ghost d={freehandPath(previous.points)} fill="none" stroke={drawingColor(previous.color)} stroke-width={previous.width??4} stroke-linecap="round" stroke-linejoin="round" opacity=".25" pointer-events={!current&&tool==='select'?'stroke':'none'}/>{/if}
  {/if}
  {/each}
  {/if}
@@ -8720,8 +8739,8 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
  {#if drawingColorOptions && selectedDrawingIds.length && !viewOnly && !animationPreview}
  <DrawingStylePicker x={drawingColorOptions.x} y={drawingColorOptions.y} colors={freeDrawColors} selected={freeStrokes.find(stroke=>stroke.id===selectedDrawingIds[0])?.color??'red'} onchange={changeDrawingColor} onclose={()=>drawingColorOptions=null}/>
  {/if}
- {#if drawingOptions && drawingMotion && animation && animationStep>0 && !videoController}
- <DrawingAnimationPicker stationary={selectedDrawingIds.every(id=>{const before=animation!.steps[animationStep-1].strokeOffsets?.find(item=>item.id===id),after=animationContent.animation!.steps[animationStep].strokeOffsets?.find(item=>item.id===id);return (before?.x??0)===(after?.x??0)&&(before?.y??0)===(after?.y??0);})} existingDrawing={animation.steps[animationStep-1].strokeIds?.includes(selectedDrawingIds[0])??true} value={drawingMotion} duration={animation.transitions[animationStep-1].duration} x={drawingOptions.x} y={drawingOptions.y} count={selectedDrawingIds.length} onedit={event=>{rememberPopoverAnchor(event,document.querySelector(`[data-drawing-id="${selectedDrawingIds[0]}"]`));drawingOptions=null;drawingColorOptions={x:event.clientX,y:event.clientY};}} onchange={updateDrawingAnimation} onclose={()=>drawingOptions=null}/>
+ {#if drawingOptions && drawingMotion && animation && !videoController}
+ <DrawingAnimationPicker stationary={selectedDrawingIds.every(id=>{const before=animation!.steps[Math.max(0,animationStep-1)].strokeOffsets?.find(item=>item.id===id),after=animationContent.animation!.steps[animationStep].strokeOffsets?.find(item=>item.id===id);return (before?.x??0)===(after?.x??0)&&(before?.y??0)===(after?.y??0);})} existingDrawing={animationStep>0&&(animation.steps[animationStep-1].strokeIds?.includes(selectedDrawingIds[0])??true)} value={drawingMotion} duration={animation.transitions[Math.max(0,animationStep-1)]?.duration??1} x={drawingOptions.x} y={drawingOptions.y} count={selectedDrawingIds.length} onedit={event=>{rememberPopoverAnchor(event,document.querySelector(`[data-drawing-id="${selectedDrawingIds[0]}"]`));drawingOptions=null;drawingColorOptions={x:event.clientX,y:event.clientY};}} onchange={updateDrawingAnimation} onclose={()=>drawingOptions=null}/>
  {/if}
 	{#if animation && animationOpen && (!viewOnly||presentation)}
 		<BuilderAnimationDock fullscreenRoot={presentation?builderRoot:null} left={animationDockLeft} width={animationDockWidth} hidden={videoController !== null || showSetupConfirm || showSettings || showExportSettings || showFeedback || showHelp || tutorialActive && !animationTutorialActive}>
@@ -9247,7 +9266,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 						type="button"
 						disabled={fieldSettingsAreDefault}
 						on:click={resetFieldSettings}
-						class="h-9 cursor-pointer bg-white px-3 text-[10px] font-black tracking-wide text-stone-900 uppercase hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40 sm:px-4 sm:text-xs"
+						class="h-8 cursor-pointer bg-white px-3 text-[10px] font-black tracking-wide text-stone-900 uppercase hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-40 sm:px-4 sm:text-xs"
 					>
 						Revert to Defaults
 					</button>
@@ -9286,7 +9305,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 							<BuilderToggleCard
 								label={option.label}
 								description={option.description}
-								checked={fieldSettings[option.key]}
+								checked={fieldSettings[option.key] ?? false}
 								onToggle={() => toggleFieldSetting(option.key)}
 							/>
 						{/each}

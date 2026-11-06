@@ -120,7 +120,7 @@ test('legacy guide downs become complete poses before editing an earlier step', 
 	assert.equal(applyAnimationStep(edited.scene, edited.animation.steps[1]).guides[0].down, '1st');
 	assert.equal(applyAnimationStep(edited.scene, edited.animation.steps[0]).guides[0].down, '2nd');
 });
-test('moving a drawing step to Start preserves the drawing as a still and removes its incoming track', () => {
+test('moving a drawing step to Start preserves its drawing and editable animation track', () => {
 	const p = play();
 	const live = applyAnimationStep(p.scene, p.animation.steps[1]);
 	live.freeStrokes = [
@@ -137,7 +137,7 @@ test('moving a drawing step to Start preserves the drawing as a still and remove
 	authored.animation.steps.reverse();
 	const reordered = rebuildTransitions(authored.animation);
 	assert.doesNotThrow(() => validateAnimation(reordered, authored.scene));
-	assert.equal(reordered.drawings!.length, 0);
+	assert.equal(reordered.drawings!.length, 1);
 	assert.equal(applyAnimationStep(authored.scene, reordered.steps[0]).freeStrokes.length, 1);
 });
 
