@@ -102,3 +102,5 @@ Keep new shared behavior in the controllers and new sport rules in adapters. Add
 - Play Clock visibility uses an opt-out setting bit for compatibility with older documents; optional initial seconds are validated integers from 0–99. Clock input event isolation must not open guide properties, and export output uses SVG text rather than the editing input.
 
 - `firstBallMovementTime(scene, animation)` derives the play-clock stop time. Clamp clock elapsed time to this value in preview and exports; never modify authored clock settings or apply the stop to the game clock. The football adapter owns this sport-specific rule.
+
+- Optional `AnimationStep.clocks` contains independent boolean game/play run commands, effective at that step marker and inherited until the next command. `evaluateAnimationClockControl` integrates elapsed running time and can insert the football snap stop; explicit later commands override it. Use the same result for preview, scrubbing, and video export. `ClockRunButton` is the shared compact edit-only control; clock commands never modify authored initial seconds.

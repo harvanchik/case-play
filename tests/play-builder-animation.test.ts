@@ -344,3 +344,20 @@ test('play clock freeze follows first football movement including delayed and ca
  animation=appendAnimationStep(animation);animation.steps[1].poses.find(p=>p.id===1)!.x=100;
  animation.steps[2].poses.find(p=>p.id===1)!.x=200;assert.equal(firstBallMovementTime(base,animation),4);
 });
+
+
+test('step clock commands stop and resume independently, persist, and can restart after the snap',async()=>{
+ const {evaluateAnimationClockControl:control}=await import('../src/lib/play-builder-animation');
+ const base=scene();let animation=appendAnimationStep(appendAnimationStep(appendAnimationStep(createAnimation(base))));
+ animation.steps[1].clocks={game:false,play:false};animation.steps[2].clocks={game:true,play:true};
+ assert.deepEqual(control(animation,.5,'game'),{elapsed:.5,running:true});
+ assert.deepEqual(control(animation,1.5,'game'),{elapsed:1,running:false});
+ assert.deepEqual(control(animation,2.5,'game'),{elapsed:1.5,running:true});
+ assert.deepEqual(control(animation,1.5,'play',.5),{elapsed:.5,running:false});
+ assert.deepEqual(control(animation,2.5,'play',.5),{elapsed:1,running:true});
+ assert.deepEqual(control(undefined,3,'game'),{elapsed:3,running:true});
+ const saved=encodePlayBuilderDocument({activePlayIndex:0,plays:[{name:'Clock commands',scene:base,animation,settings:defaultPlayBuilderFieldSettings()}]});
+ const restored=decodePlayBuilderDocument(saved).plays[0].animation!;assert.deepEqual(restored.steps[1].clocks,{game:false,play:false});
+ assert.deepEqual(control(restored,2.5,'play',.5),{elapsed:1,running:true});
+ const malformed=structuredClone(animation);malformed.steps[1].clocks={game:'stop'} as never;assert.throws(()=>validateAnimation(malformed,base));
+});

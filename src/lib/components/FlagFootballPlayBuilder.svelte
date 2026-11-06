@@ -1,5 +1,6 @@
 <script lang="ts">
- import {firstBallMovementTime} from '$lib/play-builder-animation';
+ import ClockRunButton from './play-builder/ClockRunButton.svelte';
+ import {firstBallMovementTime,evaluateAnimationClockControl} from '$lib/play-builder-animation';
  import PlayClockArtwork from './play-builder/PlayClockArtwork.svelte';
  import {playBuilderPlayClockSeconds} from '$lib/play-builder-scene';
  import ElementNameInput from './play-builder/ElementNameInput.svelte';
@@ -683,9 +684,18 @@
 					y: (pathStart(editingPath).y + editingPath.end.y) / 2
 				}
 			: null;
+ const toggleClockRunning=(kind:'game'|'play')=>{
+  if(!animation||animationPreview||viewOnly)return;
+  const next=currentAnimationContent().animation!;
+  const running=kind==='game'?gameClockControl.running:playClockControl.running;
+  saveHistory();next.steps[animationStep].clocks={...next.steps[animationStep].clocks,[kind]:!running};animation=next;
+ };
  $: ballMovementTime = firstBallMovementTime(animationContent.scene,animationContent.animation);
- $: playClockSeconds = playBuilderPlayClockSeconds(fieldSettings.fieldType, Math.min(ballMovementTime,animation && (animationOpen || animationPreview || viewOnly) ? animationTime : 0), fieldSettings.playClockSeconds);
- $: animatedClock = evaluateAnimationClock(fieldSettings.gameClockSeconds, animation && (animationOpen || animationPreview || viewOnly) ? animationTime : 0);
+ $: clockTimelineTime = animation && (animationOpen || animationPreview || viewOnly) ? animationTime : 0;
+ $: gameClockControl = evaluateAnimationClockControl(animationContent.animation,clockTimelineTime,'game');
+ $: playClockControl = evaluateAnimationClockControl(animationContent.animation,clockTimelineTime,'play',ballMovementTime);
+ $: playClockSeconds = playBuilderPlayClockSeconds(fieldSettings.fieldType, playClockControl.elapsed, fieldSettings.playClockSeconds);
+ $: animatedClock = evaluateAnimationClock(fieldSettings.gameClockSeconds, gameClockControl.elapsed);
 	$: if (animation && !animationPreview) syncCarriedBalls(animation, animationStep, markers);
 	$: animationContent = animation
 		? animationPreview
@@ -4354,7 +4364,7 @@
 	const handleWindowPointerDown = (event: PointerEvent) => {
 		if (viewOnly) return;
 		const target = event.target as Node;
-  if(target instanceof Element&&target.closest('[data-element-action-menu]'))return;
+  if(target instanceof Element&&target.closest('[data-element-action-menu],[data-clock-control]'))return;
   if(passBallId!==null&&event.button===0){
    if(editorElement?.contains(target))return;
    const hit=target instanceof Element?target.closest('[data-field-kind][data-layer-id]'):null;
@@ -7100,7 +7110,8 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 											stroke-width="2"
 											pointer-events="none"
 										/>
-										{#if scoreboardItem.kind === 'clock' && editingScoreboard === 'clock' && tool !== 'laser' && tool !== 'free-draw'}
+										{#if animation&&scoreboardItem.kind==='clock'&&editingScoreboard==='clock'}<ClockRunButton x={scoreboardItem.x+scoreboardWidth/2-8} y={scoreboardTeamBoxY+23} running={gameClockControl.running} clock="Game" ontoggle={()=>toggleClockRunning('game')}/>{/if}
+          {#if scoreboardItem.kind === 'clock' && editingScoreboard === 'clock' && tool !== 'laser' && tool !== 'free-draw'}
 											<foreignObject
 												bind:this={editorElement}
 												data-scoreboard-inline-editor
@@ -7150,7 +7161,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 												font-weight="900"
 												letter-spacing="0.75"
 												data-game-clock={scoreboardItem.kind==='clock' ? true : undefined}
- opacity={scoreboardItem.kind==='clock' && animationPlaying && !animatedClock.visible ? 0 : 1}
+ opacity={scoreboardItem.kind==='clock' && animationPlaying && gameClockControl.running && !animatedClock.visible ? 0 : 1}
  pointer-events="none">{scoreboardItem.value}</text
 											>
 										{/if}
@@ -8323,7 +8334,7 @@ const toggleSpotlight=()=>{spotlightEnabled=!spotlightEnabled;releaseLaserDrawin
 										class:cursor-grab={!isDragging('guide', guide.id)}
 										class:cursor-grabbing={isDragging('guide', guide.id)}
 									>
-										{#if fieldSettings.showPlayClock}<PlayClockArtwork x={guide.x} y={fieldBottom} seconds={playClockSeconds} editable={!viewOnly&&!animationPreview} onchange={seconds=>{if(seconds!==playClockSeconds){saveHistory();fieldSettings={...fieldSettings,playClockSeconds:seconds};}}}/>{/if}
+										{#if fieldSettings.showPlayClock}<PlayClockArtwork x={guide.x} y={fieldBottom} seconds={playClockSeconds} editable={!viewOnly&&!animationPreview} running={playClockControl.running} ontoggle={animation?()=>toggleClockRunning('play'):undefined} onchange={seconds=>{if(seconds!==playClockSeconds){saveHistory();fieldSettings={...fieldSettings,playClockSeconds:seconds};}}}/>{/if}
           <rect x={guide.x - 26} y={fieldBottom - 9} width="52" height="18" fill="#3f3f46" stroke="#111827" stroke-width="1.5" />
 										<text
 											x={guide.x - (markerDisplay.half ? 3.5 : 0)}

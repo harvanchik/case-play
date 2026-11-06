@@ -326,3 +326,9 @@ The established builder already included the animation doc, motion/drawing/arrow
 ### v1.3.0 finalized — 2026-11-06
 
 - Finalized the preceding follow-ups together: play-clock display/editing and first-movement freeze, Start drawing controls and deleted-ghost restoration, Jump artwork/label synchronization, and the one-second loop endpoint hold. User-facing release notes are in `CHANGELOG.md`; version source is `package.json`.
+
+### Follow-up — Per-step clock run controls
+
+- Added shared `ClockRunButton.svelte` while editing clocks: below the game clock and above the play clock. Matching compact stop/play icons set independently inherited `AnimationStep.clocks.game/play` commands at the selected step marker. These commands participate in existing history, save, duplication, and document validation.
+- Pure `evaluateAnimationClockControl` integrates only running intervals for deterministic browser/export countdown. The play clock retains its automatic football stop; a later explicit Start command can resume it. Editor controls remain outside export artwork and disappear on blur/outside editing.
+- Verification: 87 unit tests passed (one optional FFmpeg test skipped), including independent stop/resume integration, snap-stop override, round-trip persistence, and invalid-command rejection. Chrome verified edit-only controls and both clocks freezing at the selected step; Svelte/TypeScript passed with zero errors and warnings.

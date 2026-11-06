@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, createWriteStream } from 'node:fs';
 import { once } from 'node:events';
 import { spawn } from 'node:child_process';
 import { Resvg } from '@resvg/resvg-js';
-import { animationDuration, evaluateAnimation, evaluateAnimationClock, firstBallMovementTime } from '../play-builder-animation';
+import { animationDuration, evaluateAnimation, evaluateAnimationClock, firstBallMovementTime, evaluateAnimationClockControl } from '../play-builder-animation';
 import { decodePlayBuilderDocument } from '../play-builder-scene';
 import { renderPlayBuilderDiagramSvg, playBuilderSocialRenderOptions } from './play-builder-social-image';
 
@@ -62,13 +62,15 @@ export async function renderVideo(input: string, output: string, progressPath: s
 			if (encoderError) throw encoderError;
 			const time = Math.min(duration, i / 30);
 			const scene = evaluateAnimation(active, time);
-			const clock = evaluateAnimationClock(active.settings.gameClockSeconds, time);
+			const gameControl=evaluateAnimationClockControl(active.animation,time,'game');
+   const playControl=evaluateAnimationClockControl(active.animation,time,'play',snapTime);
+   const clock = evaluateAnimationClock(active.settings.gameClockSeconds, gameControl.elapsed);
 			const svg = renderPlayBuilderDiagramSvg(
 				{
 					activePlayIndex: 0,
 					plays: [{ ...active, animation: undefined, scene, settings: { ...active.settings, gameClockSeconds: clock.seconds } }]
 				},
-				{ clockVisible: clock.visible, playClockSeconds: playBuilderPlayClockSeconds(active.settings.fieldType,Math.min(time,snapTime),active.settings.playClockSeconds) }
+				{ clockVisible: !gameControl.running||clock.visible, playClockSeconds: playBuilderPlayClockSeconds(active.settings.fieldType,playControl.elapsed,active.settings.playClockSeconds) }
 			);
 			const frame = `<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080"><rect width="1920" height="1080" fill="#292524"/><svg x="0" y="75" width="1920" height="930" viewBox="0 0 1000 484">${svg}</svg></svg>`;
 			const png = new Resvg(frame, { font }).render().asPng();

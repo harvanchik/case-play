@@ -176,3 +176,18 @@ test('play clock stops at the first football movement and rewinds deterministica
  await ready(page,'clock-ball');const clock=page.locator('[data-los-marker] [data-play-clock] text');
  await seek(page,1);await expect(clock).toHaveText('24');await seek(page,3);await expect(clock).toHaveText('23');await seek(page,7);await expect(clock).toHaveText('23');await seek(page,0);await expect(clock).toHaveText('25');
 });
+
+
+test('clock run controls appear only while editing and save independent step commands',async({page})=>{
+ await ready(page,'clock');await expect(page.locator('[data-clock-control]')).toHaveCount(0);
+ const play=page.getByRole('textbox',{name:'Play clock seconds',exact:true});await play.click();
+ await page.getByRole('button',{name:'Stop play clock from this step',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Start play clock from this step',exact:true})).toBeVisible();
+ await page.keyboard.press('Tab');await page.keyboard.press('Escape');await seek(page,1.75);await expect(page.locator('[data-play-clock] text')).toHaveText('24');
+ await page.keyboard.press('2');await page.locator('[data-scoreboard-control="clock"]').click();
+ const game=page.getByRole('textbox',{name:'Game clock',exact:true});await game.fill('00:10');await game.press('Enter');await page.locator('[data-scoreboard-control="clock"]').click();
+ await page.getByRole('button',{name:'Stop game clock from this step',exact:true}).click();await expect(page.getByRole('button',{name:'Start game clock from this step',exact:true})).toBeVisible();
+ await game.press('Enter');await expect(page.locator('[data-clock-control]')).toHaveCount(0);
+ await seek(page,1.75);await expect(page.locator('[data-game-clock]')).toHaveText('00:09');
+ await page.keyboard.press('1');await expect(page.locator('[data-play-clock] text')).toHaveText('25');await expect(page.locator('[data-game-clock]')).toHaveText('00:10');
+});

@@ -7,7 +7,7 @@ export const MAX_ANIMATION_SECONDS = 60;
 export const MAX_ANIMATION_STEPS = 61;
 export type AnimationTarget = { type: 'marker' | 'guide' | 'path'; id: number };
 export type AnimationPose = AnimationTarget & Point & { visible: boolean; color?: GuideColor; animationColor?: string; colorFrom?: GuideColor; colorMix?: number; end?:Point; points?:Point[]; down?: DownMarkerValue; animationScale?: number; animationOpacity?: number; animationLabelOpacity?:number; animationReveal?:number; animationShadow?:Point & {scale?:number}; label?: string | null; name?: string | null; carrierId?: number; offset?: Point };
-export type AnimationStep = { id: string; name: string; poses: AnimationPose[]; strokeIds?: number[]; strokeOffsets?: { id: number; x: number; y: number; color?: GuideColor }[] };
+export type AnimationStep = { id: string; name: string; poses: AnimationPose[]; clocks?: { game?: boolean; play?: boolean }; strokeIds?: number[]; strokeOffsets?: { id: number; x: number; y: number; color?: GuideColor }[] };
 export type Motion = AnimationTarget & {
 	path: 'straight' | 'curve' | 'custom' | 'jump' | 'draw';
 	speed?: number;
@@ -450,6 +450,7 @@ export const validateAnimation = (value: unknown, scene: PlayBuilderScene): Play
 			(step.poses.length > registry.size || step.poses.filter(pose=>pose?.type!=='path').length!==scene.markers.length+scene.guides.length)
 		)
 			return invalid();
+        if(step.clocks!==undefined&&(!step.clocks||typeof step.clocks!=='object'||Array.isArray(step.clocks)||Object.entries(step.clocks).some(([key,value])=>!['game','play'].includes(key)||typeof value!=='boolean')))return invalid();
         if(step.strokeOffsets!==undefined && (!Array.isArray(step.strokeOffsets)||step.strokeOffsets.length>scene.freeStrokes.length||new Set(step.strokeOffsets.map(item=>item?.id)).size!==step.strokeOffsets.length||!step.strokeOffsets.every(item=>item&&scene.freeStrokes.some(stroke=>stroke.id===item.id)&&finite(item.x)&&finite(item.y)&&(item.color===undefined||['red','orange','yellow','green','cyan','blue','purple','white','gray','black'].includes(item.color)))))return invalid();
 		if(step.strokeIds!==undefined && (!Array.isArray(step.strokeIds)||step.strokeIds.length>scene.freeStrokes.length||new Set(step.strokeIds).size!==step.strokeIds.length||!step.strokeIds.every(id=>scene.freeStrokes.some(stroke=>stroke.id===id))))return invalid();
 		ids.add(step.id);
@@ -562,4 +563,23 @@ export function firstBallMovementTime(scene: PlayBuilderScene, animation?: PlayA
   elapsed+=transition.duration;
  }
  return Infinity;
+}
+
+
+/** Integrate only running clock intervals; step commands persist until superseded. */
+export function evaluateAnimationClockControl(animation: PlayAnimation | undefined, time: number, kind: 'game'|'play', automaticStop = Infinity) {
+ const end=Math.max(0,Number.isFinite(time)?time:0);
+ const events:{time:number;running:boolean}[]=[];
+ let at=0;
+ for(let index=0;index<(animation?.steps.length??0);index++){
+  const value=animation!.steps[index].clocks?.[kind];
+  if(value!==undefined)events.push({time:at,running:value});
+  at+=animation!.transitions[index]?.duration??0;
+ }
+ if(Number.isFinite(automaticStop))events.push({time:automaticStop,running:false});
+ events.sort((a,b)=>a.time-b.time);
+ let elapsed=0,last=0,running=true;
+ for(const event of events){if(event.time>end)break;if(running)elapsed+=event.time-last;last=event.time;running=event.running;}
+ if(running)elapsed+=end-last;
+ return {elapsed,running};
 }
